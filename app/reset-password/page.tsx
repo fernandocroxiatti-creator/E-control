@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { updatePasswordAction } from "@/app/actions/auth";
 import { AuthForm } from "@/app/components/auth-form";
 import { createClient } from "@/lib/supabase/server";
@@ -12,7 +13,7 @@ export default async function ResetPasswordPage() {
   return (
     <main className="auth-shell">
       <section className="auth-card" aria-labelledby="reset-title">
-        <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">e</span><span>eControll</span></div>
+        <div className="brand-lockup"><Image className="brand-mark brand-mark-image" src="/econtroll-logo.png" width={64} height={64} alt="" aria-hidden="true" /><span>eControll</span></div>
         <p className="eyebrow">Recuperação de acesso</p>
         <h1 id="reset-title">Criar nova senha</h1>
         <p className="auth-description">{user ? "Escolha uma nova senha para sua conta." : "Abra o link de recuperação enviado ao seu e-mail para continuar."}</p>

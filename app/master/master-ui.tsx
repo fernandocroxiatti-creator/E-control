@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { signOutAction } from "@/app/actions/auth";
 
 const masterNavigation = [
@@ -61,7 +62,7 @@ export function MasterShell({ email, children }: { email: string; children: Reac
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <Link className={`master-brand${compact ? " is-compact" : ""}`} href="/master" aria-label="eControll Admin Master, início">
-      <span className="master-brand-mark" aria-hidden="true">e</span>
+      <Image className="master-brand-mark" src="/econtroll-logo.png" width={64} height={64} alt="" aria-hidden="true" />
       <span className="master-brand-name">eControll<small>ADMIN MASTER</small></span>
     </Link>
   );

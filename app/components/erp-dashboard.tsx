@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { signOutAction } from "@/app/actions/auth";
 
 type ModuleItem = {
@@ -83,7 +84,7 @@ export function ErpDashboard({ email, passwordUpdated = false, activeSection = "
 
       <aside className={`erp-sidebar${menuOpen ? " is-open" : ""}`} aria-label="Navegação principal">
         <a className="erp-brand" href="/dashboard" aria-label="eControll, visão geral">
-          <span className="brand-mark" aria-hidden="true">e</span>
+          <Image className="brand-mark brand-mark-image" src="/econtroll-logo.png" width={64} height={64} alt="" aria-hidden="true" />
           <span className="brand-wordmark">eControll<small>ERP · Gestão integrada</small></span>
         </a>
 
@@ -123,7 +124,7 @@ export function ErpDashboard({ email, passwordUpdated = false, activeSection = "
           <button className="mobile-menu-button" type="button" aria-label={menuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
             <Icon name={menuOpen ? "close" : "menu"} />
           </button>
-          <div className="topbar-brand-mobile"><span className="brand-mark" aria-hidden="true">e</span><span>eControll</span></div>
+          <div className="topbar-brand-mobile"><Image className="brand-mark brand-mark-image" src="/econtroll-logo.png" width={64} height={64} alt="" aria-hidden="true" /><span>eControll</span></div>
 
           <label className="global-search" htmlFor="module-search">
             <Icon name="search" />

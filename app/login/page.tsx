@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { signInAction } from "@/app/actions/auth";
 import { AuthForm } from "@/app/components/auth-form";
 import { safeInternalPath } from "@/lib/supabase/env";
@@ -29,4 +30,4 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   );
 }
 
-function Brand() { return <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">e</span><span>eControll</span></div>; }
+function Brand() { return <div className="brand-lockup"><Image className="brand-mark brand-mark-image" src="/econtroll-logo.png" width={64} height={64} alt="" aria-hidden="true" /><span>eControll</span></div>; }
