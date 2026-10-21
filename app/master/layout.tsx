@@ -2,6 +2,7 @@ import { MasterShell } from "@/app/master/master-ui";
 import { requireMasterUser } from "@/lib/master/authorization";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function MasterLayout({ children }: { children: React.ReactNode }) {
   const user = await requireMasterUser();
