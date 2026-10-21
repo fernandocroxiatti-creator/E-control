@@ -82,13 +82,13 @@ export function ErpDashboard({ email, passwordUpdated = false, activeSection = "
       {menuOpen && <button className="sidebar-scrim" type="button" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
 
       <aside className={`erp-sidebar${menuOpen ? " is-open" : ""}`} aria-label="Navegação principal">
-        <a className="erp-brand" href="/dashboard" aria-label="eControl, visão geral">
+        <a className="erp-brand" href="/dashboard" aria-label="eControll, visão geral">
           <span className="brand-mark" aria-hidden="true">e</span>
-          <span className="brand-wordmark">eControl<small>ERP · Gestão integrada</small></span>
+          <span className="brand-wordmark">eControll<small>ERP · Gestão integrada</small></span>
         </a>
 
         <div className="sidebar-section-label">MENU PRINCIPAL</div>
-        <nav className="module-nav" aria-label="Módulos do eControl">
+        <nav className="module-nav" aria-label="Módulos do eControll">
           {filteredModules.map((item) => (
             <div className="nav-item-wrap" key={item.id}>
               {item.status === "overview" ? (
@@ -123,7 +123,7 @@ export function ErpDashboard({ email, passwordUpdated = false, activeSection = "
           <button className="mobile-menu-button" type="button" aria-label={menuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
             <Icon name={menuOpen ? "close" : "menu"} />
           </button>
-          <div className="topbar-brand-mobile"><span className="brand-mark" aria-hidden="true">e</span><span>eControl</span></div>
+          <div className="topbar-brand-mobile"><span className="brand-mark" aria-hidden="true">e</span><span>eControll</span></div>
 
           <label className="global-search" htmlFor="module-search">
             <Icon name="search" />
@@ -168,7 +168,7 @@ function DashboardOverview() {
         <span className="readiness-status">Acesso operacional bloqueado</span>
       </section>
       <section className="module-overview" aria-labelledby="modules-title">
-        <div className="section-heading"><div><h2 id="modules-title">Áreas de gestão</h2><p>Visão dos módulos planejados para o eControl.</p></div><span className="section-count">{tiles.length} áreas</span></div>
+        <div className="section-heading"><div><h2 id="modules-title">Áreas de gestão</h2><p>Visão dos módulos planejados para o eControll.</p></div><span className="section-count">{tiles.length} áreas</span></div>
         <div className="overview-grid">
           {tiles.map((tile) => (
             <article className="overview-tile" key={tile.title}>
@@ -180,7 +180,7 @@ function DashboardOverview() {
           ))}
         </div>
       </section>
-      <footer className="erp-footer"><span>eControl ERP</span><span>Área de preparação · Nenhum dado operacional carregado</span></footer>
+      <footer className="erp-footer"><span>eControll ERP</span><span>Área de preparação · Nenhum dado operacional carregado</span></footer>
     </>
   );
 }

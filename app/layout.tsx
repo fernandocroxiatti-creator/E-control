@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "eControl",
-  description: "Estrutura inicial do eControl.",
+  title: "eControll",
+  description: "Estrutura inicial do eControll.",
 };
 
 export default function RootLayout({

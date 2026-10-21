@@ -18,15 +18,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <Brand />
         <p className="eyebrow">Gestão integrada</p>
         <h1 id="login-title">Acesse sua conta</h1>
-        <p className="auth-description">Entre no eControl para continuar.</p>
+        <p className="auth-description">Entre no eControll para continuar.</p>
         {auth === "callback-error" && <p className="form-message error" role="alert">O link de acesso expirou ou não é válido. Solicite uma nova recuperação de senha.</p>}
         <AuthForm action={signInAction} mode="login" next={safeInternalPath(next)} />
         <div className="auth-links"><Link href="/forgot-password">Esqueci minha senha</Link></div>
         <p className="auth-note">O acesso é disponibilizado pela administração do sistema.</p>
       </section>
-      <footer className="page-footer">eControl · Ambiente de acesso</footer>
+      <footer className="page-footer">eControll · Ambiente de acesso</footer>
     </main>
   );
 }
 
-function Brand() { return <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">e</span><span>eControl</span></div>; }
+function Brand() { return <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">e</span><span>eControll</span></div>; }

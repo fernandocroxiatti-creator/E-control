@@ -157,4 +157,4 @@ function CompanyRows() {
 function BranchRows() {
   return <div className="companies-table-wrap"><table className="companies-table"><caption className="visually-hidden">Filiais cadastradas</caption><thead><tr><th>Unidade</th><th>Código</th><th>Tipo</th><th>Situação</th><th>Ações</th></tr></thead><tbody><tr><td colSpan={5}>A lista de filiais reais será conectada após a seleção de uma empresa autorizada.</td></tr></tbody></table></div>;
 }
-function WorkspaceFootnote() { return <footer className="erp-footer"><span>eControl ERP</span><span>Área de preparação · Sem consulta ou gravação de dados empresariais</span></footer>; }
+function WorkspaceFootnote() { return <footer className="erp-footer"><span>eControll ERP</span><span>Área de preparação · Sem consulta ou gravação de dados empresariais</span></footer>; }

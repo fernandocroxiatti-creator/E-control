@@ -12,6 +12,16 @@ Estas instruções aplicam-se às próximas tarefas do Codex neste repositório.
 6. Acompanhar o deploy automático da Vercel, verificar seu resultado e conferir as rotas e funções alteradas. Se o deploy não puder ser verificado, declarar isso claramente.
 7. Encerrar com um relatório do escopo, commit, validações, deploy, verificações funcionais e pendências.
 
+## Publicação automática de funcionalidades comuns
+
+- Para funcionalidades comuns concluídas e autorizadas, executar lint, TypeScript, build e os testes aplicáveis antes de publicar.
+- Se todas as verificações passarem, não houver segredos nem alterações inesperadas e a branch remota estiver sem divergência, criar o commit da etapa e publicar pelo fluxo GitHub → Vercel.
+- Não publicar código incompleto. Qualquer falha de teste, segredo, alteração inesperada ou conflito interrompe o envio e deve ser informado ao proprietário.
+- Alterações de migrations, RLS, Auth, privilégios, credenciais e mecanismos administrativos sensíveis exigem aprovação específica para publicação. A autorização de publicação não autoriza aplicar migrations nem executar concessões Master.
+- Nunca executar concessões Master automaticamente; cada concessão exige autorização expressa e procedimento próprio.
+- Preservar o isolamento entre empresas e não liberar operações empresariais reais antes da aprovação de G1.
+- Se surgir bloqueio de segurança, interromper o deploy e informar o proprietário.
+
 ## Repositórios e publicação
 
 - O código oficial é publicado em `https://github.com/fernandocroxiatti-creator/E-control.git`; a Vercel associada é `https://e-control-delta.vercel.app`.

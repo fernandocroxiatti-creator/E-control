@@ -8,7 +8,7 @@ export default function DashboardLoading() {
         <div className="loading-banner" />
         <div className="loading-grid">{Array.from({ length: 7 }, (_, index) => <div className="loading-tile" key={index} />)}</div>
       </section>
-      <p className="visually-hidden" role="status">Carregando o painel do eControl.</p>
+      <p className="visually-hidden" role="status">Carregando o painel do eControll.</p>
     </main>
   );
 }

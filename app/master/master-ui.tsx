@@ -52,7 +52,7 @@ export function MasterShell({ email, children }: { email: string; children: Reac
           </div>
         </header>
         <main id="master-main" className="master-content">{children}</main>
-        <footer className="master-footer"><span>eControl · Administração SaaS</span><span>Operações administrativas indisponíveis nesta etapa</span></footer>
+        <footer className="master-footer"><span>eControll · Administração SaaS</span><span>Operações administrativas indisponíveis nesta etapa</span></footer>
       </div>
     </div>
   );
@@ -60,9 +60,9 @@ export function MasterShell({ email, children }: { email: string; children: Reac
 
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <Link className={`master-brand${compact ? " is-compact" : ""}`} href="/master" aria-label="eControl Admin Master, início">
+    <Link className={`master-brand${compact ? " is-compact" : ""}`} href="/master" aria-label="eControll Admin Master, início">
       <span className="master-brand-mark" aria-hidden="true">e</span>
-      <span className="master-brand-name">eControl<small>ADMIN MASTER</small></span>
+      <span className="master-brand-name">eControll<small>ADMIN MASTER</small></span>
     </Link>
   );
 }
@@ -93,7 +93,7 @@ export function MasterDashboard() {
   return (
     <>
       <div className="master-heading-row">
-        <div><p className="master-eyebrow">ADMINISTRAÇÃO SAAS</p><h1>Painel Admin Master</h1><p className="master-subtitle">Visão administrativa do eControl.</p></div>
+        <div><p className="master-eyebrow">ADMINISTRAÇÃO SAAS</p><h1>Painel Admin Master</h1><p className="master-subtitle">Visão administrativa do eControll.</p></div>
         <span className="master-status"><span className="master-dot" /> Interface sem operações</span>
       </div>
       <section className="master-notice" aria-labelledby="master-ready-title">
