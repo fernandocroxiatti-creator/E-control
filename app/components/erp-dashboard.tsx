@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { signOutAction } from "@/app/actions/auth";
+import { lookupTransactionCode } from "@/app/actions/transaction-lookup";
+import type { AuthorizedTransactionContext } from "@/lib/companies/authorized-transaction-context";
 
 type ModuleItem = {
   id: string;
@@ -25,10 +27,6 @@ const modules: ModuleItem[] = [
   { id: "settings", label: "Configurações", icon: "settings", status: "development" },
 ];
 
-const transactions: Record<string, string> = {
-  ME21N: "Criar pedido de compra",
-};
-
 const tiles = [
   { title: "Empresas", icon: "building" },
   { title: "Filiais", icon: "building" },
@@ -39,11 +37,14 @@ const tiles = [
   { title: "Relatórios", icon: "chart" },
 ];
 
-export function ErpDashboard({ email, passwordUpdated = false, activeSection = "overview", children }: { email: string; passwordUpdated?: boolean; activeSection?: "overview" | "companies"; children?: React.ReactNode }) {
+export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated = false, activeSection = "overview", transactionContexts = [], children }: { email: string; showMasterAdmin?: boolean; passwordUpdated?: boolean; activeSection?: "overview" | "companies"; transactionContexts?: AuthorizedTransactionContext[]; children?: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [transactionCode, setTransactionCode] = useState("");
   const [transactionMessage, setTransactionMessage] = useState("");
+  const [selectedTenantId, setSelectedTenantId] = useState(transactionContexts[0]?.tenantId ?? "");
+  const [selectedBranchId, setSelectedBranchId] = useState(transactionContexts[0]?.branchId ?? "");
+  const [isTransactionPending, startTransactionTransition] = useTransition();
   const searchInput = useRef<HTMLInputElement>(null);
   const filteredModules = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
@@ -62,7 +63,7 @@ export function ErpDashboard({ email, passwordUpdated = false, activeSection = "
     return () => window.removeEventListener("keydown", focusModuleSearch);
   }, []);
 
-  function handleTransaction(event: React.FormEvent<HTMLFormElement>) {
+  async function handleTransaction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const code = transactionCode.trim().toUpperCase();
     if (!code) {
@@ -70,12 +71,28 @@ export function ErpDashboard({ email, passwordUpdated = false, activeSection = "
       return;
     }
 
-    setTransactionMessage(
-      transactions[code]
-        ? `${code} — ${transactions[code]}. Transação não autorizada ou indisponível neste ambiente.`
-        : "Transação não encontrada.",
-    );
+    if (!selectedTenantId || !selectedBranchId) {
+      setTransactionMessage("Selecione uma empresa e uma filial autorizadas para consultar a transação.");
+      return;
+    }
+    startTransactionTransition(async () => {
+      try {
+        const result = await lookupTransactionCode(code, selectedTenantId, selectedBranchId);
+        setTransactionMessage(result.status === "authorized"
+          ? `${code}: autorização confirmada para o contexto selecionado; a transação ainda não possui uma rotina operacional publicada.`
+          : result.status === "denied" ? "Acesso negado para esta transação, empresa ou filial."
+            : result.status === "context_required" ? "Selecione uma empresa e uma filial autorizadas."
+              : result.status === "unknown" ? "Transação não encontrada."
+                : result.status === "invalid" ? "Código de transação inválido."
+                  : "Não foi possível verificar a autorização. O acesso permanece negado.");
+      } catch {
+        setTransactionMessage("Não foi possível verificar a autorização. O acesso permanece negado.");
+      }
+    });
   }
+
+  const availableCompanies = [...new Map(transactionContexts.map((context) => [context.tenantId, context.companyName])).entries()];
+  const availableBranches = transactionContexts.filter((context) => context.tenantId === selectedTenantId);
 
   return (
     <div className="erp-shell">
@@ -134,16 +151,32 @@ export function ErpDashboard({ email, passwordUpdated = false, activeSection = "
 
           <form className="transaction-search" onSubmit={handleTransaction}>
             <label htmlFor="transaction-code">Acesso rápido</label>
+            <div className="transaction-context-selects">
+              <select aria-label="Empresa para autorização de transação" value={selectedTenantId} onChange={(event) => {
+                const tenantId = event.target.value;
+                const firstBranch = transactionContexts.find((context) => context.tenantId === tenantId);
+                setSelectedTenantId(tenantId);
+                setSelectedBranchId(firstBranch?.branchId ?? "");
+              }} disabled={availableCompanies.length === 0}>
+                <option value="">Empresa</option>{availableCompanies.map(([tenantId, companyName]) => <option key={tenantId} value={tenantId}>{companyName}</option>)}
+              </select>
+              <select aria-label="Filial para autorização de transação" value={selectedBranchId} onChange={(event) => setSelectedBranchId(event.target.value)} disabled={availableBranches.length === 0}>
+                <option value="">Filial</option>{availableBranches.map((context) => <option key={context.branchId} value={context.branchId}>{context.branchCode} · {context.branchName}</option>)}
+              </select>
+            </div>
             <div className="transaction-input-wrap">
               <input id="transaction-code" type="text" autoCapitalize="characters" autoComplete="off" spellCheck={false} maxLength={20} placeholder="Código · ex. ME21N" value={transactionCode} onChange={(event) => setTransactionCode(event.target.value)} aria-describedby="transaction-result" />
-              <button type="submit" aria-label="Pesquisar código de transação"><Icon name="arrow" /></button>
+              <button type="submit" aria-label="Pesquisar código de transação" disabled={isTransactionPending || availableCompanies.length === 0}><Icon name="arrow" /></button>
             </div>
           </form>
 
-          <div className="topbar-user" title={email} aria-label={`Usuário autenticado: ${email}`}>
-            <span className="user-avatar" aria-hidden="true">{email.charAt(0).toLocaleUpperCase("pt-BR") || "U"}</span>
-            <span className="topbar-user-email">{email}</span>
-          </div>
+          <details className="topbar-account-menu">
+            <summary className="topbar-user" aria-label="Menu da conta">
+              <span className="user-avatar" aria-hidden="true">{email.charAt(0).toLocaleUpperCase("pt-BR") || "U"}</span>
+              <span className="topbar-user-email">{email}</span>
+            </summary>
+            {showMasterAdmin && <nav className="account-menu-items" aria-label="Opções da conta"><a href="/master">Admin Master</a></nav>}
+          </details>
         </header>
 
         <main id="main-content" className="erp-content">

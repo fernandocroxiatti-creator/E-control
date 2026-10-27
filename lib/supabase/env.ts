@@ -1,17 +1,21 @@
+import {
+  getHomologationSiteUrl,
+  getProductionSiteUrl,
+  resolveSupabaseEnv,
+} from "./homologation-env";
+
 export function getSupabaseEnv() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-  if (!url || !publishableKey) {
-    return null;
-  }
-
-  return { url, publishableKey };
+  return resolveSupabaseEnv(process.env);
 }
 
 export function getSiteUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  return configuredUrl ? new URL(configuredUrl) : new URL("http://localhost:3000");
+  const target = resolveSupabaseEnv(process.env);
+  if (target?.target === "homologation") return getHomologationSiteUrl(process.env);
+  if (target?.target === "production") {
+    const url = getProductionSiteUrl(process.env);
+    if (url) return url;
+  }
+  throw new Error("Supabase target or site URL is not explicitly configured.");
 }
 
 export function safeInternalPath(value: string | null | undefined, fallback = "/dashboard") {

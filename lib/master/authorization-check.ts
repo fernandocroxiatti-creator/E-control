@@ -1,3 +1,5 @@
+import { isAuthSessionMissingError } from "@supabase/supabase-js";
+
 type MasterUser = {
   id: string;
   email?: string;
@@ -19,7 +21,18 @@ type MasterAuthorizationClient = {
 export type MasterAuthorizationResult =
   | { status: "unauthenticated" }
   | { status: "denied" }
+  | { status: "unavailable" }
   | { status: "authorized"; user: MasterUser };
+
+/** Checks the current authenticated Supabase client without trusting browser state. */
+export async function isCurrentSessionMaster(client: Pick<MasterAuthorizationClient, "rpc">): Promise<boolean> {
+  try {
+    const authorization = await client.rpc("is_current_user_master");
+    return !authorization.error && authorization.data === true;
+  } catch {
+    return false;
+  }
+}
 
 /** Resolve Master access using only the current server-side Auth session and RPC. */
 export async function checkMasterAuthorization(
@@ -29,19 +42,22 @@ export async function checkMasterAuthorization(
 
   try {
     authResult = await client.auth.getUser();
-  } catch {
-    return { status: "unauthenticated" };
+  } catch (error) {
+    return { status: isAuthSessionMissingError(error) ? "unauthenticated" : "unavailable" };
   }
 
   const { data, error } = authResult;
-  if (error || !data.user) return { status: "unauthenticated" };
+  if (error) return { status: isAuthSessionMissingError(error) ? "unauthenticated" : "unavailable" };
+  if (!data.user) return { status: "unauthenticated" };
 
+  let authorization: Awaited<ReturnType<MasterAuthorizationClient["rpc"]>>;
   try {
-    const authorization = await client.rpc("is_current_user_master");
-    if (authorization.error || authorization.data !== true) return { status: "denied" };
+    authorization = await client.rpc("is_current_user_master");
   } catch {
-    return { status: "denied" };
+    return { status: "unavailable" };
   }
+  if (authorization.error) return { status: "unavailable" };
+  if (authorization.data !== true) return { status: "denied" };
 
   return { status: "authorized", user: data.user };
 }

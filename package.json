@@ -4,11 +4,23 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:hml": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/dev-homologation.mjs",
+    "dev:admin-master-v2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/dev-admin-master-v2-integration.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:master-auth": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/master-authorization.test.mjs"
+    "test:master-auth": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/master-authorization.test.mjs",
+    "test:master-company": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/master-company-creation.test.mjs",
+    "test:branch-validation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/branch-validation.test.mjs",
+    "test:company-authorization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-authorization-migration.test.mjs",
+    "test:company-admin-invitation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-admin-invitation-preparation.test.mjs",
+    "test:company-admin-invitation-flow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-admin-invitation.test.mjs",
+    "test:company-role-permissions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-role-permission-foundation.test.mjs",
+    "test:company-authorization-compatibility": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-authorization-compatibility.test.mjs",
+    "test:homologation-env": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/homologation-env.test.mjs",
+    "test:master-v1-read": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/master-v1-read-and-transactions.test.mjs",
+    "test:master-v2": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/master-admin-v2.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

@@ -1,5 +1,2 @@
-import { MasterSection } from "@/app/master/master-ui";
-
-export default function MasterRequestsPage() {
-  return <MasterSection title="Solicitações de ampliação" description="Solicitações futuras de aumento de limites e capacidade contratada." />;
-}
+import { PreparedCapability } from "@/app/master/master-data-ui";
+export default function MasterRequestsPage() { return <PreparedCapability title="Solicitações" description="Fila administrativa para pedidos de suporte e alterações de serviço." reason="Ainda não existe modelo persistente de solicitações nem fluxo de aprovação. A tela não aceita nem armazena pedidos." />; }

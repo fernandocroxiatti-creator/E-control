@@ -1,5 +1,5 @@
-import { MasterSection } from "@/app/master/master-ui";
+import { PreparedCapability } from "@/app/master/master-data-ui";
 
 export default function MasterSettingsPage() {
-  return <MasterSection title="Configurações SaaS" description="Parâmetros globais do serviço, ainda sem configuração operacional nesta interface." actionLabel="Editar configurações" />;
+  return <PreparedCapability title="Configurações SaaS" description="Parâmetros globais do serviço." reason="Chaves, URLs de autenticação, políticas e limites não são expostos nem editáveis pelo painel. Alterações de ambiente exigem operação revisada fora da aplicação." />;
 }

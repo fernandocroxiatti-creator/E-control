@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isValidCnpj, validateBranchDraft } from "@/lib/companies/branch-validation";
 
 type WorkspaceView = "companies" | "new-company" | "branches" | "new-branch";
 
@@ -13,19 +14,6 @@ function digits(value: string) {
 
 function formatCnpj(value: string) {
   return digits(value).slice(0, 14).replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
-}
-
-function isValidCnpj(value: string) {
-  const valueDigits = digits(value);
-  if (valueDigits.length !== 14 || /^(\d)\1{13}$/.test(valueDigits)) return false;
-  const calculate = (base: string, weights: number[]) => {
-    const sum = [...base].reduce((total, digit, index) => total + Number(digit) * weights[index], 0);
-    const remainder = sum % 11;
-    return remainder < 2 ? 0 : 11 - remainder;
-  };
-  const first = calculate(valueDigits.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
-  const second = calculate(valueDigits.slice(0, 12) + first, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
-  return valueDigits.endsWith(`${first}${second}`);
 }
 
 function formatPhone(value: string) {
@@ -60,6 +48,20 @@ export function CompaniesWorkspace({ view }: { view: WorkspaceView }) {
     setFormError("");
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
+    if (isBranchForm) {
+      const formData = new FormData(form);
+      const validation = validateBranchDraft({
+        name: String(formData.get("branch_name") ?? ""),
+        code: String(formData.get("branch_code") ?? ""),
+        cnpj,
+      });
+      if (!validation.valid) {
+        setFormError(validation.message);
+        return;
+      }
+      setMessage("Dados da filial válidos localmente. A gravação permanece bloqueada até existir autorização empresarial persistente e um caminho de escrita seguro.");
+      return;
+    }
     if (cnpj && !isValidCnpj(cnpj)) {
       setFormError("Confira o CNPJ informado. A validação realizada é apenas local.");
       return;
@@ -95,7 +97,7 @@ export function CompaniesWorkspace({ view }: { view: WorkspaceView }) {
         </div>
         <div className="companies-subnav" aria-label="Navegação de empresas e filiais"><a href="/empresas">Empresas</a><a className="is-current" href="/empresas/filiais" aria-current="page">Filiais</a></div>
         <StatusLegend />
-        <div className="selected-company-note"><strong>Empresa selecionada:</strong> nenhuma. A lista depende de uma empresa real e de acesso autorizado.</div>
+        <div className="selected-company-note"><strong>Empresa selecionada:</strong> nenhuma. A listagem real exige autorização persistente de leitura por empresa; esta tela não consulta a Data API nesta etapa.</div>
         {emptyBranches.length === 0 ? <EmptyState title={query ? "Nenhuma filial encontrada" : "Selecione uma empresa autorizada"} detail={query ? "Nenhum registro é consultado nesta etapa." : "Filiais e identificação de matriz serão apresentadas após a seleção de uma empresa real autorizada."} actionLabel="Preparar cadastro de filial" actionHref="/empresas/filiais/nova" /> : <BranchRows />}
         <PendingActions labels={["Detalhes", "Editar"]} />
         <WorkspaceFootnote />
@@ -108,7 +110,7 @@ export function CompaniesWorkspace({ view }: { view: WorkspaceView }) {
           {isBranchForm && <fieldset className="form-section"><legend>Vínculo empresarial</legend><div className="form-grid"><label className="field-label form-field form-field-wide">Empresa vinculada<input disabled value="Selecione uma empresa real e autorizada quando a integração estiver disponível" aria-label="Empresa vinculada" /></label><p className="field-hint form-field-wide">Não há empresas carregadas; não é possível selecionar ou vincular uma empresa nesta etapa.</p></div></fieldset>}
           <fieldset className="form-section"><legend>{isCompanyForm ? "Dados da empresa" : "Identificação da filial"}</legend><div className="form-grid">
             {isCompanyForm && <><Field label="Razão social" required autoComplete="organization" /><Field label="Nome fantasia" autoComplete="organization" /></>}
-            {isBranchForm && <><Field label="Nome da filial" required /><Field label="Código interno" required /></>}
+          {isBranchForm && <><Field label="Nome da filial" name="branch_name" required /><Field label="Código interno" name="branch_code" required /></>}
             <label className="field-label form-field">CNPJ{isBranchForm && <span className="optional-label">quando aplicável</span>}<input inputMode="numeric" autoComplete="off" placeholder="00.000.000/0000-00" value={cnpj} onChange={(event) => setCnpj(formatCnpj(event.target.value))} aria-describedby="cnpj-hint" /></label>
             <Field label="Inscrição estadual" />
             {isCompanyForm && <><Field label="E-mail" type="email" autoComplete="email" /><PhoneField phone={phone} setPhone={setPhone} /></>}
@@ -120,12 +122,18 @@ export function CompaniesWorkspace({ view }: { view: WorkspaceView }) {
             <Field label="Bairro" />
             <Field label="Cidade" autoComplete="address-level2" />
             <label className="field-label form-field">Estado<select defaultValue=""><option value="" disabled>Selecione</option>{["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map((state) => <option key={state}>{state}</option>)}</select></label>
-            {isBranchForm && <label className="field-label form-field">Tipo de unidade<select defaultValue="branch"><option value="headquarters">Matriz</option><option value="branch">Filial</option></select></label>}
+            {isBranchForm && <label className="field-label form-field">Tipo de unidade<input disabled value="Classificação matriz/filial ainda não consta no modelo de dados" /></label>}
             <label className="field-label form-field">Situação cadastral<input disabled value="Não consultada nesta etapa" /></label>
           </div></fieldset>
           {formError && <p className="form-message error" role="alert">{formError}</p>}
           {message && <p className="form-message success" role="status">{message}</p>}
-          <div className="form-actions"><a className="secondary-button" href={isCompanyForm ? "/empresas" : "/empresas/filiais"}>Cancelar</a><button className="primary-button" type="submit">{isCompanyForm ? "Salvar empresa" : "Salvar filial"}</button></div>
+          <div className="form-actions">
+            <a className="secondary-button" href={isCompanyForm ? "/empresas" : "/empresas/filiais"}>Cancelar</a>
+            {isBranchForm && <button className="secondary-button" type="submit">Validar dados localmente</button>}
+            <button className="primary-button" type={isBranchForm ? "button" : "submit"} disabled={isBranchForm} title={isBranchForm ? "A gravação exige autorização persistente e integração segura." : undefined}>
+              {isCompanyForm ? "Salvar empresa" : "Criar filial"}
+            </button>
+          </div>
         </form>
         <WorkspaceFootnote />
       </>}
@@ -133,8 +141,8 @@ export function CompaniesWorkspace({ view }: { view: WorkspaceView }) {
   );
 }
 
-function Field({ label, required = false, type = "text", autoComplete, className = "" }: { label: string; required?: boolean; type?: string; autoComplete?: string; className?: string }) {
-  return <label className={`field-label form-field ${className}`}>{label}<input type={type} required={required} autoComplete={autoComplete} /></label>;
+function Field({ label, name, required = false, type = "text", autoComplete, className = "" }: { label: string; name?: string; required?: boolean; type?: string; autoComplete?: string; className?: string }) {
+  return <label className={`field-label form-field ${className}`}>{label}<input name={name} type={type} required={required} autoComplete={autoComplete} /></label>;
 }
 
 function PhoneField({ phone, setPhone }: { phone: string; setPhone: (value: string) => void }) {

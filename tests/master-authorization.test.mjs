@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { checkMasterAuthorization } from "../lib/master/authorization-check.ts";
+import { checkMasterAuthorization, isCurrentSessionMaster } from "../lib/master/authorization-check.ts";
 
 const projectRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const user = { id: "test-user-id", email: "test@example.invalid" };
@@ -47,7 +47,7 @@ test("allows only an authenticated user when the RPC returns exactly true", asyn
 
 test("denies when the RPC reports an error", async () => {
   const mock = mockClient({ authResult: user, rpcResult: true, rpcError: new Error("denied") });
-  assert.deepEqual(await checkMasterAuthorization(mock.client), { status: "denied" });
+  assert.deepEqual(await checkMasterAuthorization(mock.client), { status: "unavailable" });
 });
 
 test("denies unexpected truthy RPC values", async () => {
@@ -59,16 +59,41 @@ test("denies unexpected truthy RPC values", async () => {
 
 test("fails closed when authentication or the RPC throws", async () => {
   const authFailure = mockClient({ authThrows: true });
-  assert.deepEqual(await checkMasterAuthorization(authFailure.client), { status: "unauthenticated" });
+  assert.deepEqual(await checkMasterAuthorization(authFailure.client), { status: "unavailable" });
 
   const rpcFailure = mockClient({ authResult: user, rpcThrows: true });
-  assert.deepEqual(await checkMasterAuthorization(rpcFailure.client), { status: "denied" });
+  assert.deepEqual(await checkMasterAuthorization(rpcFailure.client), { status: "unavailable" });
+});
+
+test("dashboard Master visibility depends only on an exact successful true RPC result", async () => {
+  assert.equal(await isCurrentSessionMaster({ rpc: async () => ({ data: true, error: null }) }), true);
+  for (const result of [
+    { data: false, error: null },
+    { data: "true", error: null },
+    { data: true, error: new Error("rpc failed") },
+  ]) {
+    assert.equal(await isCurrentSessionMaster({ rpc: async () => result }), false);
+  }
+  assert.equal(await isCurrentSessionMaster({ rpc: async () => { throw new Error("rpc failed"); } }), false);
+});
+
+test("operational account menu receives server authorization and never checks identity in browser storage", () => {
+  const dashboard = readFileSync(join(projectRoot, "app/dashboard/page.tsx"), "utf8");
+  const shell = readFileSync(join(projectRoot, "app/components/erp-dashboard.tsx"), "utf8");
+  assert.match(dashboard, /auth\.getUser\(\)/);
+  assert.match(dashboard, /isCurrentSessionMaster\(supabase\)/);
+  assert.match(dashboard, /showMasterAdmin=\{showMasterAdmin\}/);
+  assert.match(shell, /showMasterAdmin &&[\s\S]*?href="\/master"/);
+  assert.doesNotMatch(shell, /localStorage|sessionStorage|user_metadata|app_metadata/);
+  assert.match(shell, /href="\/master">Admin Master<\/a>/);
 });
 
 test("all Admin Master pages inherit the guarded, uncached server layout", () => {
   const masterRoot = join(projectRoot, "app/master");
   const layout = readFileSync(join(masterRoot, "layout.tsx"), "utf8");
-  assert.match(layout, /requireMasterUser\(\)/);
+  assert.match(layout, /resolveMasterAuthorization\(\)/);
+  assert.match(layout, /authorization\.status === "denied"[\s\S]*?notFound\(\)/);
+  assert.match(layout, /authorization\.status === "unavailable"/);
   assert.match(layout, /dynamic\s*=\s*["']force-dynamic["']/);
   assert.match(layout, /revalidate\s*=\s*0/);
 
@@ -86,9 +111,12 @@ test("all Admin Master pages inherit the guarded, uncached server layout", () =>
     "administradores/page.tsx",
     "auditoria/page.tsx",
     "configuracoes/page.tsx",
+    "empresas/[companyId]/page.tsx",
     "empresas/page.tsx",
+    "filiais/page.tsx",
     "modulos/page.tsx",
     "page.tsx",
+    "permissoes/page.tsx",
     "planos/page.tsx",
     "solicitacoes/page.tsx",
     "suporte/page.tsx",
