@@ -218,9 +218,11 @@ export async function getMasterCompanyInvitationsEnabled(): Promise<boolean> {
   }
 }
 
-export async function getMasterCompaniesV2(search: string | null, status: string | null): Promise<ReadResult<MasterCompanyV2[]>> {
+export async function getMasterCompaniesV2(
+  search: string | null, status: string | null, limit = 100, offset = 0,
+): Promise<ReadResult<MasterCompanyV2[]>> {
   const result = await invokeMasterRead<unknown>("master_admin_list_companies_v2", {
-    p_search: search, p_status: status, p_limit: 100, p_offset: 0,
+    p_search: search, p_status: status, p_limit: limit, p_offset: offset,
   });
   return result.status === "ready" && isArrayOfRecords<MasterCompanyV2>(result.data,
     ["company_id", "legal_name", "trade_name", "cnpj", "contact_email", "contact_phone", "status", "created_at", "branch_count", "active_membership_count"])

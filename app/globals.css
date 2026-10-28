@@ -425,3 +425,5 @@ h1{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;font-size:clamp(1.8re
 .form-actions .primary-button,.form-actions .secondary-button{min-height:2.7rem;margin:0;font-size:.78rem}
 @media(max-width:680px){.companies-toolbar{flex-wrap:wrap}.companies-search{flex-basis:100%}.companies-toolbar select{flex:1}.companies-action{flex:none}.form-section{padding:1rem}.form-grid{grid-template-columns:1fr;gap:.85rem}.form-field-wide{grid-column:auto}.companies-empty{min-height:15rem;padding:1.4rem}}
 @media(max-width:380px){.companies-toolbar select{font-size:.7rem}.companies-action{padding:.65rem .7rem;font-size:.73rem}.form-actions{flex-direction:column-reverse}.form-actions>*{width:100%}}
+
+.master-pagination{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:.75rem;margin-top:1rem;color:#53665d;font-size:.72rem}.master-pagination>a:last-child{text-align:right}

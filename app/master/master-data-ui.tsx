@@ -45,6 +45,15 @@ export function AuditTable({ rows }: { rows: MasterAuditItem[] }) {
   return <div className="master-table-wrap" role="region" aria-label="Tabela de auditoria" tabIndex={0}><table className="master-table master-table--audit"><thead><tr><th>Origem</th><th>Evento</th><th>Data</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.event_source}:${row.event_key}:${row.created_at}:${index}`}><td>{row.event_source === "master" ? "Admin Master" : "Provisionamento"}</td><td><code>{row.event_key}</code></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div>;
 }
 
+export function PaginationControls({ page, hasNext, hrefForPage }: { page: number; hasNext: boolean; hrefForPage: (targetPage: number) => string }) {
+  if (page === 1 && !hasNext) return null;
+  return <nav className="master-pagination" aria-label="Paginação">
+    {page > 1 ? <Link className="master-row-link" href={hrefForPage(page - 1)}>← Anterior</Link> : <span aria-hidden="true" />}
+    <span>Página {page}</span>
+    {hasNext ? <Link className="master-row-link" href={hrefForPage(page + 1)}>Próxima →</Link> : <span aria-hidden="true" />}
+  </nav>;
+}
+
 export function DataPanel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return <section className="master-data-panel"><header><div><h2>{title}</h2>{description && <p>{description}</p>}</div></header>{children}</section>;
 }
