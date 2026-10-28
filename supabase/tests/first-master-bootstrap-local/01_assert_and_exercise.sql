@@ -52,6 +52,20 @@ end;
 $disabled$;
 reset role;
 
+set role authenticated;
+reset request.jwt.claim.sub;
+reset request.jwt.claim.role;
+do $no_session$
+begin
+  begin
+    perform public.bootstrap_first_master();
+    raise exception 'Missing synthetic Auth session granted Master';
+  exception when sqlstate '28000' then null;
+  end;
+end;
+$no_session$;
+reset role;
+
 -- Simulates only the separately approved private authorization action in this disposable DB.
 insert into app_private.first_master_bootstrap_authorization (
   target_user_id, approval_reference, authorization_reason, enabled, enabled_at
