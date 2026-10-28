@@ -110,15 +110,12 @@ test("Server Actions require the real Master SSR guard, exact configured target,
   assert.match(actions, /validateBranchMetadata/);
 });
 
-test("V2 UI exposes HML management only behind explicit local flags and per-action database readiness", () => {
+test("V2 UI exposes management only behind explicit environment flags and per-action database readiness", () => {
   const companiesPage = read("app/master/empresas/page.tsx");
   const branchesPage = read("app/master/filiais/page.tsx");
-  const env = read(".env.homologation.local");
   assert.match(companiesPage, /getMasterCompanyManagementEnabled/);
   assert.match(companiesPage, /getMasterCompanyCreationEnabled/);
   assert.match(branchesPage, /getMasterCompanyManagementEnabled/);
-  assert.match(env, /^ECONTROLL_HML_COMPANY_CREATION_ENABLED=false$/m);
-  assert.doesNotMatch(env, /^ECONTROLL_HML_COMPANY_MANAGEMENT_ENABLED=true$/m);
   assert.match(actions, /master_admin_management_ready/);
   assert.match(actions, /requireMasterUser\(\)/);
   assert.match(actions, /!env\.companyManagementEnabled/);

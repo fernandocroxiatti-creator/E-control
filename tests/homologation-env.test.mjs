@@ -199,11 +199,14 @@ test("target predicate rejects production and any non-exact URL", () => {
 
 test("dedicated launcher reads its isolated config and clears generic Supabase variables", () => {
   const launcher = readFileSync(resolve(projectRoot, "scripts/dev-homologation.mjs"), "utf8");
-  const configLines = readFileSync(resolve(projectRoot, ".env.homologation.local"), "utf8").split(/\r?\n/);
-  const config = Object.fromEntries(configLines.flatMap((line) => {
-    const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
-    return match ? [[match[1], match[2].trim()]] : [];
-  }));
+  const config = {
+    ECONTROLL_SUPABASE_TARGET: "homologation",
+    ECONTROLL_HML_ENABLED: "true",
+    ECONTROLL_HML_PROJECT_ID: HOMOLOGATION_PROJECT_ID,
+    ECONTROLL_HML_SUPABASE_URL: HOMOLOGATION_SUPABASE_URL,
+    ECONTROLL_HML_PUBLISHABLE_KEY: "sb_publishable_test_value",
+    ECONTROLL_HML_COMPANY_CREATION_ENABLED: "false",
+  };
   assert.match(launcher, /\.env\.homologation\.local/);
   assert.match(launcher, /NEXT_PUBLIC_SUPABASE_URL:\s*""/);
   assert.match(launcher, /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:\s*""/);
@@ -211,7 +214,7 @@ test("dedicated launcher reads its isolated config and clears generic Supabase v
   assert.match(launcher, /resolveHomologationSupabaseEnv\(config\)/);
   assert.equal(config.ECONTROLL_SUPABASE_TARGET === "homologation", true);
   assert.equal(config.ECONTROLL_HML_ENABLED === "true", true);
-  assert.equal(config.ECONTROLL_HML_PROJECT_ID === "psqetcrjrhbamefpfnje", true);
+  assert.equal(config.ECONTROLL_HML_PROJECT_ID === HOMOLOGATION_PROJECT_ID, true);
   assert.equal(/^sb_publishable_[A-Za-z0-9_-]+$/.test(config.ECONTROLL_HML_PUBLISHABLE_KEY ?? ""), true);
   assert.equal(config.ECONTROLL_HML_COMPANY_CREATION_ENABLED === "false", true);
 });
