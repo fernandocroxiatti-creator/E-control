@@ -14,6 +14,7 @@ export type SupabaseEnvironment = {
   companyCreationEnabled: boolean;
   companyManagementEnabled: boolean;
   companyInvitationsEnabled: boolean;
+  operationalEnabled: boolean;
 };
 
 /** Resolves the isolated local HML configuration. */
@@ -39,6 +40,7 @@ export function resolveHomologationSupabaseEnv(
     companyCreationEnabled: env.ECONTROLL_HML_COMPANY_CREATION_ENABLED === "true",
     companyManagementEnabled: env.ECONTROLL_HML_COMPANY_MANAGEMENT_ENABLED === "true",
     companyInvitationsEnabled: env.ECONTROLL_HML_COMPANY_INVITATIONS_ENABLED === "true",
+    operationalEnabled: env.ECONTROLL_HML_OPERATIONAL_ENABLED === "true",
   };
 }
 
@@ -68,6 +70,7 @@ export function resolvePreviewHomologationSupabaseEnv(
     companyCreationEnabled: false,
     companyManagementEnabled: false,
     companyInvitationsEnabled: false,
+    operationalEnabled: false,
   };
 }
 
@@ -92,6 +95,7 @@ export function resolveProductionSupabaseEnv(env: HomologationEnvironment): Supa
     companyCreationEnabled: env.ECONTROLL_PROD_COMPANY_CREATION_ENABLED === "true",
     companyManagementEnabled: env.ECONTROLL_PROD_COMPANY_MANAGEMENT_ENABLED === "true",
     companyInvitationsEnabled: env.ECONTROLL_PROD_COMPANY_INVITATIONS_ENABLED === "true",
+    operationalEnabled: env.ECONTROLL_PROD_OPERATIONAL_ENABLED === "true",
   };
 }
 

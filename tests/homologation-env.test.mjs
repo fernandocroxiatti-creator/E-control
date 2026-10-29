@@ -37,6 +37,7 @@ test("accepts only the exact explicitly enabled homologation project and a publi
     companyCreationEnabled: false,
     companyManagementEnabled: false,
     companyInvitationsEnabled: false,
+    operationalEnabled: false,
   });
 });
 
@@ -59,6 +60,7 @@ test("accepts only exact explicit production config and keeps writes disabled by
     companyCreationEnabled: false,
     companyManagementEnabled: false,
     companyInvitationsEnabled: false,
+    operationalEnabled: false,
   });
 });
 
@@ -131,6 +133,7 @@ test("Preview can use only standard public variables when they identify exact HM
     companyCreationEnabled: false,
     companyManagementEnabled: false,
     companyInvitationsEnabled: false,
+    operationalEnabled: false,
   });
   assert.equal(resolveSupabaseEnv(previewConfigured)?.projectId, HOMOLOGATION_PROJECT_ID);
   for (const override of [
@@ -158,6 +161,13 @@ test("company and branch management requires its own explicit flag", () => {
     ...configured,
     ECONTROLL_HML_COMPANY_MANAGEMENT_ENABLED: "true",
   })?.companyManagementEnabled, true);
+});
+
+test("operational ERP requires a separate explicit environment flag", () => {
+  assert.equal(resolveHomologationSupabaseEnv(configured)?.operationalEnabled, false);
+  assert.equal(resolveHomologationSupabaseEnv({ ...configured, ECONTROLL_HML_OPERATIONAL_ENABLED: "true" })?.operationalEnabled, true);
+  assert.equal(resolveProductionSupabaseEnv(productionConfigured)?.operationalEnabled, false);
+  assert.equal(resolveProductionSupabaseEnv({ ...productionConfigured, ECONTROLL_PROD_OPERATIONAL_ENABLED: "true" })?.operationalEnabled, true);
 });
 
 test("company invitations require a separate explicit environment flag", () => {

@@ -11,19 +11,21 @@ type ModuleItem = {
   label: string;
   icon: string;
   status: "overview" | "route" | "development";
+  href?: string;
 };
 
 const modules: ModuleItem[] = [
   { id: "overview", label: "Visão geral", icon: "home", status: "overview" },
-  { id: "companies", label: "Empresas e filiais", icon: "building", status: "route" },
-  { id: "inventory", label: "Estoque", icon: "box", status: "development" },
+  { id: "companies", label: "Empresas e filiais", icon: "building", status: "route", href: "/empresas" },
+  { id: "catalog", label: "Cadastros", icon: "clipboard", status: "route", href: "/operacional/cadastros" },
+  { id: "inventory", label: "Estoque", icon: "box", status: "route", href: "/operacional/estoque" },
   { id: "purchases", label: "Compras", icon: "cart", status: "development" },
   { id: "sales", label: "Vendas", icon: "receipt", status: "development" },
   { id: "finance", label: "Financeiro", icon: "wallet", status: "development" },
   { id: "accounting", label: "Contabilidade", icon: "book", status: "development" },
   { id: "reports", label: "Relatórios", icon: "chart", status: "development" },
   { id: "budgets", label: "Orçamentos", icon: "clipboard", status: "development" },
-  { id: "users", label: "Usuários e permissões", icon: "users", status: "development" },
+  { id: "users", label: "Usuários e permissões", icon: "users", status: "route", href: "/operacional/equipe" },
   { id: "settings", label: "Configurações", icon: "settings", status: "development" },
 ];
 
@@ -37,7 +39,7 @@ const tiles = [
   { title: "Relatórios", icon: "chart" },
 ];
 
-export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated = false, activeSection = "overview", transactionContexts = [], children }: { email: string; showMasterAdmin?: boolean; passwordUpdated?: boolean; activeSection?: "overview" | "companies"; transactionContexts?: AuthorizedTransactionContext[]; children?: React.ReactNode }) {
+export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated = false, activeSection = "overview", transactionContexts = [], children }: { email: string; showMasterAdmin?: boolean; passwordUpdated?: boolean; activeSection?: string; transactionContexts?: AuthorizedTransactionContext[]; children?: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [transactionCode, setTransactionCode] = useState("");
@@ -114,7 +116,7 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
                   <Icon name={item.icon} /> <span>{item.label}</span>
                 </a>
               ) : item.status === "route" ? (
-                <a className={`module-link${activeSection === "companies" ? " is-active" : ""}`} href="/empresas" aria-current={activeSection === "companies" ? "page" : undefined} onClick={() => setMenuOpen(false)}>
+                <a className={`module-link${activeSection === item.id ? " is-active" : ""}`} href={item.href ?? "/dashboard"} aria-current={activeSection === item.id ? "page" : undefined} onClick={() => setMenuOpen(false)}>
                   <Icon name={item.icon} /> <span>{item.label}</span>
                 </a>
               ) : (
