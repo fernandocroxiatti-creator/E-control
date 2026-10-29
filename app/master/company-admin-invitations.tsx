@@ -29,8 +29,8 @@ export function CompanyAdminInvitationForm({ companies, enabled }: { companies: 
   </form>;
 }
 
-export function CompanyAdminInvitationTable({ rows, tenantId, enabled }: { rows: CompanyAdminInvitation[]; tenantId: string; enabled: boolean }) {
-  if (!rows.length) return <p className="master-panel-empty">Nenhum convite emitido para esta empresa.</p>;
+export function CompanyAdminInvitationTable({ rows, tenantId, enabled, query = "" }: { rows: CompanyAdminInvitation[]; tenantId: string; enabled: boolean; query?: string }) {
+  if (!rows.length) return <p className="master-panel-empty">{query ? "Nenhum convite corresponde à busca." : "Nenhum convite emitido para esta empresa."}</p>;
   return <>
     {!enabled && <p className="master-notice" role="note">Emissão, revogação, expiração e aceite de convites permanecem desativados neste ambiente. A lista abaixo é somente leitura.</p>}
     {enabled && rows.some((row) => row.status === "expired") && <ExpireInvitations tenantId={tenantId} />}

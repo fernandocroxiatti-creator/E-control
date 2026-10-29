@@ -44,11 +44,18 @@ test("membership and catalog screens retain server-authorized data and do not pr
   const transactions = read("app/master/transacoes/page.tsx");
   assert.match(users, /getMasterMemberships\(empresa\)/);
   assert.match(users, /Buscar nos vínculos visíveis/);
+  assert.match(users, /Buscar nos convites visíveis/);
+  assert.match(users, /filteredInvitations/);
+  assert.match(users, /convite\?: string/);
+  assert.match(users, /o convite de funcionários/);
   assert.match(users, /Nenhum botão de alteração é exibido/);
   assert.match(ui, /Não expostos pela API segura atual/);
   assert.match(ui, /company_owner: "Administrador principal da empresa"/);
   assert.match(ui, /pending_approval: "Pendente de aprovação"/);
+  assert.match(ui, /Nenhum item corresponde à busca/);
   assert.match(permissions, /getMasterAccessCatalog/);
+  assert.match(permissions, /filteredCatalog/);
+  assert.match(permissions, /Buscar no catálogo/);
   assert.match(permissions, /Nenhuma alteração de papel ou concessão é permitida/);
   assert.match(transactions, /Catálogo instalado, consulta Master pendente/);
   assert.doesNotMatch(transactions, /Não há migration de catálogo instalada/);
