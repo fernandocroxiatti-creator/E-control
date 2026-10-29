@@ -92,7 +92,9 @@ export async function revokeCompanyAdminInvitationAction(
   const invitationId = value(formData, "invitation_id");
   if (!UUID.test(invitationId)) return { status: "error", message: "Convite inválido." };
   try {
-    const client = await getInvitationClient();
+    // Revocation changes business state too. It must remain behind the same
+    // explicit Production flag as issuance, rather than merely hiding a UI button.
+    const client = await getInvitationClient(true);
     if (!client) return safeFailure();
     const { data, error } = await client.rpc("master_revoke_company_admin_invitation", {
       p_invitation_id: invitationId,
@@ -112,7 +114,8 @@ export async function expireCompanyAdminInvitationsAction(
   const tenantId = value(formData, "tenant_id");
   if (!UUID.test(tenantId)) return { status: "error", message: "Empresa inválida." };
   try {
-    const client = await getInvitationClient();
+    // Expiration writes audit/state records and is therefore feature-gated.
+    const client = await getInvitationClient(true);
     if (!client) return safeFailure();
     const { data, error } = await client.rpc("master_expire_company_admin_invitations", { p_tenant_id: tenantId });
     if (error || !Number.isSafeInteger(data) || Number(data) < 0) return safeFailure();
@@ -131,7 +134,7 @@ export async function acceptCompanyAdminInvitationAction(
   if (!TOKEN.test(token)) return { status: "rejected", message: "Este convite não é válido ou já não pode ser utilizado." };
   try {
     const env = getSupabaseEnv();
-    if (!env || !isAuthorizedSupabaseTarget(env)) {
+    if (!env || !isAuthorizedSupabaseTarget(env) || !env.companyManagementEnabled || !env.companyInvitationsEnabled) {
       return { status: "error", message: "O ambiente de autenticação não está disponível." };
     }
     const client = await createClient();

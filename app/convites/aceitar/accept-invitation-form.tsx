@@ -8,7 +8,7 @@ import { acceptCompanyAdminInvitationAction, type InvitationAcceptState } from "
 const idle: InvitationAcceptState = { status: "idle" };
 const tokenPattern = /^[0-9a-f]{64}$/;
 
-export function AcceptCompanyAdminInvitationForm({ authenticated }: { authenticated: boolean }) {
+export function AcceptCompanyAdminInvitationForm({ authenticated, enabled }: { authenticated: boolean; enabled: boolean }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(acceptCompanyAdminInvitationAction, idle);
   const tokenInput = useRef<HTMLInputElement>(null);
@@ -30,14 +30,15 @@ export function AcceptCompanyAdminInvitationForm({ authenticated }: { authentica
   return <section className="auth-card invitation-accept-card">
     <p className="eyebrow">Vínculo empresarial</p>
     <h1>Aceitar convite</h1>
+    {!enabled && <div className="form-message error" role="status"><p>Os convites empresariais estão desativados neste ambiente. Nenhum vínculo será criado até a habilitação explícita e segura desta funcionalidade.</p></div>}
     {missingToken && <p className="auth-description" role="alert">O link não contém um convite válido. Abra novamente o link recebido pelo canal de convite.</p>}
-    {!authenticated && <div className="form-message error" role="status"><p>Entre primeiro com a conta que recebeu o convite. O endereço do convite continua nesta aba.</p><Link href="/login?next=%2Fconvites%2Faceitar" target="_blank" rel="noreferrer">Abrir login em outra aba</Link><button className="secondary-button" type="button" onClick={() => router.refresh()}>Já entrei; verificar sessão</button></div>}
-    {authenticated && state.status !== "accepted" && <form action={action} className="auth-form" onSubmit={prepareToken}>
+    {enabled && !authenticated && <div className="form-message error" role="status"><p>Entre primeiro com a conta que recebeu o convite. O endereço do convite continua nesta aba.</p><Link href="/login?next=%2Fconvites%2Faceitar" target="_blank" rel="noreferrer">Abrir login em outra aba</Link><button className="secondary-button" type="button" onClick={() => router.refresh()}>Já entrei; verificar sessão</button></div>}
+    {enabled && authenticated && state.status !== "accepted" && <form action={action} className="auth-form" onSubmit={prepareToken}>
       <p>Ao confirmar, o sistema valida o e-mail confirmado da sessão e vincula somente o papel empresarial autorizado no convite.</p>
       <input ref={tokenInput} type="hidden" name="invitation_token" defaultValue="" />
       <button className="primary-button" type="submit" disabled={pending}>{pending ? "Validando…" : "Confirmar e aceitar convite"}</button>
     </form>}
     {state.message && <p className={`form-message ${state.status === "accepted" ? "success" : "error"}`} role={state.status === "accepted" ? "status" : "alert"}>{state.message}</p>}
-    {state.status === "accepted" && <Link className="primary-button" href="/dashboard">Ir ao painel operacional</Link>}
+    {enabled && state.status === "accepted" && <Link className="primary-button" href="/dashboard">Ir ao painel operacional</Link>}
   </section>;
 }

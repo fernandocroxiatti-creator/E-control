@@ -30,14 +30,14 @@ export function BranchTable({ rows }: { rows: MasterBranch[] }) {
   return <div className="master-table-wrap" role="region" aria-label="Tabela de filiais" tabIndex={0}><table className="master-table master-table--branches"><thead><tr><th>Código</th><th>Filial</th><th>Status</th><th>Criada em</th></tr></thead><tbody>{rows.map((row) => <tr key={row.branch_id}><td><code>{row.code}</code></td><td><strong>{row.name}</strong></td><td><StatusBadge value={row.status} /></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div>;
 }
 
-export function MembershipTable({ rows }: { rows: MasterMembership[] }) {
-  if (!rows.length) return <EmptyRows title="Nenhum vínculo empresarial" description="Nenhuma membership foi encontrada para esta empresa." />;
-  return <div className="master-table-wrap" role="region" aria-label="Tabela de vínculos empresariais" tabIndex={0}><table className="master-table master-table--memberships"><thead><tr><th>Usuário</th><th>Vínculo</th><th>Escopo de filiais</th><th>Desde</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.display_name ?? "anonymous"}:${row.created_at}:${index}`}><td><strong>{row.display_name?.trim() || "Identidade vinculada"}</strong><small className="master-table-subline">Conta Auth vinculada; e-mail não consultado</small></td><td><StatusBadge value={row.status} /></td><td>{row.branch_access_mode === "all_branches" ? "Todas as filiais" : "Somente filiais atribuídas"}</td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div>;
+export function MembershipTable({ rows, query = "" }: { rows: MasterMembership[]; query?: string }) {
+  if (!rows.length) return <EmptyRows title={query ? "Nenhum vínculo corresponde à busca" : "Nenhum vínculo empresarial"} description={query ? "Altere ou limpe o filtro para consultar os demais vínculos visíveis." : "Nenhuma membership foi encontrada para esta empresa."} />;
+  return <div className="master-table-wrap" role="region" aria-label="Tabela de vínculos empresariais" tabIndex={0}><table className="master-table master-table--memberships"><thead><tr><th>Usuário</th><th>Vínculo</th><th>Escopo de filiais</th><th>Papéis e permissões</th><th>Desde</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.display_name ?? "anonymous"}:${row.created_at}:${index}`}><td><strong>{row.display_name?.trim() || "Identidade vinculada"}</strong><small className="master-table-subline">Conta Auth vinculada; e-mail não consultado</small></td><td><StatusBadge value={row.status} /></td><td>{row.branch_access_mode === "all_branches" ? "Todas as filiais" : "Somente filiais atribuídas"}</td><td><span className="master-muted">Não expostos pela API segura atual</span></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div>;
 }
 
 export function CatalogTable({ rows }: { rows: MasterCatalogItem[] }) {
   if (!rows.length) return <EmptyRows title="Catálogo sem registros" description="A base atual não contém definições de papéis ou permissões." />;
-  return <div className="master-table-wrap" role="region" aria-label="Tabela de permissões" tabIndex={0}><table className="master-table master-table--catalog"><thead><tr><th>Tipo</th><th>Código</th><th>Descrição</th><th>Escopo</th><th>Aprovação</th><th>Vínculos</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.item_type}:${row.item_key}`}><td>{row.item_type === "role" ? "Papel" : row.item_type === "role_permission" ? "Vínculo de permissão" : "Permissão"}</td><td><code>{row.item_key}</code></td><td>{row.display_name}</td><td>{row.scope ?? "—"}</td><td><StatusBadge value={row.approval_state} /></td><td>{row.related_permission_count}</td></tr>)}</tbody></table></div>;
+  return <div className="master-table-wrap" role="region" aria-label="Tabela de permissões" tabIndex={0}><table className="master-table master-table--catalog"><thead><tr><th>Tipo</th><th>Código</th><th>Descrição</th><th>Escopo</th><th>Aprovação</th><th>Vínculos</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.item_type}:${row.item_key}`}><td>{row.item_type === "role" ? "Papel" : row.item_type === "role_permission" ? "Vínculo de permissão" : "Permissão"}</td><td><code>{row.item_key}</code></td><td>{friendlyCatalogName(row)}</td><td>{scopeLabel(row.scope)}</td><td><StatusBadge value={row.approval_state} /></td><td>{row.related_permission_count}</td></tr>)}</tbody></table></div>;
 }
 
 export function AuditTable({ rows }: { rows: MasterAuditItem[] }) {
@@ -66,10 +66,29 @@ export function EmptyRows({ title, description }: { title: string; description: 
   return <div className="master-empty-state compact"><span className="master-empty-icon" aria-hidden="true">⌕</span><h2>{title}</h2><p>{description}</p></div>;
 }
 
-function StatusBadge({ value }: { value: string }) {
+export function StatusBadge({ value }: { value: string }) {
   const positive = ["active", "approved"].includes(value);
   const negative = ["suspended", "closed", "revoked", "retired"].includes(value);
-  return <span className={`master-badge${positive ? " is-positive" : negative ? " is-negative" : ""}`}>{value}</span>;
+  return <span className={`master-badge${positive ? " is-positive" : negative ? " is-negative" : ""}`}>{statusLabel(value)}</span>;
+}
+
+function statusLabel(value: string) {
+  const labels: Record<string, string> = { active: "Ativo", approved: "Aprovado", pending: "Pendente", pending_approval: "Pendente de aprovação", accepted: "Aceito", expired: "Expirado", inactive: "Inativo", suspended: "Suspenso", closed: "Encerrado", revoked: "Revogado", retired: "Desativado" };
+  return labels[value] ?? value;
+}
+
+function scopeLabel(value: string | null) {
+  return value === "company" ? "Empresa" : value === "branch" ? "Filial" : value ?? "—";
+}
+
+function friendlyCatalogName(row: MasterCatalogItem) {
+  const labels: Record<string, string> = {
+    company_owner: "Administrador principal da empresa",
+    company_manager: "Gerente empresarial",
+    branch_supervisor: "Supervisor de filial",
+    branch_operator: "Operador de filial",
+  };
+  return labels[row.item_key] ?? row.display_name;
 }
 
 function formatDate(value: string) {

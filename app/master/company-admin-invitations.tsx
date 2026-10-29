@@ -29,13 +29,14 @@ export function CompanyAdminInvitationForm({ companies, enabled }: { companies: 
   </form>;
 }
 
-export function CompanyAdminInvitationTable({ rows, tenantId }: { rows: CompanyAdminInvitation[]; tenantId: string }) {
+export function CompanyAdminInvitationTable({ rows, tenantId, enabled }: { rows: CompanyAdminInvitation[]; tenantId: string; enabled: boolean }) {
   if (!rows.length) return <p className="master-panel-empty">Nenhum convite emitido para esta empresa.</p>;
   return <>
-    {rows.some((row) => row.status === "expired") && <ExpireInvitations tenantId={tenantId} />}
+    {!enabled && <p className="master-notice" role="note">Emissão, revogação, expiração e aceite de convites permanecem desativados neste ambiente. A lista abaixo é somente leitura.</p>}
+    {enabled && rows.some((row) => row.status === "expired") && <ExpireInvitations tenantId={tenantId} />}
     <div className="master-table-wrap" role="region" aria-label="Convites de administrador empresarial" tabIndex={0}>
     <table className="master-table"><thead><tr><th>Destinatário</th><th>Papel</th><th>Situação</th><th>Criado em</th><th>Expira em</th><th>Ação</th></tr></thead>
-      <tbody>{rows.map((row) => <tr key={row.invitation_id}><td>{row.recipient_email}</td><td>{row.role_key}</td><td>{new Date(row.expires_at) <= new Date() && row.status === "pending" ? "expirado" : row.status}</td><td>{formatDate(row.created_at)}</td><td>{formatDate(row.expires_at)}</td><td>{row.status === "pending" && new Date(row.expires_at) > new Date() ? <RevokeInvitation invitationId={row.invitation_id} /> : "—"}</td></tr>)}</tbody>
+      <tbody>{rows.map((row) => <tr key={row.invitation_id}><td>{row.recipient_email}</td><td>{roleLabel(row.role_key)}</td><td><InvitationStatus value={new Date(row.expires_at) <= new Date() && row.status === "pending" ? "expired" : row.status} /></td><td>{formatDate(row.created_at)}</td><td>{formatDate(row.expires_at)}</td><td>{enabled && row.status === "pending" && new Date(row.expires_at) > new Date() ? <RevokeInvitation invitationId={row.invitation_id} /> : "—"}</td></tr>)}</tbody>
     </table>
     </div>
   </>;
@@ -53,4 +54,13 @@ function RevokeInvitation({ invitationId }: { invitationId: string }) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function roleLabel(value: CompanyAdminInvitation["role_key"]) {
+  return value === "company_owner" ? "Administrador principal da empresa" : value;
+}
+
+function InvitationStatus({ value }: { value: CompanyAdminInvitation["status"] }) {
+  const labels = { pending: "Pendente", accepted: "Aceito", expired: "Expirado", revoked: "Revogado" } as const;
+  return <span className={`master-badge${value === "accepted" ? " is-positive" : value === "expired" || value === "revoked" ? " is-negative" : ""}`}>{labels[value]}</span>;
 }

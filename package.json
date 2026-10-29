@@ -16,6 +16,7 @@
     "test:company-authorization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-authorization-migration.test.mjs",
     "test:company-admin-invitation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-admin-invitation-preparation.test.mjs",
     "test:company-admin-invitation-flow": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-admin-invitation.test.mjs",
+    "test:company-access-readiness-ui": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-access-readiness-ui.test.mjs",
     "test:company-role-permissions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-role-permission-foundation.test.mjs",
     "test:company-authorization-compatibility": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/company-authorization-compatibility.test.mjs",
     "test:homologation-env": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/homologation-env.test.mjs",
