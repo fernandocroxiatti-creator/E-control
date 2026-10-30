@@ -38,7 +38,7 @@ test("browser actions require the exact configured target, Master session and an
   assert.match(actions, /env\.accessGovernanceEnabled/);
   assert.match(actions, /requireMasterUser\(\)/);
   assert.match(actions, /client\.auth\.getUser\(\)/);
-  assert.equal((actions.match(/formData\.get\("confirmed"\) !== "on"/g) ?? []).length, 2);
+  assert.equal((actions.match(/formData\.get\("confirmed"\) !== "on"/g) ?? []).length >= 2, true);
   assert.doesNotMatch(actions, /service_role|SUPABASE_SERVICE_ROLE_KEY|console\.(?:log|error)/i);
   assert.match(environment, /ECONTROLL_PROD_ACCESS_GOVERNANCE_ENABLED/);
   assert.match(page, /AccessGovernance/);
@@ -68,4 +68,15 @@ test("the local isolated suite exercises Master denial, approval, grant, idempot
   assert.match(behavior, /expected Master governance audit events/);
   assert.match(runner, /20261030100000_master_access_governance\.sql/);
   assert.match(runner, /master-access-governance-behavior\.sql/);
+});
+
+test("company access migration is Master-only, default-deny and extends transaction authorization", () => {
+  const migration = read("supabase/migrations/20261030110000_company_access_entitlements.sql");
+  assert.match(migration, /company_module_availability/);
+  assert.match(migration, /company_transaction_availability/);
+  assert.match(migration, /master_set_company_transaction_availability/);
+  assert.match(migration, /app_private\.assert_current_master\(\)/);
+  assert.match(migration, /join public\.company_module_availability/);
+  assert.match(migration, /join public\.company_transaction_availability/);
+  assert.match(migration, /Migration must not enable company transactions/);
 });

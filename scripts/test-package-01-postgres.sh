@@ -13,6 +13,7 @@ for _ in $(seq 1 30); do "$docker_bin" exec "$container" pg_isready -U postgres 
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261029140000_company_membership_operational_management.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261029160000_inventory_history_purchase_foundation.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261030100000_master_access_governance.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261030110000_company_access_entitlements.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/master-access-governance-behavior.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
 insert into auth.users(id,email,email_confirmed_at) values

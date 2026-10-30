@@ -35,6 +35,7 @@ end $$;
 create function public.is_current_user_master() returns boolean language sql stable as $$
   select auth.uid() is not null and exists (select 1 from app_private.master_admins where user_id=auth.uid() and status='active')
 $$;
+create function public.authorize_company_transaction(uuid,uuid,text) returns boolean language sql stable as $$ select false $$;
 alter table public.companies enable row level security;
 alter table public.companies force row level security;
 alter table public.branches enable row level security;

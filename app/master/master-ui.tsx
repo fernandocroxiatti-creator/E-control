@@ -12,6 +12,7 @@ const masterNavigation = [
   { href: "/master/modulos", label: "Módulos", icon: "▤" },
   { href: "/master/transacoes", label: "Transações", icon: "⇄" },
   { href: "/master/permissoes", label: "Permissões", icon: "◇" },
+  { href: "/master/acessos-por-empresa", label: "Acessos por empresa", icon: "▤" },
   { href: "/master/auditoria", label: "Auditoria", icon: "≋" },
   { href: "/master/planos", label: "Planos e assinaturas", icon: "◇" },
   { href: "/master/solicitacoes", label: "Solicitações", icon: "⌁" },

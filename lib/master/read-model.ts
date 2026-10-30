@@ -277,3 +277,10 @@ export async function getMasterBranchesV2(tenantId: string): Promise<ReadResult<
     ? { status: "ready", data: result.data }
     : { status: "unavailable" };
 }
+
+export type MasterCompanyAccessItem = { module_code: string; transaction_code: string; permission_key: string; approval_state: string; enabled: boolean };
+export async function getMasterCompanyAccess(tenantId: string): Promise<ReadResult<MasterCompanyAccessItem[]>> {
+  const result = await invokeMasterRead<unknown>("master_list_company_access", { p_tenant_id: tenantId });
+  return result.status === "ready" && isArrayOfRecords<MasterCompanyAccessItem>(result.data, ["module_code", "transaction_code", "permission_key", "approval_state", "enabled"])
+    ? { status: "ready", data: result.data } : { status: "unavailable" };
+}

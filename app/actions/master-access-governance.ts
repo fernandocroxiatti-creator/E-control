@@ -89,3 +89,15 @@ export async function setRolePermissionGrantAction(
     return { status: "error", message: "A concessão não foi registrada." };
   }
 }
+
+export async function setCompanyTransactionAvailabilityAction(_state: MasterAccessActionState, formData: FormData): Promise<MasterAccessActionState> {
+  if (formData.get("confirmed") !== "on") return { status: "error", message: "Confirmação explícita obrigatória." };
+  const tenantId = text(formData, "tenant_id", 64);
+  const codes = formData.getAll("transaction_code").filter((value): value is string => typeof value === "string" && /^[A-Z][A-Z0-9]{1,19}$/.test(value));
+  if (!/^[0-9a-f-]{36}$/i.test(tenantId)) return { status: "error", message: "Empresa inválida." };
+  try { const client = await governanceClient(); if (!client) return { status: "error", message: "A configuração de acessos por empresa ainda não está ativada." };
+    const { data, error } = await client.rpc("master_set_company_transaction_availability", { p_tenant_id: tenantId, p_enabled_transaction_codes: codes });
+    if (error || data !== "updated") return { status: "error", message: "As permissões da empresa não foram salvas." };
+    revalidatePath("/master/acessos-por-empresa"); revalidatePath("/master/auditoria"); return { status: "success", message: "Permissões da empresa atualizadas e auditadas." };
+  } catch { return { status: "error", message: "As permissões da empresa não foram salvas." }; }
+}

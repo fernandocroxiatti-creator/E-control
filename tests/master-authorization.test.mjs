@@ -108,6 +108,7 @@ test("all Admin Master pages inherit the guarded, uncached server layout", () =>
   visit(masterRoot);
   assert.ok(pageFiles.length > 0);
   assert.deepEqual(pageFiles.sort(), [
+    "acessos-por-empresa/page.tsx",
     "administradores/page.tsx",
     "auditoria/page.tsx",
     "configuracoes/page.tsx",
