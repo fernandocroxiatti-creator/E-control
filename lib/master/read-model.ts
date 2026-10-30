@@ -278,9 +278,28 @@ export async function getMasterBranchesV2(tenantId: string): Promise<ReadResult<
     : { status: "unavailable" };
 }
 
-export type MasterCompanyAccessItem = { module_code: string; transaction_code: string; permission_key: string; approval_state: string; enabled: boolean };
+export type MasterCompanyAccessItem = {
+  module_code: string;
+  transaction_code: string;
+  permission_key: string;
+  approval_state: string;
+  permission_approval_state: string | null;
+  enabled: boolean;
+};
 export async function getMasterCompanyAccess(tenantId: string): Promise<ReadResult<MasterCompanyAccessItem[]>> {
-  const result = await invokeMasterRead<unknown>("master_list_company_access", { p_tenant_id: tenantId });
-  return result.status === "ready" && isArrayOfRecords<MasterCompanyAccessItem>(result.data, ["module_code", "transaction_code", "permission_key", "approval_state", "enabled"])
-    ? { status: "ready", data: result.data } : { status: "unavailable" };
+  const [result, matrix] = await Promise.all([
+    invokeMasterRead<unknown>("master_list_company_access", { p_tenant_id: tenantId }),
+    getMasterAccessControlMatrix(),
+  ]);
+  if (result.status !== "ready" || !isArrayOfRecords<Omit<MasterCompanyAccessItem, "permission_approval_state">>(result.data,
+    ["module_code", "transaction_code", "permission_key", "approval_state", "enabled"])) {
+    return { status: "unavailable" };
+  }
+  const permissionStates = new Map((matrix.status === "ready" ? matrix.data : [])
+    .filter((entry) => entry.entry_type === "permission" && entry.permission_key)
+    .map((entry) => [entry.permission_key!, entry.approval_state]));
+  return {
+    status: "ready",
+    data: result.data.map((item) => ({ ...item, permission_approval_state: permissionStates.get(item.permission_key) ?? null })),
+  };
 }

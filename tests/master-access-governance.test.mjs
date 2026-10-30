@@ -86,3 +86,14 @@ test("company access migration is Master-only, default-deny and extends transact
   assert.match(migration, /join public\.company_transaction_availability/);
   assert.match(migration, /Migration must not enable company transactions/);
 });
+
+test("company availability presents permission and transaction approval as independent states", () => {
+  const accessReadModel = read("lib/master/read-model.ts");
+  const accessConsole = read("app/master/acessos-por-empresa/company-access-console.tsx");
+  assert.match(accessReadModel, /permission_approval_state/);
+  assert.match(accessReadModel, /getMasterAccessControlMatrix/);
+  assert.match(accessConsole, /Transação global/);
+  assert.match(accessConsole, /Permissão associada/);
+  assert.match(accessConsole, /Aprovar a transação na página Papéis e permissões/);
+  assert.match(accessConsole, /Salvar permissões da empresa/);
+});
