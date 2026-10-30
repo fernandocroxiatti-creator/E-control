@@ -49,6 +49,8 @@ test("membership and governance screens retain server-authorized data and do not
   assert.match(users, /convite\?: string/);
   assert.match(users, /o convite de funcionários/);
   assert.match(users, /Nenhum botão de alteração é exibido/);
+  assert.match(users, /CompanyActivationSummary/);
+  assert.match(ui, /Próxima pendência: emitir um convite/);
   assert.match(ui, /Não expostos pela API segura atual/);
   assert.match(ui, /company_owner: "Administrador principal da empresa"/);
   assert.match(ui, /pending_approval: "Pendente de aprovação"/);

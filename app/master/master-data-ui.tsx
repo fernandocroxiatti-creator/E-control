@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { MasterAuditItem, MasterBranch, MasterCatalogItem, MasterCompany, MasterMembership, MasterOverview } from "@/lib/master/read-model";
+import type { MasterAuditItem, MasterBranch, MasterCatalogItem, MasterCompany, MasterCompanyAccessItem, MasterMembership, MasterOverview } from "@/lib/master/read-model";
 
 export function PageHeading({ title, description, meta }: { title: string; description: string; meta?: string }) {
   return <div className="master-heading-row"><div><p className="master-eyebrow">ADMINISTRAÇÃO SAAS</p><h1>{title}</h1><p className="master-subtitle">{description}</p></div>{meta && <span className="master-status">{meta}</span>}</div>;
@@ -33,6 +33,19 @@ export function BranchTable({ rows }: { rows: MasterBranch[] }) {
 export function MembershipTable({ rows, query = "" }: { rows: MasterMembership[]; query?: string }) {
   if (!rows.length) return <EmptyRows title={query ? "Nenhum vínculo corresponde à busca" : "Nenhum vínculo empresarial"} description={query ? "Altere ou limpe o filtro para consultar os demais vínculos visíveis." : "Nenhuma membership foi encontrada para esta empresa."} />;
   return <div className="master-table-wrap" role="region" aria-label="Tabela de vínculos empresariais" tabIndex={0}><table className="master-table master-table--memberships"><thead><tr><th>Usuário</th><th>Vínculo</th><th>Escopo de filiais</th><th>Papéis e permissões</th><th>Desde</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.display_name ?? "anonymous"}:${row.created_at}:${index}`}><td><strong>{row.display_name?.trim() || "Identidade vinculada"}</strong><small className="master-table-subline">Conta Auth vinculada; e-mail não consultado</small></td><td><StatusBadge value={row.status} /></td><td>{row.branch_access_mode === "all_branches" ? "Todas as filiais" : "Somente filiais atribuídas"}</td><td><span className="master-muted">Não expostos pela API segura atual</span></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div>;
+}
+
+export function CompanyActivationSummary({ company, access }: { company: MasterCompany; access: MasterCompanyAccessItem[] | null }) {
+  const operational = access?.filter((item) => ["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N"].includes(item.transaction_code)) ?? [];
+  const enabled = operational.filter((item) => item.enabled).map((item) => item.transaction_code);
+  const globallyReady = operational.filter((item) => item.approval_state === "approved" && item.permission_approval_state === "approved").map((item) => item.transaction_code);
+  return <div className="master-activation-summary">
+    <p><strong>Empresa:</strong> {company.status === "active" ? "ativa" : "indisponível"} · <strong>Filiais:</strong> {company.branch_count} · <strong>Vínculos ativos:</strong> {company.active_membership_count}</p>
+    <p><strong>Transações globalmente prontas:</strong> {globallyReady.length ? globallyReady.join(", ") : "nenhuma"}.</p>
+    <p><strong>Disponíveis para esta empresa:</strong> {enabled.length ? enabled.join(", ") : "nenhuma"}.</p>
+    {!company.active_membership_count && <p className="master-muted">Próxima pendência: emitir um convite para o proprietário empresarial, com aceite autenticado. A emissão permanece desativada enquanto a flag de convites estiver desligada.</p>}
+    {access === null && <p className="master-muted">A disponibilidade empresarial não pôde ser consultada; nenhuma alteração foi liberada.</p>}
+  </div>;
 }
 
 export function CatalogTable({ rows, query = "" }: { rows: MasterCatalogItem[]; query?: string }) {
