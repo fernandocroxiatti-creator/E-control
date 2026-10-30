@@ -47,6 +47,7 @@ test("browser actions require the exact configured target, Master session and an
   assert.match(actions, /Nenhum sucesso foi confirmado/);
   assert.match(environment, /ECONTROLL_PROD_ACCESS_GOVERNANCE_ENABLED/);
   assert.match(page, /AccessGovernance/);
+  assert.match(page, /Não foi possível carregar o histórico administrativo/);
 });
 
 test("permission console keeps confirmed governance controls while presenting roles, catalog and audit in business language", () => {
