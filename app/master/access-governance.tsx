@@ -1,61 +1,72 @@
 "use client";
 
-import { useActionState } from "react";
-import {
-  masterAccessIdle,
-  setAccessCatalogApprovalAction,
-  setRolePermissionGrantAction,
-} from "@/app/actions/master-access-governance";
-import type { MasterAccessControlEntry } from "@/lib/master/read-model";
+import { useActionState, useState } from "react";
+import { masterAccessIdle, setAccessCatalogApprovalAction, setRolePermissionGrantAction } from "@/app/actions/master-access-governance";
+import type { MasterAccessControlEntry, MasterAuditItem } from "@/lib/master/read-model";
 
-const label: Record<string, string> = {
-  role: "Papel", permission: "Permissão", transaction: "Transação", role_permission: "Concessão",
-  pending_approval: "Pendente de aprovação", approved: "Aprovado", retired: "Desativado",
+type Tab = "overview" | "roles" | "catalog" | "grants" | "history" | "availability";
+const tabs: { id: Tab; label: string }[] = [
+  { id: "overview", label: "Visão geral" }, { id: "roles", label: "Papéis" }, { id: "catalog", label: "Permissões e transações" },
+  { id: "grants", label: "Concessões" }, { id: "history", label: "Histórico" }, { id: "availability", label: "Disponibilidade empresarial" },
+];
+const roleLabels: Record<string, { name: string; description: string }> = {
+  company_owner: { name: "Proprietário empresarial", description: "Administra os vínculos e as permissões autorizadas da própria empresa." },
+  company_manager: { name: "Gerente empresarial", description: "Gerencia a empresa dentro das permissões delegadas." },
+  branch_supervisor: { name: "Supervisor de filial", description: "Coordena somente as filiais que lhe foram atribuídas." },
+  branch_operator: { name: "Operador de filial", description: "Executa as transações autorizadas nas filiais atribuídas." },
 };
+const transactionLabels: Record<string, { name: string; description: string; module: string }> = {
+  BP01: { name: "Cadastros de clientes e fornecedores", description: "Consulta e gestão de parceiros comerciais autorizados.", module: "Cadastros" },
+  MM01: { name: "Cadastro de produtos", description: "Consulta e gestão do catálogo de produtos.", module: "Estoque e produtos" },
+  SV01: { name: "Cadastro de serviços", description: "Consulta e gestão do catálogo de serviços.", module: "Cadastros" },
+  MIGO: { name: "Movimentação de estoque", description: "Entradas, saídas e ajustes de estoque autorizados.", module: "Estoque e produtos" },
+  ME21N: { name: "Criar pedido de compra", description: "Criação de pedidos de compra em rascunho.", module: "Compras" },
+  ME23N: { name: "Consultar pedidos de compra", description: "Consulta dos pedidos de compra autorizados.", module: "Compras" },
+};
+function approvalLabel(value: string) { return value === "approved" ? "Aprovado" : value === "retired" ? "Desativado" : "Pendente de aprovação"; }
+function approvalClass(value: string) { return value === "approved" ? " is-positive" : value === "retired" ? " is-negative" : ""; }
+function technicalKey(entry: MasterAccessControlEntry) { return entry.role_key ?? entry.permission_key ?? entry.transaction_code ?? ""; }
+function permissionPresentation(entry: MasterAccessControlEntry) {
+  const key = entry.permission_key ?? "";
+  const [domain, area, action] = key.replace(/^transaction\./, "").split(".");
+  const moduleName = domain === "inventory" ? "Estoque e produtos" : domain === "purchasing" ? "Compras" : domain === "masterdata" ? "Cadastros" : domain === "administration" ? "Administração" : "Outras permissões";
+  return { name: entry.display_name.trim() || [area, action].filter(Boolean).join(" · ") || "Permissão empresarial", module: moduleName, description: entry.scope === "branch" ? "Aplicável somente no escopo de filial autorizado." : "Aplicável no escopo autorizado da empresa." };
+}
+function formatEvent(event: MasterAuditItem) {
+  const labels: Record<string, string> = { "master_access_catalog.approval_changed": "Aprovação de catálogo alterada", "master_role_permission.grant": "Permissão concedida a um papel", "master_role_permission.revoke": "Permissão revogada de um papel" };
+  return labels[event.event_key] ?? "Alteração administrativa registrada";
+}
+function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.valueOf()) ? "Data indisponível" : new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short" }).format(date); }
 
-export function AccessGovernance({ entries, enabled }: { entries: MasterAccessControlEntry[]; enabled: boolean }) {
-  const manageable = entries.filter((entry) => entry.entry_type !== "role_permission");
+export function AccessGovernance({ entries, auditEvents, enabled }: { entries: MasterAccessControlEntry[]; auditEvents: MasterAuditItem[]; enabled: boolean }) {
+  const [tab, setTab] = useState<Tab>("overview");
+  const [query, setQuery] = useState("");
+  const roles = entries.filter((entry) => entry.entry_type === "role");
+  const permissions = entries.filter((entry) => entry.entry_type === "permission");
+  const transactions = entries.filter((entry) => entry.entry_type === "transaction");
   const grants = entries.filter((entry) => entry.entry_type === "role_permission");
-  const roles = entries.filter((entry) => entry.entry_type === "role" && entry.approval_state === "approved");
-  const permissions = entries.filter((entry) => entry.entry_type === "permission" && entry.approval_state === "approved");
-  return <>
-    {!enabled && <p className="master-notice" role="note">Nenhuma alteração de papel ou concessão é permitida enquanto a habilitação explícita não for autorizada. Esta tela mostra o catálogo real em modo somente leitura.</p>}
-    <div className="master-table-wrap" role="region" aria-label="Aprovações do catálogo" tabIndex={0}>
-      <table className="master-table"><thead><tr><th>Tipo</th><th>Identificador</th><th>Descrição</th><th>Escopo</th><th>Situação</th><th>Ação</th></tr></thead>
-        <tbody>{manageable.map((entry) => <tr key={`${entry.entry_type}:${entry.role_key ?? entry.permission_key ?? entry.transaction_code}`}>
-          <td>{label[entry.entry_type]}</td>
-          <td><code>{entry.role_key ?? entry.permission_key ?? entry.transaction_code}</code></td>
-          <td>{entry.display_name}</td><td>{entry.scope ?? "—"}</td>
-          <td><span className={`master-badge${entry.approval_state === "approved" ? " is-positive" : entry.approval_state === "retired" ? " is-negative" : ""}`}>{label[entry.approval_state] ?? entry.approval_state}</span></td>
-          <td><CatalogApproval entry={entry} enabled={enabled} /></td>
-        </tr>)}</tbody>
-      </table>
-    </div>
-    <section className="master-subsection"><h3>Concessões por papel</h3><p>Uma concessão só é permitida depois da aprovação independente do papel e da permissão. A revogação remove a autorização imediatamente.</p>
-      <RoleGrantForm roles={roles} permissions={permissions} enabled={enabled} />
-      {grants.length ? <div className="master-table-wrap" role="region" aria-label="Concessões existentes" tabIndex={0}><table className="master-table"><thead><tr><th>Papel</th><th>Permissão</th><th>Escopo</th><th>Situação</th><th>Ação</th></tr></thead><tbody>{grants.map((entry) => <tr key={`${entry.role_key}:${entry.permission_key}`}><td><code>{entry.role_key}</code></td><td><code>{entry.permission_key}</code></td><td>{entry.scope ?? "—"}</td><td>{entry.approval_state}</td><td><GrantRevoke roleKey={entry.role_key!} permissionKey={entry.permission_key!} enabled={enabled} /></td></tr>)}</tbody></table></div> : <p className="master-panel-empty">Nenhuma concessão efetiva foi registrada.</p>}
-    </section>
-  </>;
+  const approvedRoles = roles.filter((entry) => entry.approval_state === "approved");
+  const approvedPermissions = permissions.filter((entry) => entry.approval_state === "approved");
+  const pendingCount = entries.filter((entry) => entry.approval_state === "pending_approval").length;
+  const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
+  const matches = (entry: MasterAccessControlEntry, extra = "") => !normalizedQuery || `${technicalKey(entry)} ${entry.display_name} ${extra}`.toLocaleLowerCase("pt-BR").includes(normalizedQuery);
+  const visiblePermissions = permissions.filter((entry) => matches(entry, permissionPresentation(entry).module));
+  const visibleTransactions = transactions.filter((entry) => matches(entry, transactionLabels[entry.transaction_code ?? ""]?.module ?? ""));
+  return <div className="master-governance">
+    {!enabled && <section className="master-governance-alert" role="note"><strong>Governança em modo de consulta</strong><p>O catálogo real está disponível, mas alterações permanecem bloqueadas pela configuração do ambiente.</p></section>}
+    <nav className="master-governance-tabs" aria-label="Seções de permissões" role="tablist">{tabs.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={tab === item.id ? "is-selected" : ""} onClick={() => setTab(item.id)}>{item.label}</button>)}</nav>
+    {tab === "overview" && <section className="master-governance-overview" aria-label="Resumo da governança"><div className="master-governance-stat"><span>Papéis empresariais</span><strong>{roles.length}</strong><small>{approvedRoles.length} aprovados</small></div><div className="master-governance-stat"><span>Permissões</span><strong>{permissions.length}</strong><small>{approvedPermissions.length} aprovadas</small></div><div className="master-governance-stat"><span>Transações</span><strong>{transactions.length}</strong><small>Separadas por módulo</small></div><div className="master-governance-stat"><span>Itens pendentes</span><strong>{pendingCount}</strong><small>Não liberam acesso</small></div><section className="master-governance-guidance"><h3>Fluxo seguro de liberação</h3><ol><li>Revise e aprove o papel, a permissão ou a transação.</li><li>Conceda somente permissões já aprovadas a um papel aprovado.</li><li>Vincule o usuário à empresa e às filiais pelo fluxo autenticado.</li></ol><p>As três etapas são independentes, auditadas e validadas no servidor. Esta tela nunca cria vínculos, empresas ou acessos operacionais automaticamente.</p></section></section>}
+    {tab === "roles" && <section className="master-governance-section"><SectionHeader title="Papéis empresariais" description="Aprovar um papel torna-o elegível para concessões; não atribui o papel a usuários nem libera uma empresa." /><div className="master-role-grid">{roles.map((entry) => <RoleCard key={entry.role_key} entry={entry} enabled={enabled} />)}</div></section>}
+    {tab === "catalog" && <section className="master-governance-section"><SectionHeader title="Permissões e transações" description="Pesquise o catálogo e aprove itens individualmente. Códigos internos ficam em detalhes avançados." /><label className="master-governance-search">Buscar no catálogo<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nome, módulo ou código" /></label><CatalogGroups title="Permissões" entries={visiblePermissions} kind="permission" enabled={enabled} /><CatalogGroups title="Transações" entries={visibleTransactions} kind="transaction" enabled={enabled} /></section>}
+    {tab === "grants" && <section className="master-governance-section"><SectionHeader title="Concessões por papel" description="Uma concessão exige que papel e permissão estejam aprovados. Revogar remove a capacidade do papel imediatamente." /><RoleGrantForm roles={approvedRoles} permissions={approvedPermissions} enabled={enabled} /><section className="master-grant-list"><h3>Concessões atuais</h3>{grants.length ? grants.map((entry) => <GrantCard entry={entry} enabled={enabled} key={`${entry.role_key}:${entry.permission_key}`} />) : <p className="master-panel-empty">Nenhuma concessão efetiva foi registrada.</p>}</section></section>}
+    {tab === "history" && <section className="master-governance-section"><SectionHeader title="Histórico administrativo" description="Eventos retornados pela trilha de auditoria. O histórico não inclui dados empresariais operacionais." />{auditEvents.length ? <ol className="master-governance-history">{auditEvents.map((event, index) => <li key={`${event.event_key}:${event.created_at}:${index}`}><div><strong>{formatEvent(event)}</strong><small>{event.event_source === "master" ? "Admin Master" : "Governança administrativa"}</small><details><summary>Detalhes avançados</summary><code>{event.event_key}</code></details></div><time dateTime={event.created_at}>{formatDate(event.created_at)}</time></li>)}</ol> : <p className="master-panel-empty">Nenhum evento de governança foi registrado até o momento.</p>}</section>}
+    {tab === "availability" && <section className="master-governance-section"><SectionHeader title="Disponibilidade por empresa" description="Preparação para a camada de licenciamento empresarial, separada das permissões individuais." /><section className="master-governance-availability"><strong>A camada de disponibilidade empresarial ainda não está instalada.</strong><p>Hoje, este catálogo controla o que um papel pode receber. Ele não registra quais módulos ou transações foram contratados por cada empresa. Portanto, o sistema não apresenta uma transação como “não contratada” sem uma fonte persistida e auditável.</p><p>Antes de liberar esse controle será necessária uma migration própria de licenciamento por empresa, com RLS, FORCE RLS, RPCs Master auditadas e verificação pelo backend de cada transação. Nenhuma tabela, flag ou autorização foi criada por esta interface.</p></section></section>}
+  </div>;
 }
-
-function CatalogApproval({ entry, enabled }: { entry: MasterAccessControlEntry; enabled: boolean }) {
-  const [state, action, pending] = useActionState(setAccessCatalogApprovalAction, masterAccessIdle);
-  const key = entry.role_key ?? entry.permission_key ?? entry.transaction_code ?? "";
-  const target = entry.approval_state === "approved" ? "pending_approval" : "approved";
-  return <form action={action} className="master-inline-action"><input type="hidden" name="item_type" value={entry.entry_type} /><input type="hidden" name="item_key" value={key} /><input type="hidden" name="approval_state" value={target} />
-    <input aria-label={`Confirmar alteração de ${key}`} name="confirmed" required type="checkbox" disabled={!enabled || pending} />
-    <button className="master-row-link" type="submit" disabled={!enabled || pending}>{target === "approved" ? "Aprovar" : "Voltar a pendente"}</button>
-    {state.message && <span role={state.status === "success" ? "status" : "alert"}>{state.message}</span>}
-  </form>;
-}
-
-function RoleGrantForm({ roles, permissions, enabled }: { roles: MasterAccessControlEntry[]; permissions: MasterAccessControlEntry[]; enabled: boolean }) {
-  const [state, action, pending] = useActionState(setRolePermissionGrantAction, masterAccessIdle);
-  if (!roles.length || !permissions.length) return <p className="master-panel-empty">A aprovação de um papel e uma permissão é necessária antes de criar grants.</p>;
-  return <form action={action} className="master-filter-form"><label>Papel<select name="role_key" required defaultValue=""><option value="" disabled>Selecione</option>{roles.map((role) => <option key={role.role_key} value={role.role_key!}>{role.role_key}</option>)}</select></label><label>Permissão<select name="permission_key" required defaultValue=""><option value="" disabled>Selecione</option>{permissions.map((permission) => <option key={permission.permission_key} value={permission.permission_key!}>{permission.permission_key}</option>)}</select></label><input type="hidden" name="operation" value="grant" /><label className="master-confirmation"><input name="confirmed" required type="checkbox" disabled={!enabled || pending} /> Confirmo a concessão</label><button type="submit" disabled={!enabled || pending}>{pending ? "Registrando…" : "Conceder permissão"}</button>{state.message && <span role={state.status === "success" ? "status" : "alert"}>{state.message}</span>}</form>;
-}
-
-function GrantRevoke({ roleKey, permissionKey, enabled }: { roleKey: string; permissionKey: string; enabled: boolean }) {
-  const [state, action, pending] = useActionState(setRolePermissionGrantAction, masterAccessIdle);
-  return <form action={action} className="master-inline-action"><input type="hidden" name="role_key" value={roleKey} /><input type="hidden" name="permission_key" value={permissionKey} /><input type="hidden" name="operation" value="revoke" /><input aria-label={`Confirmar revogação de ${permissionKey}`} name="confirmed" required type="checkbox" disabled={!enabled || pending} /><button className="master-row-link" type="submit" disabled={!enabled || pending}>{pending ? "Revogando…" : "Revogar"}</button>{state.message && <span role={state.status === "success" ? "status" : "alert"}>{state.message}</span>}</form>;
-}
+function SectionHeader({ title, description }: { title: string; description: string }) { return <header className="master-governance-section-heading"><h3>{title}</h3><p>{description}</p></header>; }
+function RoleCard({ entry, enabled }: { entry: MasterAccessControlEntry; enabled: boolean }) { const key = entry.role_key ?? ""; const p = roleLabels[key] ?? { name: entry.display_name || "Papel empresarial", description: "Papel disponível no catálogo autorizado." }; return <article className="master-role-card"><div><span className={`master-badge${approvalClass(entry.approval_state)}`}>{approvalLabel(entry.approval_state)}</span><h4>{p.name}</h4><p>{p.description}</p><small>Escopo: {entry.scope === "branch" ? "filial" : "empresa"}</small><details><summary>Detalhes avançados</summary><code>{key}</code></details></div><CatalogApproval entry={entry} enabled={enabled} /></article>; }
+function CatalogGroups({ title, entries, kind, enabled }: { title: string; entries: MasterAccessControlEntry[]; kind: "permission" | "transaction"; enabled: boolean }) { const groups = new Map<string, MasterAccessControlEntry[]>(); entries.forEach((entry) => { const moduleName = kind === "transaction" ? (transactionLabels[entry.transaction_code ?? ""]?.module ?? "Outras transações") : permissionPresentation(entry).module; groups.set(moduleName, [...(groups.get(moduleName) ?? []), entry]); }); return <section className="master-catalog-section"><h4>{title}</h4>{groups.size ? [...groups.entries()].map(([moduleName, group]) => <section className="master-catalog-module" key={moduleName}><header><h5>{moduleName}</h5><span>{group.length} {group.length === 1 ? "item" : "itens"}</span></header><div>{group.map((entry) => <CatalogCard key={technicalKey(entry)} entry={entry} kind={kind} enabled={enabled} />)}</div></section>) : <p className="master-panel-empty">Nenhum item corresponde à busca.</p>}</section>; }
+function CatalogCard({ entry, kind, enabled }: { entry: MasterAccessControlEntry; kind: "permission" | "transaction"; enabled: boolean }) { const key = technicalKey(entry); const p = kind === "transaction" ? transactionLabels[key] ?? { name: entry.display_name || "Transação empresarial", description: "Transação cadastrada no catálogo.", module: "Outras transações" } : permissionPresentation(entry); return <article className="master-catalog-card"><div><span className={`master-badge${approvalClass(entry.approval_state)}`}>{approvalLabel(entry.approval_state)}</span><h5>{p.name}</h5><p>{p.description}</p><details><summary>Detalhes avançados</summary><dl><div><dt>{kind === "transaction" ? "Código" : "Identificador"}</dt><dd><code>{key}</code></dd></div><div><dt>Escopo</dt><dd>{entry.scope === "branch" ? "Filial" : entry.scope === "company" ? "Empresa" : "Não informado"}</dd></div></dl></details></div><CatalogApproval entry={entry} enabled={enabled} /></article>; }
+function CatalogApproval({ entry, enabled }: { entry: MasterAccessControlEntry; enabled: boolean }) { const [state, action, pending] = useActionState(setAccessCatalogApprovalAction, masterAccessIdle); const key = technicalKey(entry); const target = entry.approval_state === "approved" ? "pending_approval" : "approved"; return <form action={action} className="master-governance-action"><input type="hidden" name="item_type" value={entry.entry_type} /><input type="hidden" name="item_key" value={key} /><input type="hidden" name="approval_state" value={target} /><label><input aria-label={`Confirmar alteração de ${key}`} name="confirmed" required type="checkbox" disabled={!enabled || pending} /> Confirmo esta alteração</label><button type="submit" disabled={!enabled || pending}>{pending ? "Registrando…" : target === "approved" ? "Aprovar" : "Voltar a pendente"}</button>{state.message && <p className={`master-company-feedback is-compact${state.status === "success" ? " is-success" : " is-error"}`} role={state.status === "success" ? "status" : "alert"}>{state.message}</p>}</form>; }
+function RoleGrantForm({ roles, permissions, enabled }: { roles: MasterAccessControlEntry[]; permissions: MasterAccessControlEntry[]; enabled: boolean }) { const [state, action, pending] = useActionState(setRolePermissionGrantAction, masterAccessIdle); if (!roles.length || !permissions.length) return <p className="master-panel-empty">Aprove ao menos um papel e uma permissão antes de registrar uma concessão.</p>; return <form action={action} className="master-governance-grant-form"><label>Papel<select name="role_key" required defaultValue=""><option value="" disabled>Selecione o papel</option>{roles.map((role) => <option key={role.role_key} value={role.role_key!}>{roleLabels[role.role_key ?? ""]?.name ?? role.display_name}</option>)}</select></label><label>Permissão<select name="permission_key" required defaultValue=""><option value="" disabled>Selecione a permissão</option>{permissions.map((permission) => <option key={permission.permission_key} value={permission.permission_key!}>{permissionPresentation(permission).name}</option>)}</select></label><input type="hidden" name="operation" value="grant" /><label className="master-checkbox-label"><input name="confirmed" required type="checkbox" disabled={!enabled || pending} /> Confirmo a concessão</label><button type="submit" disabled={!enabled || pending}>{pending ? "Registrando…" : "Conceder permissão"}</button>{state.message && <p className={`master-company-feedback is-compact${state.status === "success" ? " is-success" : " is-error"}`} role={state.status === "success" ? "status" : "alert"}>{state.message}</p>}</form>; }
+function GrantCard({ entry, enabled }: { entry: MasterAccessControlEntry; enabled: boolean }) { const [state, action, pending] = useActionState(setRolePermissionGrantAction, masterAccessIdle); const role = roleLabels[entry.role_key ?? ""]?.name ?? entry.role_key ?? "Papel empresarial"; const permission = permissionPresentation(entry).name; return <article className="master-grant-card"><div><strong>{permission}</strong><p>Concedida a: {role}</p><details><summary>Detalhes avançados</summary><code>{entry.permission_key}</code></details></div><form action={action} className="master-governance-action"><input type="hidden" name="role_key" value={entry.role_key!} /><input type="hidden" name="permission_key" value={entry.permission_key!} /><input type="hidden" name="operation" value="revoke" /><label><input aria-label={`Confirmar revogação de ${entry.permission_key}`} name="confirmed" required type="checkbox" disabled={!enabled || pending} /> Confirmo a revogação</label><button type="submit" disabled={!enabled || pending}>{pending ? "Revogando…" : "Revogar"}</button>{state.message && <p className={`master-company-feedback is-compact${state.status === "success" ? " is-success" : " is-error"}`} role={state.status === "success" ? "status" : "alert"}>{state.message}</p>}</form></article>; }

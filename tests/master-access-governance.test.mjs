@@ -9,6 +9,7 @@ const read = (file) => readFileSync(resolve(root, file), "utf8");
 const migration = read("supabase/migrations/20261030100000_master_access_governance.sql");
 const actions = read("app/actions/master-access-governance.ts");
 const page = read("app/master/permissoes/page.tsx");
+const governanceUi = read("app/master/access-governance.tsx");
 const environment = read("lib/supabase/homologation-env.ts");
 
 test("Master governance adds pending stock reads without approving catalog access or creating grants", () => {
@@ -41,6 +42,21 @@ test("browser actions require the exact configured target, Master session and an
   assert.doesNotMatch(actions, /service_role|SUPABASE_SERVICE_ROLE_KEY|console\.(?:log|error)/i);
   assert.match(environment, /ECONTROLL_PROD_ACCESS_GOVERNANCE_ENABLED/);
   assert.match(page, /AccessGovernance/);
+});
+
+test("permission console keeps confirmed governance controls while presenting roles, catalog and audit in business language", () => {
+  for (const tab of ["Visão geral", "Papéis", "Permissões e transações", "Concessões", "Histórico", "Disponibilidade empresarial"]) {
+    assert.match(governanceUi, new RegExp(tab));
+  }
+  assert.match(governanceUi, /Proprietário empresarial/);
+  assert.match(governanceUi, /Cadastro de produtos/);
+  assert.match(governanceUi, /Detalhes avançados/);
+  assert.match(governanceUi, /name="confirmed" required/);
+  assert.match(governanceUi, /setAccessCatalogApprovalAction/);
+  assert.match(governanceUi, /setRolePermissionGrantAction/);
+  assert.match(page, /getMasterAudit\(50\)/);
+  assert.doesNotMatch(page, /CatalogTable/);
+  assert.match(governanceUi, /camada de disponibilidade empresarial ainda não está instalada/i);
 });
 
 test("the local isolated suite exercises Master denial, approval, grant, idempotency, revocation and audit", () => {

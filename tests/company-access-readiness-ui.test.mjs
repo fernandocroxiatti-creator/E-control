@@ -37,7 +37,7 @@ test("disabled invitations do not expose write controls in either invitation rou
   assert.match(acceptForm, /convites empresariais estão desativados/);
 });
 
-test("membership and catalog screens retain server-authorized data and do not promise unavailable commands", () => {
+test("membership and governance screens retain server-authorized data and do not promise unavailable commands", () => {
   const users = read("app/master/administradores/page.tsx");
   const ui = read("app/master/master-data-ui.tsx");
   const permissions = read("app/master/permissoes/page.tsx");
@@ -53,10 +53,10 @@ test("membership and catalog screens retain server-authorized data and do not pr
   assert.match(ui, /company_owner: "Administrador principal da empresa"/);
   assert.match(ui, /pending_approval: "Pendente de aprovação"/);
   assert.match(ui, /Nenhum item corresponde à busca/);
-  assert.match(permissions, /getMasterAccessCatalog/);
-  assert.match(permissions, /filteredCatalog/);
-  assert.match(permissions, /Buscar no catálogo/);
-  assert.match(permissions, /Nenhuma alteração de papel ou concessão é permitida/);
+  assert.match(permissions, /getMasterAccessControlMatrix/);
+  assert.match(permissions, /getMasterAudit\(50\)/);
+  assert.match(permissions, /AccessGovernance/);
+  assert.doesNotMatch(permissions, /getMasterAccessCatalog/);
   assert.match(transactions, /Catálogo instalado, consulta Master pendente/);
   assert.doesNotMatch(transactions, /Não há migration de catálogo instalada/);
 });
