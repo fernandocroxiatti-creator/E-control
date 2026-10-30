@@ -16,6 +16,15 @@ create table public.access_role_definitions (role_key text primary key, display_
 create table public.role_permission_grants (role_key text not null references public.access_role_definitions(role_key), permission_key text not null references public.permission_definitions(permission_key), primary key(role_key,permission_key));
 create table public.membership_role_assignments (id uuid primary key default gen_random_uuid(),tenant_id uuid not null,membership_id uuid not null,role_key text not null references public.access_role_definitions(role_key),branch_id uuid,assigned_by_user_id uuid not null references auth.users(id));
 create table public.erp_transaction_authorization_catalog (transaction_code text primary key,module_code text not null,permission_key text not null references public.permission_definitions(permission_key),approval_state text not null default 'pending_approval',created_at timestamptz not null default now());
+-- The compatibility harness begins after the company-role authorization
+-- foundation. Keep its pre-existing ME21N proposal pending, exactly as the
+-- canonical 20261027190000 migration does in an installed environment.
+insert into public.permission_definitions (permission_key,description)
+values ('transaction.purchasing.purchase_order.create','Transação ME21N: criar pedido de compra.')
+on conflict (permission_key) do nothing;
+insert into public.erp_transaction_authorization_catalog (transaction_code,module_code,permission_key)
+values ('ME21N','PUR','transaction.purchasing.purchase_order.create')
+on conflict (transaction_code) do nothing;
 create table app_private.provisioning_audit_events (id uuid primary key default gen_random_uuid(),event_key text not null,tenant_id uuid,subject_user_id uuid,actor_user_id uuid,actor_database_role text,actor_api_role text,details jsonb default '{}'::jsonb,created_at timestamptz not null default now());
 create table app_private.master_admins (user_id uuid primary key references auth.users(id), status text not null, authorized_by_user_id uuid references auth.users(id), authorization_reason text, approval_reference text);
 create function app_private.is_active_company_member(uuid) returns boolean language sql stable as $$ select true $$;
