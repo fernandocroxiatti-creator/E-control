@@ -5,9 +5,7 @@ import { requireMasterUser } from "@/lib/master/authorization";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { isAuthorizedSupabaseTarget } from "@/lib/supabase/homologation-env";
 import { createClient } from "@/lib/supabase/server";
-
-export type MasterAccessActionState = { status: "idle" | "success" | "error"; message?: string };
-export const masterAccessIdle: MasterAccessActionState = { status: "idle" };
+import type { MasterAccessActionState } from "@/lib/master/action-state";
 
 const itemTypes = new Set(["role", "permission", "transaction"]);
 const states = new Set(["pending_approval", "approved", "retired"]);
@@ -26,6 +24,19 @@ async function governanceClient() {
   if (!client) return null;
   const { data: { user }, error } = await client.auth.getUser();
   return error || !user ? null : client;
+}
+
+function refreshGovernanceViews() {
+  try {
+    revalidatePath("/master/permissoes");
+    revalidatePath("/master/administradores");
+    revalidatePath("/master/auditoria");
+    return true;
+  } catch {
+    // Deliberately avoid logging the database response or session data.
+    console.error("[master-governance] revalidation_failed");
+    return false;
+  }
 }
 
 export async function setAccessCatalogApprovalAction(
@@ -49,13 +60,16 @@ export async function setAccessCatalogApprovalAction(
       p_item_key: itemKey,
       p_approval_state: approvalState,
     });
-    if (error || data !== approvalState) return { status: "error", message: "A aprovação não foi registrada." };
-    revalidatePath("/master/permissoes");
-    revalidatePath("/master/administradores");
-    revalidatePath("/master/auditoria");
-    return { status: "success", message: "Estado do catálogo atualizado e auditado." };
+    if (error || data !== approvalState) {
+      console.error("[master-governance] catalog_approval_rpc_not_confirmed");
+      return { status: "error", message: "Não foi possível confirmar a aprovação. Atualize a página e consulte a auditoria antes de tentar novamente." };
+    }
+    return refreshGovernanceViews()
+      ? { status: "success", message: "Estado do catálogo atualizado e auditado." }
+      : { status: "success", message: "A aprovação foi registrada e auditada, mas a tela não pôde ser atualizada. Atualize a página para conferir." };
   } catch {
-    return { status: "error", message: "A aprovação não foi registrada." };
+    console.error("[master-governance] catalog_approval_action_failed");
+    return { status: "error", message: "Não foi possível concluir a aprovação. Nenhum sucesso foi confirmado; atualize a página e consulte a auditoria antes de tentar novamente." };
   }
 }
 
@@ -80,13 +94,17 @@ export async function setRolePermissionGrantAction(
       p_permission_key: permissionKey,
       p_operation: operation,
     });
-    if (error || ![operation, "unchanged"].includes(String(data))) return { status: "error", message: "A concessão não foi registrada." };
-    revalidatePath("/master/permissoes");
-    revalidatePath("/master/administradores");
-    revalidatePath("/master/auditoria");
-    return { status: "success", message: operation === "grant" ? "Permissão concedida e auditada." : "Permissão revogada e auditada." };
+    if (error || ![operation, "unchanged"].includes(String(data))) {
+      console.error("[master-governance] role_permission_rpc_not_confirmed");
+      return { status: "error", message: "Não foi possível confirmar a alteração da concessão. Atualize a página e consulte a auditoria antes de tentar novamente." };
+    }
+    const message = operation === "grant" ? "Permissão concedida e auditada." : "Permissão revogada e auditada.";
+    return refreshGovernanceViews()
+      ? { status: "success", message }
+      : { status: "success", message: `${message} A tela não pôde ser atualizada; atualize a página para conferir.` };
   } catch {
-    return { status: "error", message: "A concessão não foi registrada." };
+    console.error("[master-governance] role_permission_action_failed");
+    return { status: "error", message: "Não foi possível concluir a alteração da concessão. Nenhum sucesso foi confirmado; atualize a página e consulte a auditoria antes de tentar novamente." };
   }
 }
 
@@ -97,7 +115,20 @@ export async function setCompanyTransactionAvailabilityAction(_state: MasterAcce
   if (!/^[0-9a-f-]{36}$/i.test(tenantId)) return { status: "error", message: "Empresa inválida." };
   try { const client = await governanceClient(); if (!client) return { status: "error", message: "A configuração de acessos por empresa ainda não está ativada." };
     const { data, error } = await client.rpc("master_set_company_transaction_availability", { p_tenant_id: tenantId, p_enabled_transaction_codes: codes });
-    if (error || data !== "updated") return { status: "error", message: "As permissões da empresa não foram salvas." };
-    revalidatePath("/master/acessos-por-empresa"); revalidatePath("/master/auditoria"); return { status: "success", message: "Permissões da empresa atualizadas e auditadas." };
-  } catch { return { status: "error", message: "As permissões da empresa não foram salvas." }; }
+    if (error || data !== "updated") {
+      console.error("[master-governance] company_access_rpc_not_confirmed");
+      return { status: "error", message: "Não foi possível confirmar as permissões da empresa. Atualize a página e consulte a auditoria antes de tentar novamente." };
+    }
+    try {
+      revalidatePath("/master/acessos-por-empresa");
+      revalidatePath("/master/auditoria");
+      return { status: "success", message: "Permissões da empresa atualizadas e auditadas." };
+    } catch {
+      console.error("[master-governance] company_access_revalidation_failed");
+      return { status: "success", message: "As permissões foram atualizadas e auditadas, mas a tela não pôde ser atualizada. Atualize a página para conferir." };
+    }
+  } catch {
+    console.error("[master-governance] company_access_action_failed");
+    return { status: "error", message: "Não foi possível concluir a atualização. Nenhum sucesso foi confirmado; atualize a página e consulte a auditoria antes de tentar novamente." };
+  }
 }

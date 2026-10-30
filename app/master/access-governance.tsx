@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { masterAccessIdle, setAccessCatalogApprovalAction, setRolePermissionGrantAction } from "@/app/actions/master-access-governance";
+import { setAccessCatalogApprovalAction, setRolePermissionGrantAction } from "@/app/actions/master-access-governance";
+import { masterAccessIdle } from "@/lib/master/action-state";
 import type { MasterAccessControlEntry, MasterAuditItem } from "@/lib/master/read-model";
 
 type Tab = "overview" | "roles" | "catalog" | "grants" | "history" | "availability";

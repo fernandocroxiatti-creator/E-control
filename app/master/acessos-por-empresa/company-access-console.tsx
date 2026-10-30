@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useMemo, useState } from "react";
-import { masterAccessIdle, setCompanyTransactionAvailabilityAction } from "@/app/actions/master-access-governance";
+import { setCompanyTransactionAvailabilityAction } from "@/app/actions/master-access-governance";
+import { masterAccessIdle } from "@/lib/master/action-state";
 import type { MasterCompany, MasterCompanyAccessItem } from "@/lib/master/read-model";
 const names:Record<string,string>={BP01:"Clientes e fornecedores",MM01:"Cadastro de produtos",SV01:"Cadastro de serviços",MIGO:"Movimentação de estoque",ME21N:"Criar pedido de compra",ME23N:"Consultar pedidos de compra"};
 const modules:Record<string,string>={MDM:"Cadastros",INV:"Estoque",PUR:"Compras",SAL:"Vendas",FIN:"Financeiro",SRV:"Serviços",REP:"Relatórios",ADM:"Administração"};
