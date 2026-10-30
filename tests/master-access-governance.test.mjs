@@ -97,6 +97,10 @@ test("company availability presents permission and transaction approval as indep
   assert.match(accessConsole, /Permissão associada/);
   assert.match(accessConsole, /Aprovar a transação na página Papéis e permissões/);
   assert.match(accessConsole, /Salvar permissões da empresa/);
+  assert.match(accessConsole, /Disponibilidade salva/);
+  assert.match(accessConsole, /Alteração pendente/);
+  assert.match(actions, /master_list_company_access/);
+  assert.match(actions, /company_access_postcondition_not_confirmed/);
 });
 
 test("transaction governance always identifies transaction entries by code, not by their associated permission", () => {

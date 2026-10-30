@@ -39,6 +39,25 @@ function refreshGovernanceViews() {
   }
 }
 
+type CompanyAccessRow = { transaction_code?: unknown; enabled?: unknown };
+
+function companyAccessErrorMessage(code: string | undefined) {
+  if (code === "22023") return "Uma transação selecionada ainda não está aprovada globalmente. Revise os estados do catálogo antes de salvar.";
+  if (code === "P0002") return "A empresa não está ativa ou não foi encontrada. Atualize a página antes de tentar novamente.";
+  if (code === "42501") return "Sua sessão não possui autorização Master para alterar a disponibilidade desta empresa.";
+  return "Não foi possível confirmar as permissões da empresa. Atualize a página e consulte a auditoria antes de tentar novamente.";
+}
+
+function hasExpectedCompanyAvailability(value: unknown, expectedCodes: string[]) {
+  if (!Array.isArray(value)) return false;
+  const savedCodes = new Set(
+    value.filter((row): row is CompanyAccessRow => typeof row === "object" && row !== null)
+      .filter((row) => row.enabled === true && typeof row.transaction_code === "string")
+      .map((row) => row.transaction_code as string),
+  );
+  return savedCodes.size === expectedCodes.length && expectedCodes.every((code) => savedCodes.has(code));
+}
+
 export async function setAccessCatalogApprovalAction(
   _state: MasterAccessActionState,
   formData: FormData,
@@ -111,13 +130,18 @@ export async function setRolePermissionGrantAction(
 export async function setCompanyTransactionAvailabilityAction(_state: MasterAccessActionState, formData: FormData): Promise<MasterAccessActionState> {
   if (formData.get("confirmed") !== "on") return { status: "error", message: "Confirmação explícita obrigatória." };
   const tenantId = text(formData, "tenant_id", 64);
-  const codes = formData.getAll("transaction_code").filter((value): value is string => typeof value === "string" && /^[A-Z][A-Z0-9]{1,19}$/.test(value));
+  const codes = [...new Set(formData.getAll("transaction_code").filter((value): value is string => typeof value === "string" && /^[A-Z][A-Z0-9]{1,19}$/.test(value)))].sort();
   if (!/^[0-9a-f-]{36}$/i.test(tenantId)) return { status: "error", message: "Empresa inválida." };
   try { const client = await governanceClient(); if (!client) return { status: "error", message: "A configuração de acessos por empresa ainda não está ativada." };
     const { data, error } = await client.rpc("master_set_company_transaction_availability", { p_tenant_id: tenantId, p_enabled_transaction_codes: codes });
     if (error || data !== "updated") {
-      console.error("[master-governance] company_access_rpc_not_confirmed");
-      return { status: "error", message: "Não foi possível confirmar as permissões da empresa. Atualize a página e consulte a auditoria antes de tentar novamente." };
+      console.error(`[master-governance] company_access_rpc_not_confirmed:${error?.code ?? "unexpected_result"}`);
+      return { status: "error", message: companyAccessErrorMessage(error?.code) };
+    }
+    const confirmation = await client.rpc("master_list_company_access", { p_tenant_id: tenantId });
+    if (confirmation.error || !hasExpectedCompanyAvailability(confirmation.data, codes)) {
+      console.error(`[master-governance] company_access_postcondition_not_confirmed:${confirmation.error?.code ?? "mismatch"}`);
+      return { status: "error", message: "A resposta da gravação foi recebida, mas o estado persistido não pôde ser confirmado. Não repita a operação; atualize a página e consulte a auditoria." };
     }
     try {
       revalidatePath("/master/acessos-por-empresa");

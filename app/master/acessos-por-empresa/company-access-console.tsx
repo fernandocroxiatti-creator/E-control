@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { setCompanyTransactionAvailabilityAction } from "@/app/actions/master-access-governance";
 import { masterAccessIdle } from "@/lib/master/action-state";
 import type { MasterCompany, MasterCompanyAccessItem } from "@/lib/master/read-model";
@@ -32,6 +33,7 @@ function unavailableReason(item: MasterCompanyAccessItem) {
 function CompanyAccessWorkspace({ companies, selected, items, ready }: {
   companies: MasterCompany[]; selected: string; items: MasterCompanyAccessItem[]; ready: boolean;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const initiallyEnabled = useMemo(() => new Set(items.filter((item) => item.enabled).map((item) => item.transaction_code)), [items]);
   const [chosen, setChosen] = useState(() => new Set(initiallyEnabled));
@@ -44,6 +46,10 @@ function CompanyAccessWorkspace({ companies, selected, items, ready }: {
   const company = companies.find((entry) => entry.company_id === selected);
   const changedCodes = items.filter((item) => initiallyEnabled.has(item.transaction_code) !== chosen.has(item.transaction_code)).map((item) => item.transaction_code);
   const hasChanges = changedCodes.length > 0;
+
+  useEffect(() => {
+    if (state.status === "success") router.refresh();
+  }, [router, state.status]);
 
   return <div className="master-company-access">
     <label className="master-governance-search">Buscar empresa
@@ -59,7 +65,9 @@ function CompanyAccessWorkspace({ companies, selected, items, ready }: {
         {Object.entries(grouped).map(([moduleCode, rows]) => <section className="master-catalog-module" key={moduleCode}>
           <header><h5>{modules[moduleCode] ?? moduleCode}</h5><span>{rows.length} transações</span></header>
           <div className="master-company-transaction-list">{rows.map((row) => {
+            const savedForCompany = initiallyEnabled.has(row.transaction_code);
             const selectedForCompany = chosen.has(row.transaction_code);
+            const pendingChange = savedForCompany !== selectedForCompany;
             const eligible = row.approval_state === "approved" && row.permission_approval_state === "approved";
             const canChange = eligible || selectedForCompany;
             return <label className="master-company-transaction" key={row.transaction_code}>
@@ -70,7 +78,8 @@ function CompanyAccessWorkspace({ companies, selected, items, ready }: {
               <span className="master-company-transaction-statuses">
                 <span>Transação global <b className={`master-badge${stateClass(row.approval_state)}`}>{stateLabel(row.approval_state)}</b></span>
                 <span>Permissão associada <b className={`master-badge${stateClass(row.permission_approval_state)}`}>{stateLabel(row.permission_approval_state)}</b></span>
-                <span>Disponibilidade da empresa <b className={`master-badge${selectedForCompany ? " is-positive" : ""}`}>{selectedForCompany ? "Habilitada" : "Não habilitada"}</b></span>
+                <span>Disponibilidade salva <b className={`master-badge${savedForCompany ? " is-positive" : ""}`}>{savedForCompany ? "Habilitada" : "Não habilitada"}</b></span>
+                {pendingChange && <span>Alteração pendente <b className="master-badge">{selectedForCompany ? "Será habilitada" : "Será revogada"}</b></span>}
               </span>
             </label>;
           })}</div>
@@ -86,5 +95,6 @@ function CompanyAccessWorkspace({ companies, selected, items, ready }: {
 }
 
 export function CompanyAccessConsole(props: { companies: MasterCompany[]; selected: string; items: MasterCompanyAccessItem[]; ready: boolean }) {
-  return <CompanyAccessWorkspace key={props.selected} {...props} />;
+  const savedState = props.items.map((item) => `${item.transaction_code}:${item.enabled ? "1" : "0"}`).join("|");
+  return <CompanyAccessWorkspace key={`${props.selected}:${savedState}`} {...props} />;
 }

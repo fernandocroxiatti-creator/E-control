@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { InventoryMovementForm, InventoryMovementHistory } from "@/app/components/operational-catalog";
-import { getAuthorizedTransactionContexts } from "@/lib/companies/authorized-transaction-context";
+import { getOperationalTransactionContexts, operationalContextMessage } from "@/lib/companies/authorized-transaction-context";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { listOperationalInventoryMovements, listOperationalProductOptions, listOperationalStock } from "@/lib/operational/read-model";
 
@@ -14,7 +14,8 @@ function pageLink(search: Search, key: "page" | "history_page", value: number) {
 
 export default async function OperationalInventoryPage({ searchParams }: { searchParams: Promise<Search> }) {
   const search = await searchParams; const client = await createClient(); if (!client) return <p className="master-notice">Integração indisponível.</p>;
-  const { data: { user } } = await client.auth.getUser(); const contexts = user ? await getAuthorizedTransactionContexts(client, user.id) : [];
+  const { data: { user } } = await client.auth.getUser(); const access = user ? await getOperationalTransactionContexts(client, user.id) : { status: "no_active_membership" as const, contexts: [] };
+  const contexts = access.contexts;
   const selected = contexts.find((context) => context.branchId === search.filial) ?? contexts.find((context) => context.tenantId === search.empresa) ?? contexts[0]; const enabled = Boolean(getSupabaseEnv()?.operationalEnabled);
   const stockPage = requestedPage(search.page); const historyPage = requestedPage(search.history_page); const selectedItem = uuid(search.item); const selectedType = movementType(search.movement_type);
   const [stock, history, products] = selected && enabled ? await Promise.all([
@@ -30,7 +31,7 @@ export default async function OperationalInventoryPage({ searchParams }: { searc
       {stock.data.rows.length ? <div className="master-table-wrap" tabIndex={0}><table className="master-table"><thead><tr><th>SKU</th><th>Produto</th><th>Saldo</th><th>Mínimo</th><th>Reposição</th></tr></thead><tbody>{stock.data.rows.map((row) => <tr key={row.item_id}><td><code>{row.code}</code></td><td><strong>{row.name}</strong></td><td>{row.quantity}</td><td>{row.minimum_stock}</td><td>{row.below_reorder_point ? "Atenção" : row.reorder_point}</td></tr>)}</tbody></table></div> : <p className="master-panel-empty">Nenhum produto ativo atende aos filtros desta filial.</p>}
       <nav className="master-pagination" aria-label="Paginação de saldo"><span>Página {stock.data.page}</span>{stock.data.page > 1 ? <Link href={pageLink(search, "page", stock.data.page - 1)}>Anterior</Link> : <span aria-disabled="true">Anterior</span>}{stock.data.hasMore ? <Link href={pageLink(search, "page", stock.data.page + 1)}>Próxima</Link> : <span aria-disabled="true">Próxima</span>}</nav>
       {history?.status === "ready" && <><InventoryMovementHistory movements={history.data.rows} /><nav className="master-pagination" aria-label="Paginação de movimentações"><span>Página {history.data.page}</span>{history.data.page > 1 ? <Link href={pageLink(search, "history_page", history.data.page - 1)}>Anterior</Link> : <span aria-disabled="true">Anterior</span>}{history.data.hasMore ? <Link href={pageLink(search, "history_page", history.data.page + 1)}>Próxima</Link> : <span aria-disabled="true">Próxima</span>}</nav></>}
-    </> : <p className="master-notice">A consulta e os movimentos de estoque permanecem bloqueados até a ativação autorizada da fundação operacional.</p>}
+    </> : <p className="master-notice">{access.status === "ready" ? "A consulta e os movimentos de estoque permanecem bloqueados até a ativação autorizada da fundação operacional." : operationalContextMessage(access.status)}</p>}
     <p className="master-notice"><Link href="/operacional/cadastros">Cadastros operacionais</Link> · A leitura do histórico é feita pela RPC autorizada e não expõe a tabela diretamente.</p>
   </>;
 }

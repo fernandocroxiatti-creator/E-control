@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OperationalCatalog } from "@/app/components/operational-catalog";
 import { getSupabaseEnv } from "@/lib/supabase/env";
-import { getAuthorizedTransactionContexts } from "@/lib/companies/authorized-transaction-context";
+import { getOperationalTransactionContexts, operationalContextMessage } from "@/lib/companies/authorized-transaction-context";
 import { createClient } from "@/lib/supabase/server";
 import { listOperationalItems, listOperationalParties, listOperationalSupplierOptions } from "@/lib/operational/read-model";
 
@@ -27,7 +27,8 @@ export default async function OperationalCatalogPage({ searchParams }: { searchP
   const search = await searchParams; const client = await createClient();
   if (!client) return <p className="master-notice">Integração indisponível.</p>;
   const { data: { user } } = await client.auth.getUser();
-  const contexts = user ? await getAuthorizedTransactionContexts(client, user.id) : [];
+  const access = user ? await getOperationalTransactionContexts(client, user.id) : { status: "no_active_membership" as const, contexts: [] };
+  const contexts = access.contexts;
   const tenantId = contexts.some((context) => context.tenantId === search.empresa) ? search.empresa! : contexts[0]?.tenantId;
   const companies = [...new Map(contexts.map((context) => [context.tenantId, context.companyName])).entries()];
   const env = getSupabaseEnv(); const enabled = Boolean(env?.operationalEnabled);
@@ -47,7 +48,7 @@ export default async function OperationalCatalogPage({ searchParams }: { searchP
       <OperationalCatalog tenantId={tenantId} enabled={enabled} parties={parties?.status === "ready" ? parties.data.rows : []} items={items?.status === "ready" ? items.data.rows : []} suppliers={suppliers?.status === "ready" ? suppliers.data : []} />
       {parties?.status === "ready" && <Pagination label="clientes e fornecedores" current={parties.data.page} hasMore={parties.data.hasMore} search={{ ...filterSearch, item_page: String(itemPage) }} keyName="party_page" />}
       {items?.status === "ready" && <Pagination label="produtos e serviços" current={items.data.page} hasMore={items.data.hasMore} search={{ ...filterSearch, party_page: String(partyPage) }} keyName="item_page" />}
-    </> : <p className="master-notice">Nenhuma empresa autorizada está disponível para consulta.</p>}
+    </> : <p className="master-notice">{operationalContextMessage(access.status)}</p>}
     <p className="master-notice">O <Link href="/operacional/estoque">estoque</Link> usa apenas movimentos auditados e não permite saldo negativo.</p>
   </>;
 }

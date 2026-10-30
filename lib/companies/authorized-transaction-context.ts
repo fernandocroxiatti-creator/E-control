@@ -12,19 +12,23 @@ export type AuthorizedTransactionContext = {
   branchName: string;
 };
 
+export type OperationalContextStatus = "ready" | "no_active_membership" | "no_authorized_branch" | "unavailable";
+export type OperationalContextResult = { status: OperationalContextStatus; contexts: AuthorizedTransactionContext[] };
+
 /** Reads only membership and branch rows visible to the current SSR session through RLS. */
-export async function getAuthorizedTransactionContexts(
+export async function getOperationalTransactionContexts(
   client: ContextClient,
   authenticatedUserId: string,
-): Promise<AuthorizedTransactionContext[]> {
-  if (!authenticatedUserId) return [];
+): Promise<OperationalContextResult> {
+  if (!authenticatedUserId) return { status: "no_active_membership", contexts: [] };
   try {
     const { data: memberships, error: membershipError } = await client
       .from("company_memberships")
       .select("id, tenant_id, branch_access_mode")
       .eq("user_id", authenticatedUserId)
       .eq("status", "active");
-    if (membershipError || !Array.isArray(memberships) || memberships.length === 0) return [];
+    if (membershipError) return { status: "unavailable", contexts: [] };
+    if (!Array.isArray(memberships) || memberships.length === 0) return { status: "no_active_membership", contexts: [] };
 
     const tenantIds = [...new Set(memberships.map((row: { tenant_id: string }) => row.tenant_id))];
     const { data: companies, error: companyError } = await client
@@ -32,7 +36,7 @@ export async function getAuthorizedTransactionContexts(
       .select("id, legal_name")
       .in("id", tenantIds)
       .eq("status", "active");
-    if (companyError || !Array.isArray(companies)) return [];
+    if (companyError || !Array.isArray(companies)) return { status: "unavailable", contexts: [] };
     const companyNames = new Map(companies.map((row: { id: string; legal_name: string }) => [row.id, row.legal_name]));
 
     const contexts: AuthorizedTransactionContext[] = [];
@@ -80,8 +84,23 @@ export async function getAuthorizedTransactionContexts(
         branchName: branch.name,
       })));
     }
-    return contexts;
+    return { status: contexts.length ? "ready" : "no_authorized_branch", contexts };
   } catch {
-    return [];
+    return { status: "unavailable", contexts: [] };
   }
+}
+
+/** Compatibility helper for callers that only need the RLS-authorized contexts. */
+export async function getAuthorizedTransactionContexts(
+  client: ContextClient,
+  authenticatedUserId: string,
+): Promise<AuthorizedTransactionContext[]> {
+  return (await getOperationalTransactionContexts(client, authenticatedUserId)).contexts;
+}
+
+export function operationalContextMessage(status: OperationalContextStatus) {
+  if (status === "no_active_membership") return "Você não possui vínculo empresarial ativo. Um administrador da empresa deve concluir o convite, a aprovação do vínculo e a atribuição de filial.";
+  if (status === "no_authorized_branch") return "Seu vínculo empresarial não possui uma filial ativa autorizada. Solicite a revisão da filial vinculada ao seu acesso.";
+  if (status === "unavailable") return "Não foi possível verificar seu contexto empresarial. O acesso operacional permanece bloqueado por segurança.";
+  return "";
 }
