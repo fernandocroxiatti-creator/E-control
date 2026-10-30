@@ -3,6 +3,7 @@ import { ErpDashboard } from "@/app/components/erp-dashboard";
 import { createClient } from "@/lib/supabase/server";
 import { isCurrentSessionMaster } from "@/lib/master/authorization-check";
 import { getAuthorizedTransactionContexts } from "@/lib/companies/authorized-transaction-context";
+import { getSupabaseEnv } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 
@@ -16,5 +17,5 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const showMasterAdmin = await isCurrentSessionMaster(supabase);
   const transactionContexts = await getAuthorizedTransactionContexts(supabase, user.id);
   const { password } = await searchParams;
-  return <ErpDashboard email={user.email ?? "Usuário autenticado"} showMasterAdmin={showMasterAdmin} passwordUpdated={password === "updated"} transactionContexts={transactionContexts} />;
+  return <ErpDashboard email={user.email ?? "Usuário autenticado"} showMasterAdmin={showMasterAdmin} passwordUpdated={password === "updated"} transactionContexts={transactionContexts} operationalEnabled={Boolean(getSupabaseEnv()?.operationalEnabled)} />;
 }

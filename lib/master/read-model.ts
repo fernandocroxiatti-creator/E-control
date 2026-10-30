@@ -72,6 +72,15 @@ export type MasterCatalogItem = {
   approval_state: string;
   related_permission_count: number;
 };
+export type MasterAccessControlEntry = {
+  entry_type: "role" | "permission" | "transaction" | "role_permission";
+  role_key: string | null;
+  permission_key: string | null;
+  transaction_code: string | null;
+  display_name: string;
+  scope: string | null;
+  approval_state: string;
+};
 
 async function invokeMasterRead<T>(
   name: string,
@@ -168,6 +177,14 @@ export async function getMasterAccessCatalog(): Promise<ReadResult<MasterCatalog
     : { status: "unavailable" };
 }
 
+export async function getMasterAccessControlMatrix(): Promise<ReadResult<MasterAccessControlEntry[]>> {
+  const result = await invokeMasterRead<unknown>("master_list_access_control_matrix");
+  return result.status === "ready" && isArrayOfRecords<MasterAccessControlEntry>(result.data,
+    ["entry_type", "role_key", "permission_key", "transaction_code", "display_name", "scope", "approval_state"])
+    ? { status: "ready", data: result.data }
+    : { status: "unavailable" };
+}
+
 export async function getMasterAudit(limit = 50): Promise<ReadResult<MasterAuditItem[]>> {
   const result = await invokeMasterRead<unknown>("master_admin_list_audit", { p_limit: limit });
   return result.status === "ready" && isArrayOfRecords<MasterAuditItem>(result.data,
@@ -213,6 +230,20 @@ export async function getMasterCompanyInvitationsEnabled(): Promise<boolean> {
     if (!client) return false;
     const { data, error } = await client.rpc("master_admin_management_ready");
     return !error && data === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getMasterAccessGovernanceEnabled(): Promise<boolean> {
+  const env = getSupabaseEnv();
+  if (!env || !isAuthorizedSupabaseTarget(env) || !env.companyManagementEnabled || !env.accessGovernanceEnabled) return false;
+  await requireMasterUser();
+  try {
+    const client = await createClient();
+    if (!client) return false;
+    const { data: { user }, error } = await client.auth.getUser();
+    return !error && Boolean(user);
   } catch {
     return false;
   }

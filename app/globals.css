@@ -320,6 +320,10 @@ h1{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;font-size:clamp(1.8re
 .master-filter-form label{display:grid;gap:.3rem;min-width:min(17rem,100%);color:#53665d;font-size:.65rem;font-weight:750}
 .master-filter-form input,.master-filter-form select{min-height:2.45rem;padding:.55rem .65rem;border:1px solid #d9e4dd;border-radius:.55rem;background:#fff;color:#2e453a;font:inherit}
 .master-filter-form button{min-height:2.45rem;padding:.55rem .9rem;border:0;border-radius:.55rem;background:#17684f;color:#fff;font:inherit;font-size:.68rem;font-weight:750;cursor:pointer}
+.master-pagination{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin:.85rem 0 1.35rem;color:#61736a;font-size:.68rem}
+.master-pagination a,.master-pagination [aria-disabled=true]{min-width:5.6rem;padding:.48rem .7rem;border:1px solid #d6e3dc;border-radius:.5rem;text-align:center;text-decoration:none}
+.master-pagination a{background:#fff;color:#17684f;font-weight:750}
+.master-pagination [aria-disabled=true]{color:#a3aea8;background:#f7f9f8}
 .master-quick-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}
 .master-quick-links a,.master-company-choice{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.75rem;border:1px solid #e6ede8;border-radius:.65rem;color:#3f5b4d;font-size:.7rem;font-weight:700;text-decoration:none}
 .master-quick-links a:hover,.master-company-choice:hover,.master-company-choice.is-selected{border-color:#c7dfd0;background:#f4faf6;text-decoration:none}
@@ -374,6 +378,7 @@ h1{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;font-size:clamp(1.8re
 .master-row-editor{margin:.25rem 0;color:#17684f;font-size:.65rem}
 .master-row-editor summary{cursor:pointer;font-weight:750}
 .master-row-editor .master-v2-form{min-width:18rem;margin:.75rem 0;padding:.8rem;border:1px solid #e3ebe6;border-radius:.65rem;background:#fbfdfb}
+.master-row-editor summary{margin-top:.35rem;color:#17684f;cursor:pointer;font-size:.63rem;font-weight:750}
 .master-muted{color:#849189;font-size:.65rem}
 .master-company-feedback.is-compact{position:relative;margin:.3rem 0;padding:.38rem .55rem;font-size:.61rem}
 .master-feedback-dismiss{margin-left:.6rem;border:0;background:transparent;color:inherit;font-size:1rem;cursor:pointer}

@@ -34,6 +34,10 @@ for required in \
   "$ROOT/supabase/migrations/20261026100000_master_company_branch_management.sql" \
   "$ROOT/supabase/migrations/20261027180000_company_admin_invitations.sql" \
   "$ROOT/supabase/migrations/20261027190000_company_role_permission_authorization.sql" \
+  "$ROOT/supabase/migrations/20261029130000_operational_erp_foundation.sql" \
+  "$ROOT/supabase/migrations/20261029140000_company_membership_operational_management.sql" \
+  "$ROOT/supabase/migrations/20261030100000_master_access_governance.sql" \
+  "$ROOT/tests/sql/master-access-governance-behavior.sql" \
   "$SCRIPT_DIR/../EC-ROLE-01-local/01_role_permission_behavior.sql"; do
   [ -f "$required" ] || { echo "FAIL: required test input missing: $required" >&2; exit 2; }
 done
@@ -84,3 +88,7 @@ run_sql company-admin-invitations "$ROOT/supabase/migrations/20261027180000_comp
 run_sql company-role-permission-authorization "$ROOT/supabase/migrations/20261027190000_company_role_permission_authorization.sql"
 run_sql invitation-behavior "$SCRIPT_DIR/03_invitation_behavior.sql"
 run_sql role-permission-behavior "$SCRIPT_DIR/../EC-ROLE-01-local/01_role_permission_behavior.sql"
+run_sql operational-foundation "$ROOT/supabase/migrations/20261029130000_operational_erp_foundation.sql"
+run_sql operational-membership-management "$ROOT/supabase/migrations/20261029140000_company_membership_operational_management.sql"
+run_sql master-access-governance "$ROOT/supabase/migrations/20261030100000_master_access_governance.sql"
+run_sql master-access-governance-behavior "$ROOT/tests/sql/master-access-governance-behavior.sql"

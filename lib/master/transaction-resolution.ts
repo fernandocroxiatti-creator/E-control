@@ -6,6 +6,20 @@ export const transactionCatalog = {
     route: null,
     enabled: false,
   },
+  ME23N: {
+    module: "PUR",
+    label: "Consultar pedido de compra",
+    permissionKey: "transaction.purchasing.purchase_order.read",
+    route: null,
+    enabled: false,
+  },
+  MIGO: {
+    module: "INV",
+    label: "Movimentar estoque",
+    permissionKey: "transaction.inventory.stock.move",
+    route: null,
+    enabled: false,
+  },
 } as const;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

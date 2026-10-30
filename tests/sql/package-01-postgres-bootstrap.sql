@@ -17,7 +17,39 @@ create table public.role_permission_grants (role_key text not null references pu
 create table public.membership_role_assignments (id uuid primary key default gen_random_uuid(),tenant_id uuid not null,membership_id uuid not null,role_key text not null references public.access_role_definitions(role_key),branch_id uuid,assigned_by_user_id uuid not null references auth.users(id));
 create table public.erp_transaction_authorization_catalog (transaction_code text primary key,module_code text not null,permission_key text not null references public.permission_definitions(permission_key),approval_state text not null default 'pending_approval',created_at timestamptz not null default now());
 create table app_private.provisioning_audit_events (id uuid primary key default gen_random_uuid(),event_key text not null,tenant_id uuid,subject_user_id uuid,actor_user_id uuid,actor_database_role text,actor_api_role text,details jsonb default '{}'::jsonb,created_at timestamptz not null default now());
+create table app_private.master_admins (user_id uuid primary key references auth.users(id), status text not null, authorized_by_user_id uuid references auth.users(id), authorization_reason text, approval_reference text);
 create function app_private.is_active_company_member(uuid) returns boolean language sql stable as $$ select true $$;
 create function app_private.can_access_branch(uuid,uuid) returns boolean language sql stable as $$ select true $$;
 create function app_private.has_tenant_permission(uuid,text,uuid default null) returns boolean language sql stable as $$ select true $$;
 create function app_private.write_provisioning_audit(text,uuid,uuid,uuid,jsonb) returns void language sql as $$ insert into app_private.provisioning_audit_events(event_key,tenant_id,subject_user_id,actor_user_id,details) values($1,$2,$3,$4,$5) $$;
+create function app_private.assert_current_master() returns uuid language plpgsql stable as $$
+declare actor_id uuid;
+begin
+  actor_id := auth.uid();
+  if coalesce(auth.role(),'') <> 'authenticated' or actor_id is null
+    or not exists (select 1 from app_private.master_admins where user_id=actor_id and status='active') then
+    raise exception 'Active Admin Master authorization required' using errcode='42501';
+  end if;
+  return actor_id;
+end $$;
+create function public.is_current_user_master() returns boolean language sql stable as $$
+  select auth.uid() is not null and exists (select 1 from app_private.master_admins where user_id=auth.uid() and status='active')
+$$;
+alter table public.companies enable row level security;
+alter table public.companies force row level security;
+alter table public.branches enable row level security;
+alter table public.branches force row level security;
+alter table public.company_memberships enable row level security;
+alter table public.company_memberships force row level security;
+alter table public.branch_access enable row level security;
+alter table public.branch_access force row level security;
+alter table public.permission_definitions enable row level security;
+alter table public.permission_definitions force row level security;
+alter table public.access_role_definitions enable row level security;
+alter table public.access_role_definitions force row level security;
+alter table public.role_permission_grants enable row level security;
+alter table public.role_permission_grants force row level security;
+alter table public.membership_role_assignments enable row level security;
+alter table public.membership_role_assignments force row level security;
+alter table public.erp_transaction_authorization_catalog enable row level security;
+alter table public.erp_transaction_authorization_catalog force row level security;

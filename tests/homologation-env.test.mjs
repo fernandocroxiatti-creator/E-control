@@ -37,6 +37,7 @@ test("accepts only the exact explicitly enabled homologation project and a publi
     companyCreationEnabled: false,
     companyManagementEnabled: false,
     companyInvitationsEnabled: false,
+    accessGovernanceEnabled: false,
     operationalEnabled: false,
   });
 });
@@ -60,6 +61,7 @@ test("accepts only exact explicit production config and keeps writes disabled by
     companyCreationEnabled: false,
     companyManagementEnabled: false,
     companyInvitationsEnabled: false,
+    accessGovernanceEnabled: false,
     operationalEnabled: false,
   });
 });
@@ -133,6 +135,7 @@ test("Preview can use only standard public variables when they identify exact HM
     companyCreationEnabled: false,
     companyManagementEnabled: false,
     companyInvitationsEnabled: false,
+    accessGovernanceEnabled: false,
     operationalEnabled: false,
   });
   assert.equal(resolveSupabaseEnv(previewConfigured)?.projectId, HOMOLOGATION_PROJECT_ID);
@@ -181,6 +184,19 @@ test("company invitations require a separate explicit environment flag", () => {
     ...productionConfigured,
     ECONTROLL_PROD_COMPANY_INVITATIONS_ENABLED: "true",
   })?.companyInvitationsEnabled, true);
+});
+
+test("Master access governance requires a separate explicit environment flag", () => {
+  assert.equal(resolveHomologationSupabaseEnv(configured)?.accessGovernanceEnabled, false);
+  assert.equal(resolveHomologationSupabaseEnv({
+    ...configured,
+    ECONTROLL_HML_ACCESS_GOVERNANCE_ENABLED: "true",
+  })?.accessGovernanceEnabled, true);
+  assert.equal(resolveProductionSupabaseEnv(productionConfigured)?.accessGovernanceEnabled, false);
+  assert.equal(resolveProductionSupabaseEnv({
+    ...productionConfigured,
+    ECONTROLL_PROD_ACCESS_GOVERNANCE_ENABLED: "true",
+  })?.accessGovernanceEnabled, true);
 });
 
 test("homologation recovery links use localhost or a Vercel Preview host", () => {

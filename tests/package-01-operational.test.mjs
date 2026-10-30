@@ -11,6 +11,11 @@ const members = read("supabase/migrations/20261029140000_company_membership_oper
 const actions = read("app/actions/operational.ts");
 const catalog = read("app/components/operational-catalog.tsx");
 const team = read("app/operacional/equipe/page.tsx");
+const catalogPage = read("app/operacional/cadastros/page.tsx");
+const stockPage = read("app/operacional/estoque/page.tsx");
+const operationalReadModel = read("lib/operational/read-model.ts");
+const dashboard = read("app/components/erp-dashboard.tsx");
+const dashboardPage = read("app/dashboard/page.tsx");
 
 test("operational foundation is tenant-scoped, append-audited and direct-table closed", () => {
   for (const table of ["business_parties", "catalog_items", "catalog_item_cost_history", "inventory_balances", "inventory_movements"]) {
@@ -76,4 +81,33 @@ test("browser-facing operational actions remain server-session and explicit-flag
   assert.match(catalog, /OperationalTeam/);
   assert.match(actions, /setOperationalMembershipStatusAction/);
   assert.match(team, /listOperationalMemberships/);
+});
+
+test("dashboard exposes an authorized business context without bypassing the operational flag", () => {
+  assert.match(dashboard, /operationalEnabled = false/);
+  assert.match(dashboard, /const operationalReady = operationalEnabled && Boolean\(activeContext\)/);
+  assert.match(dashboard, /Acesso empresarial ativo/);
+  assert.match(dashboard, /Operações aguardando habilitação/);
+  assert.match(dashboard, /Acesso operacional bloqueado/);
+  assert.match(dashboard, /companyName.*branchCode.*branchName/s);
+  assert.match(dashboardPage, /transactionContexts=\{transactionContexts\}/);
+  assert.match(dashboardPage, /operationalEnabled=\{Boolean\(getSupabaseEnv\(\)\?\.operationalEnabled\)\}/);
+});
+
+test("operational catalog uses the approved update RPCs and bounded server-side pagination", () => {
+  assert.match(actions, /operational_update_business_party/);
+  assert.match(actions, /operational_update_catalog_item/);
+  assert.match(actions, /updateBusinessPartyAction/);
+  assert.match(actions, /updateCatalogItemAction/);
+  assert.match(catalog, /Editar cadastro/);
+  assert.match(catalog, /Editar item/);
+  assert.match(catalogPage, /party_type/);
+  assert.match(catalogPage, /item_status/);
+  assert.match(catalogPage, /Pagination/);
+  assert.match(operationalReadModel, /const PAGE_SIZE = 25/);
+  assert.match(operationalReadModel, /p_limit: PAGE_SIZE \+ 1/);
+  assert.match(operationalReadModel, /p_offset: \(currentPage - 1\) \* PAGE_SIZE/);
+  assert.match(stockPage, /Paginação de saldo/);
+  assert.match(stockPage, /Paginação de movimentações/);
+  assert.doesNotMatch(actions, /service_role|SUPABASE_SERVICE_ROLE_KEY|console\.(?:log|error)/i);
 });

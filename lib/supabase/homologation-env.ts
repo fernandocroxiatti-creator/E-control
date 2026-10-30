@@ -14,6 +14,7 @@ export type SupabaseEnvironment = {
   companyCreationEnabled: boolean;
   companyManagementEnabled: boolean;
   companyInvitationsEnabled: boolean;
+  accessGovernanceEnabled: boolean;
   operationalEnabled: boolean;
 };
 
@@ -40,6 +41,7 @@ export function resolveHomologationSupabaseEnv(
     companyCreationEnabled: env.ECONTROLL_HML_COMPANY_CREATION_ENABLED === "true",
     companyManagementEnabled: env.ECONTROLL_HML_COMPANY_MANAGEMENT_ENABLED === "true",
     companyInvitationsEnabled: env.ECONTROLL_HML_COMPANY_INVITATIONS_ENABLED === "true",
+    accessGovernanceEnabled: env.ECONTROLL_HML_ACCESS_GOVERNANCE_ENABLED === "true",
     operationalEnabled: env.ECONTROLL_HML_OPERATIONAL_ENABLED === "true",
   };
 }
@@ -70,6 +72,7 @@ export function resolvePreviewHomologationSupabaseEnv(
     companyCreationEnabled: false,
     companyManagementEnabled: false,
     companyInvitationsEnabled: false,
+    accessGovernanceEnabled: false,
     operationalEnabled: false,
   };
 }
@@ -95,6 +98,7 @@ export function resolveProductionSupabaseEnv(env: HomologationEnvironment): Supa
     companyCreationEnabled: env.ECONTROLL_PROD_COMPANY_CREATION_ENABLED === "true",
     companyManagementEnabled: env.ECONTROLL_PROD_COMPANY_MANAGEMENT_ENABLED === "true",
     companyInvitationsEnabled: env.ECONTROLL_PROD_COMPANY_INVITATIONS_ENABLED === "true",
+    accessGovernanceEnabled: env.ECONTROLL_PROD_ACCESS_GOVERNANCE_ENABLED === "true",
     operationalEnabled: env.ECONTROLL_PROD_OPERATIONAL_ENABLED === "true",
   };
 }
