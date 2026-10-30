@@ -1,26 +1,59 @@
-export const transactionCatalog = {
-  ME21N: {
-    module: "PUR",
-    label: "Criar pedido de compra",
-    permissionKey: "transaction.purchasing.purchase_order.create",
-    route: null,
-    enabled: false,
+export type ErpTransactionDefinition = {
+  code: string;
+  moduleCode: "MDM" | "INV" | "PUR";
+  moduleName: string;
+  name: string;
+  description: string;
+  permissionKey: string;
+  route: string;
+};
+
+/**
+ * Browser-safe presentation metadata. Authorization never relies on this map:
+ * every lookup is verified by authorize_company_transaction on the server.
+ */
+export const erpTransactionCatalog = {
+  BP01: {
+    code: "BP01", moduleCode: "MDM", moduleName: "Cadastros", name: "Clientes e fornecedores",
+    description: "Consulta e gestão de parceiros comerciais autorizados.",
+    permissionKey: "transaction.masterdata.party.manage", route: "/operacional/cadastros",
   },
-  ME23N: {
-    module: "PUR",
-    label: "Consultar pedido de compra",
-    permissionKey: "transaction.purchasing.purchase_order.read",
-    route: null,
-    enabled: false,
+  MM01: {
+    code: "MM01", moduleCode: "MDM", moduleName: "Estoque e produtos", name: "Cadastro de produtos",
+    description: "Consulta e gestão do catálogo de produtos.",
+    permissionKey: "transaction.masterdata.catalog.product.manage", route: "/operacional/cadastros?item_type=product",
+  },
+  SV01: {
+    code: "SV01", moduleCode: "MDM", moduleName: "Cadastros", name: "Cadastro de serviços",
+    description: "Consulta e gestão do catálogo de serviços.",
+    permissionKey: "transaction.masterdata.catalog.service.manage", route: "/operacional/cadastros?item_type=service",
   },
   MIGO: {
-    module: "INV",
-    label: "Movimentar estoque",
-    permissionKey: "transaction.inventory.stock.move",
-    route: null,
-    enabled: false,
+    code: "MIGO", moduleCode: "INV", moduleName: "Estoque e produtos", name: "Movimentação de estoque",
+    description: "Entradas, saídas e ajustes de estoque autorizados.",
+    permissionKey: "transaction.inventory.stock.move", route: "/operacional/estoque",
   },
-} as const;
+  ME21N: {
+    code: "ME21N", moduleCode: "PUR", moduleName: "Compras", name: "Criar pedido de compra",
+    description: "Criação de pedidos de compra em rascunho.",
+    permissionKey: "transaction.purchasing.purchase_order.create", route: "/operacional/compras",
+  },
+  ME23N: {
+    code: "ME23N", moduleCode: "PUR", moduleName: "Compras", name: "Consultar pedidos de compra",
+    description: "Consulta dos pedidos de compra autorizados.",
+    permissionKey: "transaction.purchasing.purchase_order.read", route: "/operacional/compras",
+  },
+} as const satisfies Record<string, ErpTransactionDefinition>;
+
+export type ErpTransactionCode = keyof typeof erpTransactionCatalog;
+
+export function getErpTransactionDefinition(code: string | null | undefined): ErpTransactionDefinition | null {
+  if (!code || !Object.hasOwn(erpTransactionCatalog, code)) return null;
+  return erpTransactionCatalog[code as ErpTransactionCode];
+}
+
+
+export const transactionCatalog = erpTransactionCatalog;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CODE = /^[A-Z][A-Z0-9]{1,19}$/;
@@ -37,8 +70,7 @@ export function validateTransactionContext(companyId: unknown, branchId: unknown
 }
 
 export function transactionHasExecutableRoute(code: string): boolean {
-  const entry = transactionCatalog[code as keyof typeof transactionCatalog];
-  return Boolean(entry?.enabled && entry.route);
+  return Boolean(getErpTransactionDefinition(code)?.route);
 }
 
 export type TransactionLookupClient = {
@@ -49,9 +81,10 @@ export type TransactionLookupClient = {
 };
 
 export type TransactionLookupResult =
-  | { status: "invalid" | "unknown" | "unauthenticated" | "context_required" | "unavailable" | "denied" | "authorized" };
+  | { status: "invalid" | "unknown" | "unauthenticated" | "context_required" | "unavailable" | "denied" }
+  | { status: "authorized"; code: string; route: string; name: string };
 
-/** Resolves an ERP transaction through the authenticated, tenant-and-branch-scoped database policy. */
+/** Resolves one known transaction through the authenticated, tenant-and-branch-scoped database policy. */
 export async function resolveTransactionForSession(
   client: TransactionLookupClient,
   rawCode: unknown,
@@ -60,6 +93,8 @@ export async function resolveTransactionForSession(
 ): Promise<TransactionLookupResult> {
   const code = normalizeTransactionInput(rawCode);
   if (!code) return { status: "invalid" };
+  const definition = getErpTransactionDefinition(code);
+  if (!definition) return { status: "unknown" };
   let user: { id: string } | null;
   try {
     const result = await client.auth.getUser();
@@ -69,7 +104,6 @@ export async function resolveTransactionForSession(
     return { status: "unauthenticated" };
   }
   if (!user.id) return { status: "unauthenticated" };
-  if (!Object.hasOwn(transactionCatalog, code)) return { status: "unknown" };
   if (!validateTransactionContext(tenantId, branchId)) return { status: "context_required" };
   try {
     const { data, error } = await client.rpc("authorize_company_transaction", {
@@ -78,7 +112,7 @@ export async function resolveTransactionForSession(
       p_transaction_code: code,
     });
     if (error || typeof data !== "boolean") return { status: "unavailable" };
-    return data ? { status: "authorized" } : { status: "denied" };
+    return data ? { status: "authorized", code, route: definition.route, name: definition.name } : { status: "denied" };
   } catch {
     return { status: "unavailable" };
   }

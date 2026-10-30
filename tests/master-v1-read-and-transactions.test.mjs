@@ -19,13 +19,16 @@ function authClient({ user = { id: "user-session" }, error = null, throws = fals
   return { auth: { async getUser() { if (throws) throw new Error("private auth error"); return { data: { user }, error }; } } };
 }
 
-test("transaction code is normalized and constrained without accepting a route", () => {
+test("transaction catalog contains the six implemented ERP codes and stable operational routes", () => {
   assert.equal(normalizeTransactionInput(" me21n "), "ME21N");
   assert.equal(normalizeTransactionInput("../../admin"), null);
   assert.equal(normalizeTransactionInput(""), null);
-  assert.equal(transactionHasExecutableRoute("ME21N"), false);
-  assert.equal(transactionCatalog.ME21N.enabled, false);
-  assert.equal(transactionCatalog.ME21N.route, null);
+  for (const code of ["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N"]) {
+    assert.equal(transactionHasExecutableRoute(code), true);
+    assert.match(transactionCatalog[code].route, /^\/operacional\//);
+  }
+  assert.equal(transactionCatalog.MIGO.permissionKey, "transaction.inventory.stock.move");
+  assert.equal(transactionCatalog.ME23N.permissionKey, "transaction.purchasing.purchase_order.read");
 });
 
 test("transaction context requires valid company and branch UUIDs", () => {
@@ -55,7 +58,9 @@ test("transaction authorization calls the authenticated tenant RPC only with val
       return { data: true, error: null };
     },
   };
-  assert.deepEqual(await resolveTransactionForSession(client, "me21n", company, branch), { status: "authorized" });
+  assert.deepEqual(await resolveTransactionForSession(client, "me21n", company, branch), {
+    status: "authorized", code: "ME21N", route: "/operacional/compras", name: "Criar pedido de compra",
+  });
   assert.deepEqual(calls, [{
     name: "authorize_company_transaction",
     args: { p_tenant_id: company, p_branch_id: branch, p_transaction_code: "ME21N" },

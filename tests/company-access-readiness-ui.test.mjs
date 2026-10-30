@@ -57,6 +57,6 @@ test("membership and governance screens retain server-authorized data and do not
   assert.match(permissions, /getMasterAudit\(50\)/);
   assert.match(permissions, /AccessGovernance/);
   assert.doesNotMatch(permissions, /getMasterAccessCatalog/);
-  assert.match(transactions, /Catálogo instalado, consulta Master pendente/);
+  assert.match(transactions, /estado real de aprovação e a disponibilidade por empresa são administrados em Papéis e permissões/);
   assert.doesNotMatch(transactions, /Não há migration de catálogo instalada/);
 });

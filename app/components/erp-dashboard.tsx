@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { signOutAction } from "@/app/actions/auth";
 import { lookupTransactionCode } from "@/app/actions/transaction-lookup";
@@ -40,6 +41,7 @@ const tiles = [
 ];
 
 export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated = false, activeSection = "overview", transactionContexts = [], operationalEnabled = false, children }: { email: string; showMasterAdmin?: boolean; passwordUpdated?: boolean; activeSection?: string; transactionContexts?: AuthorizedTransactionContext[]; operationalEnabled?: boolean; children?: React.ReactNode }) {
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [transactionCode, setTransactionCode] = useState("");
@@ -80,8 +82,12 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
     startTransactionTransition(async () => {
       try {
         const result = await lookupTransactionCode(code, selectedTenantId, selectedBranchId);
-        setTransactionMessage(result.status === "authorized"
-          ? `${code}: autorização confirmada para o contexto selecionado; a transação ainda não possui uma rotina operacional publicada.`
+        if (result.status === "authorized") {
+          const query = new URLSearchParams({ empresa: selectedTenantId, filial: selectedBranchId });
+          router.push(`${result.route}${result.route.includes("?") ? "&" : "?"}${query.toString()}`);
+          return;
+        }
+        setTransactionMessage(result.status === "disabled" ? "A transação foi autorizada, mas o ambiente operacional ainda não foi habilitado."
           : result.status === "denied" ? "Acesso negado para esta transação, empresa ou filial."
             : result.status === "context_required" ? "Selecione uma empresa e uma filial autorizadas."
               : result.status === "unknown" ? "Transação não encontrada."

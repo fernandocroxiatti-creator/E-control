@@ -11,6 +11,7 @@ const actions = read("app/actions/master-access-governance.ts");
 const actionState = read("lib/master/action-state.ts");
 const page = read("app/master/permissoes/page.tsx");
 const governanceUi = read("app/master/access-governance.tsx");
+const transactionCatalog = read("lib/master/transaction-resolution.ts");
 const environment = read("lib/supabase/homologation-env.ts");
 
 test("Master governance adds pending stock reads without approving catalog access or creating grants", () => {
@@ -55,14 +56,14 @@ test("permission console keeps confirmed governance controls while presenting ro
     assert.match(governanceUi, new RegExp(tab));
   }
   assert.match(governanceUi, /Proprietário empresarial/);
-  assert.match(governanceUi, /Cadastro de produtos/);
+  assert.match(transactionCatalog, /Cadastro de produtos/);
   assert.match(governanceUi, /Detalhes avançados/);
   assert.match(governanceUi, /name="confirmed" required/);
   assert.match(governanceUi, /setAccessCatalogApprovalAction/);
   assert.match(governanceUi, /setRolePermissionGrantAction/);
   assert.match(page, /getMasterAudit\(50\)/);
   assert.doesNotMatch(page, /CatalogTable/);
-  assert.match(governanceUi, /camada de disponibilidade empresarial ainda não está instalada/i);
+  assert.match(governanceUi, /Acessos por empresa/);
 });
 
 test("the local isolated suite exercises Master denial, approval, grant, idempotency, revocation and audit", () => {
@@ -96,4 +97,12 @@ test("company availability presents permission and transaction approval as indep
   assert.match(accessConsole, /Permissão associada/);
   assert.match(accessConsole, /Aprovar a transação na página Papéis e permissões/);
   assert.match(accessConsole, /Salvar permissões da empresa/);
+});
+
+test("transaction governance always identifies transaction entries by code, not by their associated permission", () => {
+  const governanceUi = read("app/master/access-governance.tsx");
+  const catalog = read("lib/master/transaction-resolution.ts");
+  assert.match(governanceUi, /entry\.entry_type === "transaction" \? entry\.transaction_code/);
+  assert.match(governanceUi, /getErpTransactionDefinition/);
+  for (const code of ["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N"]) assert.match(catalog, new RegExp(`${code}:`));
 });
