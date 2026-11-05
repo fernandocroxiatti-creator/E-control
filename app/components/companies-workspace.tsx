@@ -1,168 +1,67 @@
 "use client";
 
-import { useState } from "react";
-import { isValidCnpj, validateBranchDraft } from "@/lib/companies/branch-validation";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import type { AuthorizedTransactionContext, OperationalContextStatus } from "@/lib/companies/authorized-transaction-context";
+import { operationalContextMessage } from "@/lib/companies/authorized-transaction-context";
 
 type WorkspaceView = "companies" | "new-company" | "branches" | "new-branch";
+type CompanyRow = { tenantId: string; companyName: string; branches: AuthorizedTransactionContext[] };
 
-const emptyCompanies: never[] = [];
-const emptyBranches: never[] = [];
-
-function digits(value: string) {
-  return value.replace(/\D/g, "");
-}
-
-function formatCnpj(value: string) {
-  return digits(value).slice(0, 14).replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
-}
-
-function formatPhone(value: string) {
-  const phone = digits(value).slice(0, 11);
-  if (phone.length <= 2) return phone ? `(${phone}` : "";
-  const area = phone.slice(0, 2);
-  const rest = phone.slice(2);
-  if (phone.length <= 10) return `(${area}) ${rest.slice(0, 4)}${rest.length > 4 ? `-${rest.slice(4)}` : ""}`;
-  return `(${area}) ${rest.slice(0, 5)}${rest.length > 5 ? `-${rest.slice(5)}` : ""}`;
-}
-
-function formatCep(value: string) {
-  return digits(value).slice(0, 8).replace(/^(\d{5})(\d)/, "$1-$2");
-}
-
-export function CompaniesWorkspace({ view }: { view: WorkspaceView }) {
-  const [query, setQuery] = useState("");
-  const [message, setMessage] = useState("");
-  const [formError, setFormError] = useState("");
-  const [cnpj, setCnpj] = useState("");
-  const [phone, setPhone] = useState("");
-  const [cep, setCep] = useState("");
-
-  const isCompanyForm = view === "new-company";
-  const isBranchForm = view === "new-branch";
-  const heading = view === "companies" ? "Empresas" : view === "branches" ? "Filiais" : isCompanyForm ? "Nova empresa" : "Nova filial";
-  const kicker = view === "branches" || isBranchForm ? "EMPRESAS / FILIAIS" : "EMPRESAS E FILIAIS";
-
-  function submitPreparationForm(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage("");
-    setFormError("");
-    const form = event.currentTarget;
-    if (!form.reportValidity()) return;
-    if (isBranchForm) {
-      const formData = new FormData(form);
-      const validation = validateBranchDraft({
-        name: String(formData.get("branch_name") ?? ""),
-        code: String(formData.get("branch_code") ?? ""),
-        cnpj,
-      });
-      if (!validation.valid) {
-        setFormError(validation.message);
-        return;
-      }
-      setMessage("Dados da filial válidos localmente. A gravação permanece bloqueada até existir autorização empresarial persistente e um caminho de escrita seguro.");
-      return;
-    }
-    if (cnpj && !isValidCnpj(cnpj)) {
-      setFormError("Confira o CNPJ informado. A validação realizada é apenas local.");
-      return;
-    }
-    setMessage("Os campos foram conferidos localmente. A gravação estará disponível após a ativação segura do módulo.");
+function companyRows(contexts: AuthorizedTransactionContext[]) {
+  const rows = new Map<string, CompanyRow>();
+  for (const context of contexts) {
+    const row = rows.get(context.tenantId) ?? { tenantId: context.tenantId, companyName: context.companyName, branches: [] };
+    row.branches.push(context);
+    rows.set(context.tenantId, row);
   }
-
-  return (
-    <>
-      <div className="page-heading-row companies-heading">
-        <div><p className="page-kicker">E-CONTROL / {kicker}</p><h1>{heading}</h1><p className="page-subtitle">Gerenciamento em preparação, sem acesso a dados empresariais nesta etapa.</p></div>
-        <span className="workspace-badge"><span className="environment-dot" /> Em preparação</span>
-      </div>
-
-      {view === "companies" && <>
-        <div className="companies-toolbar">
-          <label className="companies-search" htmlFor="company-search"><span aria-hidden="true">⌕</span><input id="company-search" type="search" placeholder="Pesquisar por nome ou CNPJ" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-          <select aria-label="Filtrar situação" defaultValue="all"><option value="all">Todas as situações</option><option value="active">Ativa</option><option value="suspended">Suspensa</option><option value="inactive">Inativa</option></select>
-          <a className="primary-button companies-action" href="/empresas/nova">Nova empresa</a>
-        </div>
-        <div className="companies-subnav" aria-label="Navegação de empresas e filiais"><a className="is-current" href="/empresas" aria-current="page">Empresas</a><a href="/empresas/filiais">Filiais</a></div>
-        <StatusLegend />
-        {emptyCompanies.length === 0 ? <EmptyState title={query ? "Nenhuma empresa encontrada" : "Nenhuma empresa disponível"} detail={query ? "A pesquisa é somente visual. Registros reais aparecerão quando a integração autorizada estiver ativa." : "Empresas reais serão exibidas após a ativação segura do módulo e a autorização do escopo empresarial."} actionLabel="Preparar cadastro" actionHref="/empresas/nova" /> : <CompanyRows />}
-        <PendingActions labels={["Visualizar", "Editar", "Gerenciar filiais"]} />
-        <WorkspaceFootnote />
-      </>}
-
-      {view === "branches" && <>
-        <div className="companies-toolbar">
-          <label className="companies-search" htmlFor="branch-search"><span aria-hidden="true">⌕</span><input id="branch-search" type="search" placeholder="Pesquisar filiais" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-          <select aria-label="Filtrar situação" defaultValue="all"><option value="all">Todas as situações</option><option value="active">Ativa</option><option value="suspended">Suspensa</option><option value="inactive">Inativa</option></select>
-          <a className="primary-button companies-action" href="/empresas/filiais/nova">Nova filial</a>
-        </div>
-        <div className="companies-subnav" aria-label="Navegação de empresas e filiais"><a href="/empresas">Empresas</a><a className="is-current" href="/empresas/filiais" aria-current="page">Filiais</a></div>
-        <StatusLegend />
-        <div className="selected-company-note"><strong>Empresa selecionada:</strong> nenhuma. A listagem real exige autorização persistente de leitura por empresa; esta tela não consulta a Data API nesta etapa.</div>
-        {emptyBranches.length === 0 ? <EmptyState title={query ? "Nenhuma filial encontrada" : "Selecione uma empresa autorizada"} detail={query ? "Nenhum registro é consultado nesta etapa." : "Filiais e identificação de matriz serão apresentadas após a seleção de uma empresa real autorizada."} actionLabel="Preparar cadastro de filial" actionHref="/empresas/filiais/nova" /> : <BranchRows />}
-        <PendingActions labels={["Detalhes", "Editar"]} />
-        <WorkspaceFootnote />
-      </>}
-
-      {(isCompanyForm || isBranchForm) && <>
-        <div className="form-back-link"><a href={isCompanyForm ? "/empresas" : "/empresas/filiais"}>← Voltar para {isCompanyForm ? "empresas" : "filiais"}</a></div>
-        <div className="form-preparation-callout" role="note"><strong>Formulário em preparação</strong><span>Preenchimento e validação local apenas. Nenhum dado será enviado ou gravado.</span></div>
-        <form className="business-form" onSubmit={submitPreparationForm}>
-          {isBranchForm && <fieldset className="form-section"><legend>Vínculo empresarial</legend><div className="form-grid"><label className="field-label form-field form-field-wide">Empresa vinculada<input disabled value="Selecione uma empresa real e autorizada quando a integração estiver disponível" aria-label="Empresa vinculada" /></label><p className="field-hint form-field-wide">Não há empresas carregadas; não é possível selecionar ou vincular uma empresa nesta etapa.</p></div></fieldset>}
-          <fieldset className="form-section"><legend>{isCompanyForm ? "Dados da empresa" : "Identificação da filial"}</legend><div className="form-grid">
-            {isCompanyForm && <><Field label="Razão social" required autoComplete="organization" /><Field label="Nome fantasia" autoComplete="organization" /></>}
-          {isBranchForm && <><Field label="Nome da filial" name="branch_name" required /><Field label="Código interno" name="branch_code" required /></>}
-            <label className="field-label form-field">CNPJ{isBranchForm && <span className="optional-label">quando aplicável</span>}<input inputMode="numeric" autoComplete="off" placeholder="00.000.000/0000-00" value={cnpj} onChange={(event) => setCnpj(formatCnpj(event.target.value))} aria-describedby="cnpj-hint" /></label>
-            <Field label="Inscrição estadual" />
-            {isCompanyForm && <><Field label="E-mail" type="email" autoComplete="email" /><PhoneField phone={phone} setPhone={setPhone} /></>}
-            {isBranchForm && <><Field label="E-mail" type="email" autoComplete="email" /><PhoneField phone={phone} setPhone={setPhone} /></>}
-            <label className="field-label form-field">CEP<input inputMode="numeric" autoComplete="postal-code" placeholder="00000-000" value={cep} onChange={(event) => setCep(formatCep(event.target.value))} /></label>
-            <Field label="Endereço" autoComplete="address-line1" className="form-field-wide" />
-            <Field label="Número" />
-            <Field label="Complemento" autoComplete="address-line2" />
-            <Field label="Bairro" />
-            <Field label="Cidade" autoComplete="address-level2" />
-            <label className="field-label form-field">Estado<select defaultValue=""><option value="" disabled>Selecione</option>{["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map((state) => <option key={state}>{state}</option>)}</select></label>
-            {isBranchForm && <label className="field-label form-field">Tipo de unidade<input disabled value="Classificação matriz/filial ainda não consta no modelo de dados" /></label>}
-            <label className="field-label form-field">Situação cadastral<input disabled value="Não consultada nesta etapa" /></label>
-          </div></fieldset>
-          {formError && <p className="form-message error" role="alert">{formError}</p>}
-          {message && <p className="form-message success" role="status">{message}</p>}
-          <div className="form-actions">
-            <a className="secondary-button" href={isCompanyForm ? "/empresas" : "/empresas/filiais"}>Cancelar</a>
-            {isBranchForm && <button className="secondary-button" type="submit">Validar dados localmente</button>}
-            <button className="primary-button" type={isBranchForm ? "button" : "submit"} disabled={isBranchForm} title={isBranchForm ? "A gravação exige autorização persistente e integração segura." : undefined}>
-              {isCompanyForm ? "Salvar empresa" : "Criar filial"}
-            </button>
-          </div>
-        </form>
-        <WorkspaceFootnote />
-      </>}
-    </>
-  );
+  return [...rows.values()].sort((left, right) => left.companyName.localeCompare(right.companyName, "pt-BR"));
 }
 
-function Field({ label, name, required = false, type = "text", autoComplete, className = "" }: { label: string; name?: string; required?: boolean; type?: string; autoComplete?: string; className?: string }) {
-  return <label className={`field-label form-field ${className}`}>{label}<input name={name} type={type} required={required} autoComplete={autoComplete} /></label>;
+function contextHref(path: string, context: AuthorizedTransactionContext) {
+  const query = new URLSearchParams({ empresa: context.tenantId, filial: context.branchId });
+  return `${path}?${query.toString()}`;
 }
 
-function PhoneField({ phone, setPhone }: { phone: string; setPhone: (value: string) => void }) {
-  return <label className="field-label form-field">Telefone<input type="tel" autoComplete="tel" inputMode="tel" placeholder="(00) 00000-0000" value={phone} onChange={(event) => setPhone(formatPhone(event.target.value))} /></label>;
+export function CompaniesWorkspace({ view, contexts, accessStatus, operationalEnabled, selectedCompanyId }: {
+  view: WorkspaceView;
+  contexts: AuthorizedTransactionContext[];
+  accessStatus: OperationalContextStatus;
+  operationalEnabled: boolean;
+  selectedCompanyId?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const rows = useMemo(() => companyRows(contexts), [contexts]);
+  const filteredRows = rows.filter((row) => row.companyName.toLocaleLowerCase("pt-BR").includes(query.trim().toLocaleLowerCase("pt-BR")));
+  const selected = rows.find((row) => row.tenantId === selectedCompanyId) ?? rows[0];
+  const operationalLabel = operationalEnabled ? "Ambiente operacional habilitado" : "Ativação operacional pendente";
+
+  if (view === "new-company") return <UnavailableWrite title="Cadastro de empresas" description="A criação de empresas é uma operação global do Admin Master. Nenhuma empresa pode ser criada a partir do painel empresarial." href="/empresas" />;
+  if (view === "new-branch") return <UnavailableWrite title="Cadastro de filiais" description="Esta sessão pode consultar as filiais autorizadas. A criação empresarial de filiais aguarda uma RPC específica, com autorização e auditoria, e não será simulada pela interface." href="/empresas/filiais" />;
+
+  const isBranches = view === "branches";
+  return <>
+    <div className="page-heading-row companies-heading">
+      <div><p className="page-kicker">E-CONTROL / EMPRESAS E FILIAIS</p><h1>{isBranches ? "Filiais autorizadas" : "Empresas autorizadas"}</h1><p className="page-subtitle">Empresas e filiais visíveis exclusivamente pelo vínculo empresarial da sua sessão.</p></div>
+      <span className="workspace-badge"><span className="environment-dot" /> {operationalLabel}</span>
+    </div>
+    <div className="companies-subnav" aria-label="Navegação de empresas e filiais"><Link className={!isBranches ? "is-current" : ""} href="/empresas" aria-current={!isBranches ? "page" : undefined}>Empresas</Link><Link className={isBranches ? "is-current" : ""} href="/empresas/filiais" aria-current={isBranches ? "page" : undefined}>Filiais</Link></div>
+    {!contexts.length ? <section className="master-notice" role="status"><strong>Contexto empresarial indisponível</strong><p>{operationalContextMessage(accessStatus)}</p><p>Quando o convite for aceito, o vínculo estiver ativo e uma filial for autorizada, a empresa aparecerá aqui automaticamente.</p></section> : <>
+      <section className="master-data-panel"><header><div><h2>{isBranches ? "Empresa ativa" : "Empresas disponíveis"}</h2><p>{isBranches ? "Escolha uma empresa autorizada para consultar somente as filiais ativas às quais sua sessão possui acesso." : "A lista não utiliza dados demonstrativos e não expõe empresas de terceiros."}</p></div></header>
+        {!isBranches && <label className="companies-search" htmlFor="company-search"><span aria-hidden="true">⌕</span><input id="company-search" type="search" placeholder="Pesquisar empresa autorizada" value={query} onChange={(event) => setQuery(event.target.value)} /></label>}
+        {!isBranches ? <div className="master-company-picker">{filteredRows.map((row) => <Link className={`master-company-choice${row.tenantId === selected?.tenantId ? " is-selected" : ""}`} key={row.tenantId} href={`/empresas/filiais?empresa=${encodeURIComponent(row.tenantId)}`}><span><strong>{row.companyName}</strong><small>{row.branches.length} filial(is) autorizada(s)</small></span><span aria-hidden="true">→</span></Link>)}</div> : <CompanySelector rows={rows} selected={selected?.tenantId} />}
+        {!filteredRows.length && !isBranches && <p className="master-panel-empty">Nenhuma empresa autorizada corresponde à busca.</p>}
+      </section>
+      {isBranches && selected && <section className="master-data-panel"><header><div><h2>{selected.companyName}</h2><p>Filiais ativas liberadas para seu vínculo empresarial.</p></div></header><div className="master-table-wrap" tabIndex={0}><table className="master-table"><thead><tr><th>Código</th><th>Filial</th><th>Situação</th><th>Abrir</th></tr></thead><tbody>{selected.branches.map((branch) => <tr key={branch.branchId}><td><code>{branch.branchCode}</code></td><td><strong>{branch.branchName}</strong></td><td><span className="master-badge is-positive">Autorizada</span></td><td><Link className="master-row-link" href={contextHref("/operacional/cadastros", branch)}>Usar contexto</Link></td></tr>)}</tbody></table></div></section>}
+      {!operationalEnabled && <section className="master-notice" role="note"><strong>Contexto reconhecido; operações ainda protegidas</strong><p>As empresas e filiais já são exibidas pela autorização persistente. Cadastros, estoque, compras e O.S. só serão gravados após a ativação explícita do ambiente operacional e as permissões efetivas do papel.</p></section>}
+    </>}
+  </>;
 }
 
-function EmptyState({ title, detail, actionLabel, actionHref }: { title: string; detail: string; actionLabel: string; actionHref: string }) {
-  return <section className="companies-empty" aria-live="polite"><div className="empty-icon" aria-hidden="true">⌂</div><h2>{title}</h2><p>{detail}</p><a className="secondary-button" href={actionHref}>{actionLabel}</a></section>;
+function CompanySelector({ rows, selected }: { rows: CompanyRow[]; selected?: string }) {
+  return <form className="master-filter-form" method="get"><label>Empresa<select name="empresa" defaultValue={selected ?? ""}>{rows.map((row) => <option key={row.tenantId} value={row.tenantId}>{row.companyName}</option>)}</select></label><button type="submit">Consultar filiais</button></form>;
 }
 
-function StatusLegend() {
-  return <div className="status-legend" aria-label="Legenda de situação cadastral"><span>Legenda de situação</span><b className="status-pill is-active">Ativa</b><b className="status-pill is-suspended">Suspensa</b><b className="status-pill is-inactive">Inativa</b></div>;
+function UnavailableWrite({ title, description, href }: { title: string; description: string; href: string }) {
+  return <><div className="page-heading-row companies-heading"><div><p className="page-kicker">E-CONTROL / EMPRESAS E FILIAIS</p><h1>{title}</h1><p className="page-subtitle">{description}</p></div><span className="workspace-badge">Ação não disponível</span></div><section className="master-notice"><strong>Nenhum formulário demonstrativo foi exibido</strong><p>{description}</p><Link className="master-row-link" href={href}>Voltar à consulta autorizada</Link></section></>;
 }
-function PendingActions({ labels }: { labels: string[] }) {
-  return <div className="pending-actions" aria-label="Ações disponíveis após integração"><span>Ações para registros reais:</span>{labels.map((label) => <button type="button" disabled key={label}>{label}</button>)}</div>;
-}
-function CompanyRows() {
-  return <div className="companies-table-wrap"><table className="companies-table"><caption className="visually-hidden">Empresas cadastradas</caption><thead><tr><th>Empresa</th><th>CNPJ</th><th>Situação</th><th>Ações</th></tr></thead><tbody><tr><td colSpan={4}>A lista de empresas reais será conectada após a ativação segura do módulo.</td></tr></tbody></table></div>;
-}
-function BranchRows() {
-  return <div className="companies-table-wrap"><table className="companies-table"><caption className="visually-hidden">Filiais cadastradas</caption><thead><tr><th>Unidade</th><th>Código</th><th>Tipo</th><th>Situação</th><th>Ações</th></tr></thead><tbody><tr><td colSpan={5}>A lista de filiais reais será conectada após a seleção de uma empresa autorizada.</td></tr></tbody></table></div>;
-}
-function WorkspaceFootnote() { return <footer className="erp-footer"><span>eControll ERP</span><span>Área de preparação · Sem consulta ou gravação de dados empresariais</span></footer>; }

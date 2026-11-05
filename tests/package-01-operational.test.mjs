@@ -90,7 +90,8 @@ test("dashboard exposes an authorized business context without bypassing the ope
   assert.match(dashboard, /Operações aguardando habilitação/);
   assert.match(dashboard, /Acesso operacional bloqueado/);
   assert.match(dashboard, /companyName.*branchCode.*branchName/s);
-  assert.match(dashboardPage, /transactionContexts=\{transactionContexts\}/);
+  assert.match(dashboardPage, /transactionContexts=\{access\.contexts\}/);
+  assert.match(dashboardPage, /operationalContextStatus=\{access\.status\}/);
   assert.match(dashboardPage, /operationalEnabled=\{Boolean\(getSupabaseEnv\(\)\?\.operationalEnabled\)\}/);
 });
 

@@ -27,9 +27,9 @@ test("validates an optional CNPJ locally without network access", () => {
   assert.equal(validateBranchDraft({ name: "Filial", code: "01", cnpj: "inválido" }).valid, false);
 });
 
-test("branch creation remains disabled and the preparation form has no write action", () => {
+test("branch creation has no client-side write action before a secure business API exists", () => {
   const component = readFileSync(resolve(projectRoot, "app/components/companies-workspace.tsx"), "utf8");
-  assert.match(component, /A gravação permanece bloqueada até existir autorização empresarial persistente/);
-  assert.match(component, /type=\{isBranchForm \? "button" : "submit"\} disabled=\{isBranchForm\}/);
+  assert.match(component, /criação empresarial de filiais aguarda uma RPC específica/);
+  assert.match(component, /Nenhum formulário demonstrativo foi exibido/);
   assert.doesNotMatch(component, /provision_branch|master_create_branch|service_role/);
 });

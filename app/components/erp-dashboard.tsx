@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { signOutAction } from "@/app/actions/auth";
 import { lookupTransactionCode } from "@/app/actions/transaction-lookup";
-import type { AuthorizedTransactionContext } from "@/lib/companies/authorized-transaction-context";
+import { operationalContextMessage, type AuthorizedTransactionContext, type OperationalContextStatus } from "@/lib/companies/authorized-transaction-context";
 
 type ModuleItem = {
   id: string;
@@ -41,7 +41,7 @@ const tiles = [
   { title: "Relatórios", icon: "chart" },
 ];
 
-export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated = false, activeSection = "overview", transactionContexts = [], operationalEnabled = false, children }: { email: string; showMasterAdmin?: boolean; passwordUpdated?: boolean; activeSection?: string; transactionContexts?: AuthorizedTransactionContext[]; operationalEnabled?: boolean; children?: React.ReactNode }) {
+export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated = false, activeSection = "overview", transactionContexts = [], operationalContextStatus = "no_active_membership", operationalEnabled = false, children }: { email: string; showMasterAdmin?: boolean; passwordUpdated?: boolean; activeSection?: string; transactionContexts?: AuthorizedTransactionContext[]; operationalContextStatus?: OperationalContextStatus; operationalEnabled?: boolean; children?: React.ReactNode }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -191,43 +191,43 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
         <main id="main-content" className="erp-content">
           {passwordUpdated && <p className="form-message success dashboard-password-message" role="status">Senha atualizada.</p>}
           <div id="transaction-result" className={`transaction-feedback${transactionMessage ? " is-visible" : ""}`} role="status" aria-live="polite">{transactionMessage}</div>
-          {children ?? <DashboardOverview transactionContexts={transactionContexts} operationalEnabled={operationalEnabled} />}
+          {children ?? <DashboardOverview transactionContexts={transactionContexts} operationalContextStatus={operationalContextStatus} operationalEnabled={operationalEnabled} />}
         </main>
       </div>
     </div>
   );
 }
 
-function DashboardOverview({ transactionContexts, operationalEnabled }: { transactionContexts: AuthorizedTransactionContext[]; operationalEnabled: boolean }) {
+function DashboardOverview({ transactionContexts, operationalContextStatus, operationalEnabled }: { transactionContexts: AuthorizedTransactionContext[]; operationalContextStatus: OperationalContextStatus; operationalEnabled: boolean }) {
   const activeContext = transactionContexts[0];
   const operationalReady = operationalEnabled && Boolean(activeContext);
   return (
     <>
       <div className="page-heading-row">
         <div><p className="page-kicker">E-CONTROL / VISÃO GERAL</p><h1>Visão geral</h1><p className="page-subtitle">Seu espaço de trabalho para a gestão integrada.</p></div>
-        <span className="workspace-badge"><span className="environment-dot" /> {operationalReady ? "Ambiente operacional" : activeContext ? "Empresa autorizada" : "Ambiente de preparação"}</span>
+        <span className="workspace-badge"><span className="environment-dot" /> {operationalReady ? "Ambiente operacional" : activeContext ? "Empresa autorizada" : "Acesso empresarial pendente"}</span>
       </div>
       <section className="readiness-banner" aria-labelledby="readiness-title">
         <span className="readiness-icon"><Icon name="shield" /></span>
         {operationalReady ? <div><h2 id="readiness-title">Acesso empresarial ativo</h2><p>{activeContext.companyName} · {activeContext.branchCode} — {activeContext.branchName}. Cadastros e estoque são liberados conforme as transações autorizadas.</p></div>
           : activeContext ? <div><h2 id="readiness-title">Empresa autorizada</h2><p>{activeContext.companyName} · {activeContext.branchCode} — {activeContext.branchName}. As operações aguardam a habilitação explícita do ambiente.</p></div>
-            : <div><h2 id="readiness-title">Ambiente em preparação</h2><p>Os módulos empresariais serão disponibilizados após a configuração e validação dos controles de acesso e isolamento.</p></div>}
+            : <div><h2 id="readiness-title">Contexto empresarial necessário</h2><p>{operationalContextMessage(operationalContextStatus) || "Sua sessão ainda não possui empresa e filial autorizadas."}</p></div>}
         <span className="readiness-status">{operationalReady ? "Operações disponíveis" : activeContext ? "Operações aguardando habilitação" : "Acesso operacional bloqueado"}</span>
       </section>
       <section className="module-overview" aria-labelledby="modules-title">
-        <div className="section-heading"><div><h2 id="modules-title">Áreas de gestão</h2><p>Visão dos módulos planejados para o eControll.</p></div><span className="section-count">{tiles.length} áreas</span></div>
+        <div className="section-heading"><div><h2 id="modules-title">Áreas de gestão</h2><p>Atalhos exibem o estado de autorização real da sessão; módulos futuros permanecem identificados.</p></div><span className="section-count">{tiles.length} áreas</span></div>
         <div className="overview-grid">
           {tiles.map((tile) => (
             <article className="overview-tile" key={tile.title}>
               <div className="tile-icon"><Icon name={tile.icon} /></div>
               <h3>{tile.title}</h3>
-              <p>{operationalReady && (tile.title === "Estoque" || tile.title === "Empresas" || tile.title === "Filiais") ? "Disponível conforme suas permissões." : "Disponível após configuração da empresa."}</p>
-              <span className="tile-status"><span className="status-dot" /> {operationalReady && (tile.title === "Estoque" || tile.title === "Empresas" || tile.title === "Filiais") ? "Disponível" : "Em desenvolvimento"}</span>
+              <p>{operationalReady ? "Disponível conforme suas permissões efetivas." : activeContext ? "Empresa reconhecida; aguardando ativação operacional." : "Exige vínculo empresarial e filial autorizada."}</p>
+              <span className="tile-status"><span className="status-dot" /> {operationalReady ? "Verificar permissões" : activeContext ? "Aguardando ativação" : "Acesso pendente"}</span>
             </article>
           ))}
         </div>
       </section>
-      <footer className="erp-footer"><span>eControll ERP</span><span>{operationalReady ? "Contexto empresarial autorizado" : "Área de preparação · Nenhum dado operacional carregado"}</span></footer>
+      <footer className="erp-footer"><span>eControll ERP</span><span>{operationalReady ? "Contexto empresarial autorizado" : activeContext ? "Contexto empresarial reconhecido · operações protegidas" : "Nenhum contexto empresarial autorizado"}</span></footer>
     </>
   );
 }

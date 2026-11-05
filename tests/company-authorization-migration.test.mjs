@@ -95,8 +95,9 @@ test("legacy actor-parameter routines are not left executable to service_role", 
   assert.match(migration, /Legacy actor-parameter provisioning routines remain executable by an API role/);
 });
 
-test("branch creation UI stays disabled pending real database integration validation", () => {
+test("branch creation UI avoids a simulated write while the business API is unavailable", () => {
   const component = readFileSync(resolve(projectRoot, "app/components/companies-workspace.tsx"), "utf8");
-  assert.match(component, /type=\{isBranchForm \? "button" : "submit"\} disabled=\{isBranchForm\}/);
-  assert.match(component, /A gravação permanece bloqueada até existir autorização empresarial persistente/);
+  assert.match(component, /criação empresarial de filiais aguarda uma RPC específica/);
+  assert.match(component, /Nenhum formulário demonstrativo foi exibido/);
+  assert.doesNotMatch(component, /provision_branch|master_create_branch|service_role/);
 });
