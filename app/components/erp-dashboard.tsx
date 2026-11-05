@@ -21,6 +21,7 @@ const modules: ModuleItem[] = [
   { id: "catalog", label: "Cadastros", icon: "clipboard", status: "route", href: "/operacional/cadastros" },
   { id: "inventory", label: "Estoque", icon: "box", status: "route", href: "/operacional/estoque" },
   { id: "purchases", label: "Compras", icon: "cart", status: "route", href: "/operacional/compras" },
+  { id: "services", label: "Ordens de serviço", icon: "clipboard", status: "route", href: "/operacional/ordens-servico" },
   { id: "sales", label: "Vendas", icon: "receipt", status: "development" },
   { id: "finance", label: "Financeiro", icon: "wallet", status: "development" },
   { id: "accounting", label: "Contabilidade", icon: "book", status: "development" },

@@ -9,10 +9,13 @@ import type { MasterCompany, MasterCompanyAccessItem } from "@/lib/master/read-m
 const names: Record<string, string> = {
   BP01: "Clientes e fornecedores", MM01: "Cadastro de produtos", SV01: "Cadastro de serviços",
   MIGO: "Movimentação de estoque", ME21N: "Criar pedido de compra", ME23N: "Consultar pedidos de compra",
+  MM02: "Alterar produtos", MM03: "Consultar produtos", MB52: "Saldos por filial", MB51: "Histórico de estoque",
+  MI01: "Iniciar inventário", MI04: "Registrar contagem", MI07: "Aplicar inventário", ZTR01: "Transferir entre filiais",
+  ZOS01: "Criar ordem de serviço", ZOS02: "Alterar ordem de serviço", ZOS03: "Consultar ordem de serviço", ZOS04: "Encerrar ordem de serviço",
 };
 const modules: Record<string, string> = {
   MDM: "Cadastros", INV: "Estoque", PUR: "Compras", SAL: "Vendas", FIN: "Financeiro",
-  SRV: "Serviços", REP: "Relatórios", ADM: "Administração",
+  SVC: "Serviços", SRV: "Serviços", REP: "Relatórios", ADM: "Administração",
 };
 
 function stateLabel(value: string | null) {

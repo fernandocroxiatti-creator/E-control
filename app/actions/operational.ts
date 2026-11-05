@@ -111,6 +111,18 @@ export async function recordInventoryMovementAction(_: ActionState, form: FormDa
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
 }
 
+export async function createWorkOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient();
+    const tenantId = value(form, "tenant_id", 36); const branchId = value(form, "branch_id", 36);
+    const customerId = value(form, "customer_id", 36); const id = requestId(form); const problem = value(form, "problem_description", 4000);
+    if (!client || !UUID.test(tenantId) || !UUID.test(branchId) || !UUID.test(customerId) || !id || !problem) return { status: "error", message: "Informe cliente e descrição do problema. A autorização será verificada pelo banco." };
+    const { error } = await client.rpc("operational_create_work_order", { p_tenant_id: tenantId, p_branch_id: branchId, p_customer_id: customerId, p_equipment_description: value(form, "equipment_description", 500) || null, p_problem_description: problem, p_request_id: id });
+    if (error) return { status: "error", message: "Não foi possível abrir a O.S. Empresa, filial, transação e permissão são validadas pelo banco." };
+    revalidatePath("/operacional/ordens-servico"); return { status: "success", message: "Ordem de serviço aberta e auditada." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
 export async function setOperationalMembershipStatusAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
     const client = await operationalClient();

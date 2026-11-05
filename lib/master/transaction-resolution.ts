@@ -1,6 +1,6 @@
 export type ErpTransactionDefinition = {
   code: string;
-  moduleCode: "MDM" | "INV" | "PUR";
+  moduleCode: "MDM" | "INV" | "PUR" | "SVC";
   moduleName: string;
   name: string;
   description: string;
@@ -43,6 +43,18 @@ export const erpTransactionCatalog = {
     description: "Consulta dos pedidos de compra autorizados.",
     permissionKey: "transaction.purchasing.purchase_order.read", route: "/operacional/compras",
   },
+  MM02: { code: "MM02", moduleCode: "MDM", moduleName: "Estoque e produtos", name: "Alterar produtos", description: "Alteração autorizada de produtos cadastrados.", permissionKey: "transaction.masterdata.catalog.product.update", route: "/operacional/cadastros?item_type=product" },
+  MM03: { code: "MM03", moduleCode: "MDM", moduleName: "Estoque e produtos", name: "Consultar produtos", description: "Consulta autorizada do catálogo de produtos.", permissionKey: "transaction.masterdata.catalog.product.read", route: "/operacional/cadastros?item_type=product" },
+  MB52: { code: "MB52", moduleCode: "INV", moduleName: "Estoque", name: "Saldos por filial", description: "Consulta de saldos por filial autorizada.", permissionKey: "transaction.inventory.balance.read", route: "/operacional/estoque" },
+  MB51: { code: "MB51", moduleCode: "INV", moduleName: "Estoque", name: "Histórico de estoque", description: "Consulta auditável de movimentações por filial.", permissionKey: "transaction.inventory.history.read", route: "/operacional/estoque" },
+  MI01: { code: "MI01", moduleCode: "INV", moduleName: "Estoque", name: "Iniciar inventário", description: "Abertura de inventário físico por filial.", permissionKey: "transaction.inventory.physical.create", route: "/operacional/estoque" },
+  MI04: { code: "MI04", moduleCode: "INV", moduleName: "Estoque", name: "Registrar contagem", description: "Registro de contagem física autorizado.", permissionKey: "transaction.inventory.physical.count", route: "/operacional/estoque" },
+  MI07: { code: "MI07", moduleCode: "INV", moduleName: "Estoque", name: "Aplicar inventário", description: "Aplicação auditada de diferenças de inventário.", permissionKey: "transaction.inventory.physical.adjust", route: "/operacional/estoque" },
+  ZTR01: { code: "ZTR01", moduleCode: "INV", moduleName: "Estoque", name: "Transferir entre filiais", description: "Transferência atômica e rastreável entre filiais autorizadas.", permissionKey: "transaction.inventory.transfer", route: "/operacional/estoque" },
+  ZOS01: { code: "ZOS01", moduleCode: "SVC", moduleName: "Ordem de serviço", name: "Criar ordem de serviço", description: "Abertura de O.S. por empresa e filial.", permissionKey: "transaction.service_order.create", route: "/operacional/ordens-servico" },
+  ZOS02: { code: "ZOS02", moduleCode: "SVC", moduleName: "Ordem de serviço", name: "Alterar ordem de serviço", description: "Diagnóstico, serviços e peças de uma O.S.", permissionKey: "transaction.service_order.update", route: "/operacional/ordens-servico" },
+  ZOS03: { code: "ZOS03", moduleCode: "SVC", moduleName: "Ordem de serviço", name: "Consultar ordem de serviço", description: "Consulta de O.S. autorizada por filial.", permissionKey: "transaction.service_order.read", route: "/operacional/ordens-servico" },
+  ZOS04: { code: "ZOS04", moduleCode: "SVC", moduleName: "Ordem de serviço", name: "Encerrar ordem de serviço", description: "Consumo, encerramento e estorno auditáveis.", permissionKey: "transaction.service_order.close", route: "/operacional/ordens-servico" },
 } as const satisfies Record<string, ErpTransactionDefinition>;
 
 export type ErpTransactionCode = keyof typeof erpTransactionCatalog;

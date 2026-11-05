@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 export type OperationalParty = { party_id: string; party_type: "customer" | "supplier" | "both"; legal_name: string; document_number: string | null; contact_email: string | null; contact_phone: string | null; status: "active" | "inactive"; created_at: string };
 export type OperationalItem = { item_id: string; item_type: "product" | "service"; code: string; name: string; category: string | null; unit_of_measure: string; current_cost: number; selling_price: number; minimum_stock: number; reorder_point: number; status: "active" | "inactive"; created_at: string };
 export type OperationalStock = { item_id: string; code: string; name: string; quantity: number; minimum_stock: number; reorder_point: number; below_reorder_point: boolean };
-export type OperationalInventoryMovement = { movement_id: string; item_id: string; item_code: string; item_name: string; movement_type: "initial" | "entry" | "exit" | "adjustment_positive" | "adjustment_negative"; quantity: number; balance_after: number; reference_note: string | null; created_at: string };
+export type OperationalInventoryMovement = { movement_id: string; item_id: string; item_code: string; item_name: string; movement_type: "initial" | "entry" | "exit" | "adjustment_positive" | "adjustment_negative" | "transfer_out" | "transfer_in" | "physical_count_in" | "physical_count_out" | "service_consumption" | "service_reversal"; quantity: number; balance_after: number; reference_note: string | null; created_at: string };
 export type OperationalPurchaseOrder = { purchase_order_id: string; order_number: number; supplier_id: string; supplier_name: string; status: "draft" | "submitted" | "cancelled"; total_amount: number; item_count: number; items: Array<{ item_id: string; quantity: number; unit_price: number }>; created_at: string; updated_at: string };
+export type OperationalWorkOrder = { work_order_id: string; order_number: number; customer_name: string; status: "open" | "in_progress" | "closed" | "cancelled" | "reversed"; total_amount: number; created_at: string; updated_at: string };
 export type OperationalRead<T> = { status: "ready"; data: T } | { status: "unavailable" };
 export type OperationalPage<T> = OperationalRead<{ rows: T[]; hasMore: boolean; page: number }>;
 
@@ -76,6 +77,13 @@ export async function listOperationalPurchaseOrders(tenantId: string, branchId: 
   const currentPage = requestedPage(options.page);
   const result = await read<unknown>("operational_list_purchase_orders", { p_tenant_id: tenantId, p_branch_id: branchId, p_search: options.search, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
   return result.status === "ready" && records<OperationalPurchaseOrder>(result.data, ["purchase_order_id", "order_number", "supplier_id", "supplier_name", "status", "total_amount", "item_count", "items", "created_at", "updated_at"])
+    ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
+}
+
+export async function listOperationalWorkOrders(tenantId: string, branchId: string, options: { status?: string | null; page?: number }): Promise<OperationalPage<OperationalWorkOrder>> {
+  const currentPage = requestedPage(options.page);
+  const result = await read<unknown>("operational_list_work_orders", { p_tenant_id: tenantId, p_branch_id: branchId, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
+  return result.status === "ready" && records<OperationalWorkOrder>(result.data, ["work_order_id", "order_number", "customer_name", "status", "total_amount", "created_at", "updated_at"])
     ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
 }
 
