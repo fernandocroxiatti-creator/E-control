@@ -45,6 +45,7 @@ function companyAccessErrorMessage(code: string | undefined) {
   if (code === "22023") return "Uma transação selecionada ainda não está aprovada globalmente. Revise os estados do catálogo antes de salvar.";
   if (code === "P0002") return "A empresa não está ativa ou não foi encontrada. Atualize a página antes de tentar novamente.";
   if (code === "42501") return "Sua sessão não possui autorização Master para alterar a disponibilidade desta empresa.";
+  if (code === "21000") return "A seleção contém mais de uma transação do mesmo módulo e não pôde ser consolidada. Nenhuma alteração foi gravada; atualize a página antes de tentar novamente.";
   return "Não foi possível confirmar as permissões da empresa. Atualize a página e consulte a auditoria antes de tentar novamente.";
 }
 

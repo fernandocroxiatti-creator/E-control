@@ -103,6 +103,19 @@ test("company availability presents permission and transaction approval as indep
   assert.match(actions, /company_access_postcondition_not_confirmed/);
 });
 
+test("company availability consolidates selected transactions by module without weakening its Master-only ACL", () => {
+  const correction = read("supabase/migrations/20261105110000_company_access_availability_deduplication.sql");
+  const runner = read("scripts/test-package-01-postgres.sh");
+  assert.match(correction, /group by catalog\.module_code/);
+  assert.match(correction, /app_private\.assert_current_master\(\)/);
+  assert.match(correction, /pg_advisory_xact_lock/);
+  assert.match(correction, /revoke all on function public\.master_set_company_transaction_availability/);
+  assert.match(correction, /grant execute on function public\.master_set_company_transaction_availability\(uuid, text\[\]\) to authenticated/);
+  assert.doesNotMatch(correction, /grant execute[\s\S]*to service_role/);
+  assert.match(actions, /code === "21000"/);
+  assert.match(runner, /20261105110000_company_access_availability_deduplication\.sql/);
+});
+
 test("transaction governance always identifies transaction entries by code, not by their associated permission", () => {
   const governanceUi = read("app/master/access-governance.tsx");
   const catalog = read("lib/master/transaction-resolution.ts");

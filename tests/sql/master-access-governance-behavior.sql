@@ -16,11 +16,19 @@ on conflict (role_key) do nothing;
 insert into public.companies (id, legal_name) values
   ('72000000-0000-4000-8000-000000000001', 'Company Access A'),
   ('72000000-0000-4000-8000-000000000002', 'Company Access B');
+insert into public.permission_definitions (permission_key, description)
+values ('transaction.test.pending', 'Pending isolated governance test');
+insert into public.erp_transaction_authorization_catalog (transaction_code, module_code, permission_key)
+values ('ZZ99', 'ADM', 'transaction.test.pending');
 
 do $test$
 declare
   event_count integer;
   migo_permission text;
+  bp01_permission text;
+  mm01_permission text;
+  enabled_module_count integer;
+  enabled_transaction_count integer;
   module_enabled boolean;
   transaction_enabled boolean;
 begin
@@ -46,8 +54,26 @@ begin
   if public.master_set_access_catalog_approval('permission', migo_permission, 'approved') <> 'approved' then
     raise exception 'permission associated with MIGO approval failed';
   end if;
-  if public.master_set_company_transaction_availability('72000000-0000-4000-8000-000000000001', array['MIGO']) <> 'updated' then
-    raise exception 'company transaction availability update failed';
+  select permission_key into bp01_permission from public.erp_transaction_authorization_catalog where transaction_code='BP01';
+  select permission_key into mm01_permission from public.erp_transaction_authorization_catalog where transaction_code='MM01';
+  if public.master_set_access_catalog_approval('transaction', 'BP01', 'approved') <> 'approved'
+    or public.master_set_access_catalog_approval('permission', bp01_permission, 'approved') <> 'approved'
+    or public.master_set_access_catalog_approval('transaction', 'MM01', 'approved') <> 'approved'
+    or public.master_set_access_catalog_approval('permission', mm01_permission, 'approved') <> 'approved' then
+    raise exception 'same-module catalog approvals failed';
+  end if;
+  if public.master_set_company_transaction_availability('72000000-0000-4000-8000-000000000001', array['BP01','MM01','MIGO']) <> 'updated' then
+    raise exception 'company transaction availability update for same-module transactions failed';
+  end if;
+  select count(*) into enabled_module_count from public.company_module_availability
+    where tenant_id='72000000-0000-4000-8000-000000000001' and enabled;
+  select count(*) into enabled_transaction_count from public.company_transaction_availability
+    where tenant_id='72000000-0000-4000-8000-000000000001' and enabled;
+  if enabled_module_count <> 2 or enabled_transaction_count <> 3 then
+    raise exception 'same-module availability was not atomically consolidated: modules=%, transactions=%', enabled_module_count, enabled_transaction_count;
+  end if;
+  if public.master_set_company_transaction_availability('72000000-0000-4000-8000-000000000001', array['BP01','MM01','MIGO']) <> 'updated' then
+    raise exception 'same-module availability retry was not idempotent';
   end if;
   if not public.authorize_company_transaction('72000000-0000-4000-8000-000000000001', '73000000-0000-4000-8000-000000000001', 'MIGO') then
     raise exception 'approved and enabled transaction was not authorized';
@@ -64,7 +90,7 @@ begin
     raise exception 'company transaction revocation failed: module=%, transaction=%', module_enabled, transaction_enabled;
   end if;
   begin
-    perform public.master_set_company_transaction_availability('72000000-0000-4000-8000-000000000001', array['BP01']);
+    perform public.master_set_company_transaction_availability('72000000-0000-4000-8000-000000000001', array['ZZ99']);
     raise exception 'pending transaction became company eligible';
   exception when invalid_parameter_value then null;
   end;
