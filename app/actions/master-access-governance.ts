@@ -39,6 +39,22 @@ function refreshGovernanceViews() {
   }
 }
 
+function requestedPermissionKeys(formData: FormData) {
+  return [...new Set(formData.getAll("permission_key")
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter((value) => /^[a-z][a-z0-9_.]{1,127}$/.test(value)))].sort();
+}
+
+function matrixConfirmsGrants(value: unknown, roleKey: string, permissionKeys: string[]) {
+  if (!Array.isArray(value)) return false;
+  const confirmed = new Set(value
+    .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+    .filter((entry) => entry.entry_type === "role_permission" && entry.role_key === roleKey && typeof entry.permission_key === "string")
+    .map((entry) => entry.permission_key as string));
+  return permissionKeys.every((permissionKey) => confirmed.has(permissionKey));
+}
+
 type CompanyAccessRow = { transaction_code?: unknown; enabled?: unknown };
 
 function companyAccessErrorMessage(code: string | undefined) {
@@ -125,6 +141,48 @@ export async function setRolePermissionGrantAction(
   } catch {
     console.error("[master-governance] role_permission_action_failed");
     return { status: "error", message: "Não foi possível concluir a alteração da concessão. Nenhum sucesso foi confirmado; atualize a página e consulte a auditoria antes de tentar novamente." };
+  }
+}
+
+export async function grantRolePermissionsBatchAction(
+  _state: MasterAccessActionState,
+  formData: FormData,
+): Promise<MasterAccessActionState> {
+  if (formData.get("confirmed") !== "on") return { status: "error", message: "Confirmação explícita obrigatória." };
+  const roleKey = text(formData, "role_key", 80);
+  const permissionKeys = requestedPermissionKeys(formData);
+  if (!roleKey || !permissionKeys.length || permissionKeys.length > 32) {
+    return { status: "error", message: "Seleção de concessões inválida." };
+  }
+  try {
+    const client = await governanceClient();
+    if (!client) return { status: "error", message: "Concessões administrativas estão desativadas neste ambiente." };
+    const confirmed: string[] = [];
+    for (const permissionKey of permissionKeys) {
+      const { data, error } = await client.rpc("master_set_role_permission_grant", {
+        p_role_key: roleKey,
+        p_permission_key: permissionKey,
+        p_operation: "grant",
+      });
+      if (error || !["grant", "unchanged"].includes(String(data))) {
+        const canonical = await client.rpc("master_list_access_control_matrix");
+        const persisted = canonical.error ? confirmed.length : confirmed.filter((key) => matrixConfirmsGrants(canonical.data, roleKey, [key])).length;
+        refreshGovernanceViews();
+        return { status: "error", message: `Foram confirmadas ${persisted} de ${permissionKeys.length} permissões. A alteração restante não foi confirmada; a lista canônica foi recarregada. Nenhuma repetição automática foi feita.` };
+      }
+      confirmed.push(permissionKey);
+    }
+    const canonical = await client.rpc("master_list_access_control_matrix");
+    if (canonical.error || !matrixConfirmsGrants(canonical.data, roleKey, permissionKeys)) {
+      refreshGovernanceViews();
+      return { status: "error", message: "As concessões foram solicitadas, mas o estado canônico não confirmou todas. Atualize a página e consulte a auditoria antes de tentar novamente." };
+    }
+    return refreshGovernanceViews()
+      ? { status: "success", message: `${permissionKeys.length} permissões concedidas e auditadas.` }
+      : { status: "success", message: `${permissionKeys.length} permissões concedidas e auditadas. Atualize a página para conferir o estado canônico.` };
+  } catch {
+    console.error("[master-governance] role_permission_batch_action_failed");
+    return { status: "error", message: "Não foi possível concluir as concessões. Nenhum sucesso foi presumido; atualize a página e consulte a auditoria." };
   }
 }
 

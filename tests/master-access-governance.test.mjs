@@ -123,3 +123,20 @@ test("transaction governance always identifies transaction entries by code, not 
   assert.match(governanceUi, /getErpTransactionDefinition/);
   for (const code of ["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N"]) assert.match(catalog, new RegExp(`${code}:`));
 });
+
+test("bulk role grants remain Master-only, explicit, canonical-readback verified and never silently partial", () => {
+  assert.match(actions, /export async function grantRolePermissionsBatchAction/);
+  assert.match(actions, /formData\.getAll\("permission_key"\)/);
+  assert.match(actions, /master_set_role_permission_grant/);
+  assert.match(actions, /master_list_access_control_matrix/);
+  assert.match(actions, /Foram confirmadas \$\{persisted\} de \$\{permissionKeys\.length\} permissões/);
+  assert.match(actions, /Nenhuma repetição automática foi feita/);
+  assert.match(actions, /formData\.get\("confirmed"\) !== "on"/);
+  assert.doesNotMatch(actions, /service_role|SUPABASE_SERVICE_ROLE_KEY/i);
+  assert.match(governanceUi, /Buscar permissões/);
+  assert.match(governanceUi, /Selecionar visíveis/);
+  assert.match(governanceUi, /Resumo antes da confirmação/);
+  assert.match(governanceUi, /normalize\("NFD"\)/);
+  assert.match(governanceUi, /Concedida/);
+  assert.match(governanceUi, /Não concedida/);
+});
