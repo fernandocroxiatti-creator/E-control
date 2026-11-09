@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CompanyAdminInvitationForm, CompanyAdminInvitationTable } from "@/app/master/company-admin-invitations";
-import { getCompanyAdminInvitations, getMasterAccessControlMatrix, getMasterCompanies, getMasterCompanyAccess, getMasterCompanyInvitationsEnabled, getMasterMemberships } from "@/lib/master/read-model";
+import { getCompanyAdminInvitations, getMasterAccessControlMatrix, getMasterCompanies, getMasterCompanyAccess, getMasterCompanyInvitationsEnabled, getMasterMembershipAuthorizations, getMasterMemberships } from "@/lib/master/read-model";
 import { BackendUnavailable, CompanyActivationSummary, DataPanel, MembershipTable, PageHeading } from "@/app/master/master-data-ui";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
@@ -12,16 +12,17 @@ export default async function MasterUsersPage({ searchParams }: { searchParams: 
     getMasterCompanies(null, null), empresa ? getMasterMemberships(empresa) : Promise.resolve(null),
   ]);
   const invitationsEnabled = await getMasterCompanyInvitationsEnabled();
-  const [invitations, companyAccess, accessMatrix] = empresa ? await Promise.all([getCompanyAdminInvitations(empresa), getMasterCompanyAccess(empresa), getMasterAccessControlMatrix()]) : [null, null, null];
+  const [invitations, companyAccess, accessMatrix, membershipAuthorizations] = empresa ? await Promise.all([getCompanyAdminInvitations(empresa), getMasterCompanyAccess(empresa), getMasterAccessControlMatrix(), getMasterMembershipAuthorizations(empresa)]) : [null, null, null, null];
   const selectedCompany = companies.status === "ready" ? companies.data.find((item) => item.company_id === empresa) : undefined;
   const normalizedSearch = busca?.trim().toLocaleLowerCase("pt-BR") ?? "";
   const normalizedInvitationSearch = convite?.trim().toLocaleLowerCase("pt-BR") ?? "";
   const filteredInvitations = invitations?.status === "ready" && normalizedInvitationSearch
     ? invitations.data.filter((invitation) => `${invitation.recipient_email} ${invitation.role_key} ${invitation.status}`.toLocaleLowerCase("pt-BR").includes(normalizedInvitationSearch))
     : invitations?.status === "ready" ? invitations.data : null;
-  const filteredMemberships = memberships?.status === "ready" && normalizedSearch
-    ? memberships.data.filter((membership) => `${membership.display_name ?? ""} ${membership.status} ${membership.branch_access_mode}`.toLocaleLowerCase("pt-BR").includes(normalizedSearch))
-    : memberships?.status === "ready" ? memberships.data : null;
+  const membershipRows = membershipAuthorizations?.status === "ready" ? membershipAuthorizations.data : memberships?.status === "ready" ? memberships.data : null;
+  const filteredMemberships = membershipRows && normalizedSearch
+    ? membershipRows.filter((membership) => `${membership.display_name ?? ""} ${membership.status} ${membership.branch_access_mode}`.toLocaleLowerCase("pt-BR").includes(normalizedSearch))
+    : membershipRows;
   return <>
     <PageHeading title="Usuários e vínculos" description="Convites individuais e consulta de vínculos; credenciais e tokens não são persistidos em claro." meta="Convites empresariais" />
     <DataPanel title="Empresa" description="Escolha a empresa para consultar os vínculos existentes.">

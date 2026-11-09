@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { CompanyAdminInvitation, MasterAccessControlEntry, MasterAuditItem, MasterBranch, MasterCatalogItem, MasterCompany, MasterCompanyAccessItem, MasterMembership, MasterOverview } from "@/lib/master/read-model";
+import type { CompanyAdminInvitation, MasterAccessControlEntry, MasterAuditItem, MasterBranch, MasterCatalogItem, MasterCompany, MasterCompanyAccessItem, MasterMembership, MasterMembershipAuthorization, MasterOverview } from "@/lib/master/read-model";
 
 export function PageHeading({ title, description, meta }: { title: string; description: string; meta?: string }) {
   return <div className="master-heading-row"><div><p className="master-eyebrow">ADMINISTRAÇÃO SAAS</p><h1>{title}</h1><p className="master-subtitle">{description}</p></div>{meta && <span className="master-status">{meta}</span>}</div>;
@@ -30,9 +30,15 @@ export function BranchTable({ rows }: { rows: MasterBranch[] }) {
   return <div className="master-table-wrap" role="region" aria-label="Tabela de filiais" tabIndex={0}><table className="master-table master-table--branches"><thead><tr><th>Código</th><th>Filial</th><th>Status</th><th>Criada em</th></tr></thead><tbody>{rows.map((row) => <tr key={row.branch_id}><td><code>{row.code}</code></td><td><strong>{row.name}</strong></td><td><StatusBadge value={row.status} /></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div>;
 }
 
-export function MembershipTable({ rows, query = "" }: { rows: MasterMembership[]; query?: string }) {
+export function MembershipTable({ rows, query = "" }: { rows: Array<MasterMembership | MasterMembershipAuthorization>; query?: string }) {
   if (!rows.length) return <EmptyRows title={query ? "Nenhum vínculo corresponde à busca" : "Nenhum vínculo empresarial"} description={query ? "Altere ou limpe o filtro para consultar os demais vínculos visíveis." : "Nenhuma membership foi encontrada para esta empresa."} />;
-  return <div className="master-table-wrap" role="region" aria-label="Tabela de vínculos empresariais" tabIndex={0}><table className="master-table master-table--memberships"><thead><tr><th>Usuário</th><th>Vínculo</th><th>Escopo de filiais</th><th>Papéis e permissões</th><th>Desde</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.display_name ?? "anonymous"}:${row.created_at}:${index}`}><td><strong>{row.display_name?.trim() || "Identidade vinculada"}</strong><small className="master-table-subline">Conta Auth vinculada; e-mail não consultado</small></td><td><StatusBadge value={row.status} /></td><td>{row.branch_access_mode === "all_branches" ? "Todas as filiais" : "Somente filiais atribuídas"}</td><td><span className="master-muted">Não expostos pela API segura atual</span></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div>;
+  return <div className="master-table-wrap" role="region" aria-label="Tabela de vínculos empresariais" tabIndex={0}><table className="master-table master-table--memberships"><thead><tr><th>Usuário</th><th>Vínculo</th><th>Escopo de filiais</th><th>Papéis e permissões</th><th>Desde</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.display_name ?? "anonymous"}:${row.created_at}:${index}`}><td><strong>{row.display_name?.trim() || "Identidade vinculada"}</strong><small className="master-table-subline">Conta Auth vinculada; e-mail não consultado</small></td><td><StatusBadge value={row.status} /></td><td>{row.branch_access_mode === "all_branches" ? "Todas as filiais" : "Somente filiais atribuídas"}</td><td><MembershipRoles roles={"roles" in row ? row.roles : undefined} /></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div>;
+}
+
+function MembershipRoles({ roles }: { roles: MasterMembershipAuthorization["roles"] | undefined }) {
+  if (roles === undefined) return <span className="master-muted">Aguardando a API segura de papéis e grants.</span>;
+  if (!roles.length) return <span className="master-muted">Sem papel atribuído.</span>;
+  return <ul className="master-role-summary">{roles.map((role) => <li key={`${role.role_key}:${role.branch_name ?? "company"}`}><strong>{role.display_name}</strong><small>{role.approval_state === "approved" ? "Aprovado" : "Pendente"} · {role.granted_permission_keys.length} permissões concedidas{role.branch_name ? ` · ${role.branch_name}` : ""}</small></li>)}</ul>;
 }
 
 export function CompanyActivationSummary({ company, access, invitations = [], accessMatrix = [], operationalEnabled = false }: { company: MasterCompany; access: MasterCompanyAccessItem[] | null; invitations?: CompanyAdminInvitation[]; accessMatrix?: MasterAccessControlEntry[]; operationalEnabled?: boolean }) {

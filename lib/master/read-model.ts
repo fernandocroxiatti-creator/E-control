@@ -54,6 +54,15 @@ export type MasterMembership = {
   branch_access_mode: string;
   created_at: string;
 };
+export type MasterMembershipRole = {
+  role_key: string;
+  display_name: string;
+  scope: "company" | "branch";
+  approval_state: string;
+  branch_name: string | null;
+  granted_permission_keys: string[];
+};
+export type MasterMembershipAuthorization = MasterMembership & { roles: MasterMembershipRole[] };
 export type CompanyAdminInvitation = {
   invitation_id: string;
   recipient_email: string;
@@ -159,6 +168,17 @@ export async function getMasterMemberships(tenantId: string): Promise<ReadResult
     ["display_name", "status", "branch_access_mode", "created_at"])
     ? { status: "ready", data: result.data }
     : { status: "unavailable" };
+}
+
+export async function getMasterMembershipAuthorizations(tenantId: string): Promise<ReadResult<MasterMembershipAuthorization[]>> {
+  const result = await invokeMasterRead<unknown>("master_admin_list_membership_authorizations", { p_tenant_id: tenantId });
+  return result.status === "ready" && isArrayOfRecords<MasterMembershipAuthorization>(result.data,
+    ["display_name", "status", "branch_access_mode", "created_at", "roles"])
+    && result.data.every((membership) => Array.isArray(membership.roles)
+      && membership.roles.every((role) => isRecord(role)
+        && typeof role.role_key === "string" && typeof role.display_name === "string"
+        && Array.isArray(role.granted_permission_keys)))
+    ? { status: "ready", data: result.data } : { status: "unavailable" };
 }
 
 export async function getCompanyAdminInvitations(tenantId: string): Promise<ReadResult<CompanyAdminInvitation[]>> {

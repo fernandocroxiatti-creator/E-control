@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { BranchManagementTable } from "@/app/master/company-management-tables";
 import { BranchMetadataForm, CompanyMetadataForm, CompanyStatusForm } from "@/app/master/company-management-ui";
 import { BackendUnavailable, DataPanel, MembershipTable, PageHeading } from "@/app/master/master-data-ui";
-import { getMasterBranchesV2, getMasterCompanyManagementEnabled, getMasterCompanyV2, getMasterMemberships } from "@/lib/master/read-model";
+import { getMasterBranchesV2, getMasterCompanyManagementEnabled, getMasterCompanyV2, getMasterMembershipAuthorizations, getMasterMemberships } from "@/lib/master/read-model";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const dynamic = "force-dynamic";
@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 export default async function MasterCompanyDetailPage({ params }: { params: Promise<{ companyId: string }> }) {
   const { companyId } = await params;
   if (!UUID.test(companyId)) notFound();
-  const [companyResult, branchesResult, membershipsResult, managementEnabled] = await Promise.all([
-    getMasterCompanyV2(companyId), getMasterBranchesV2(companyId), getMasterMemberships(companyId), getMasterCompanyManagementEnabled(),
+  const [companyResult, branchesResult, membershipsResult, membershipAuthorizations, managementEnabled] = await Promise.all([
+    getMasterCompanyV2(companyId), getMasterBranchesV2(companyId), getMasterMemberships(companyId), getMasterMembershipAuthorizations(companyId), getMasterCompanyManagementEnabled(),
   ]);
   if (companyResult.status === "ready" && !companyResult.data) notFound();
   const company = companyResult.status === "ready" ? companyResult.data : null;
@@ -30,7 +30,7 @@ export default async function MasterCompanyDetailPage({ params }: { params: Prom
         {branchesResult.status === "ready" ? <BranchManagementTable rows={branchesResult.data} companyId={companyId} enabled={managementEnabled} /> : <BackendUnavailable item="As filiais da empresa" />}
         {managementEnabled && <details className="master-row-editor"><summary>Cadastrar filial nesta empresa</summary><BranchMetadataForm key={randomUUID()} requestId={randomUUID()} companyId={companyId} /></details>}
       </DataPanel>
-      <DataPanel title="Usuários vinculados" description="Consulta apenas memberships já existentes; não mostra e-mail nem concede acesso.">{membershipsResult.status === "ready" ? <MembershipTable rows={membershipsResult.data} /> : <BackendUnavailable item="Os vínculos empresariais" />}</DataPanel>
+      <DataPanel title="Usuários vinculados" description="Consulta apenas vínculos, papéis e grants já existentes; não mostra e-mail nem concede acesso.">{membershipsResult.status === "ready" ? <MembershipTable rows={membershipAuthorizations.status === "ready" ? membershipAuthorizations.data : membershipsResult.data} /> : <BackendUnavailable item="Os vínculos empresariais" />}</DataPanel>
     </> : <BackendUnavailable item="Os detalhes cadastrais da empresa" />}
   </>;
 }
