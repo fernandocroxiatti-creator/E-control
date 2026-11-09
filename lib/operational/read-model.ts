@@ -88,9 +88,25 @@ export async function listOperationalWorkOrders(tenantId: string, branchId: stri
 }
 
 export type OperationalMembership = { membership_id: string; display_name: string; status: "pending" | "active" | "suspended" | "revoked"; branch_access_mode: string; created_at: string; branch_count: number; role_count: number };
+export type OperationalEmployeeInvitation = { invitation_id: string; recipient_email: string; status: "pending" | "accepted" | "expired" | "revoked"; created_at: string; expires_at: string; accepted_at: string | null; revoked_at: string | null; branch_count: number };
+export type OperationalMembershipAuthorization = { membership_id: string; role_key: string; role_display_name: string; scope: "company" | "branch"; branch_id: string | null; branch_name: string | null; granted_permission_count: number };
 
 export async function listOperationalMemberships(tenantId: string): Promise<OperationalRead<OperationalMembership[]>> {
   const result = await read<unknown>("company_list_memberships", { p_tenant_id: tenantId });
   return result.status === "ready" && records<OperationalMembership>(result.data, ["membership_id", "display_name", "status", "branch_access_mode", "created_at", "branch_count", "role_count"])
+    ? { status: "ready", data: result.data } : { status: "unavailable" };
+}
+
+export async function listOperationalEmployeeInvitations(tenantId: string): Promise<OperationalRead<OperationalEmployeeInvitation[]>> {
+  const result = await read<unknown>("company_list_employee_invitations", { p_tenant_id: tenantId });
+  return result.status === "ready" && records<OperationalEmployeeInvitation>(result.data,
+    ["invitation_id", "recipient_email", "status", "created_at", "expires_at", "accepted_at", "revoked_at", "branch_count"])
+    ? { status: "ready", data: result.data } : { status: "unavailable" };
+}
+
+export async function listOperationalMembershipAuthorizations(tenantId: string): Promise<OperationalRead<OperationalMembershipAuthorization[]>> {
+  const result = await read<unknown>("company_list_membership_authorizations", { p_tenant_id: tenantId });
+  return result.status === "ready" && records<OperationalMembershipAuthorization>(result.data,
+    ["membership_id", "role_key", "role_display_name", "scope", "branch_id", "branch_name", "granted_permission_count"])
     ? { status: "ready", data: result.data } : { status: "unavailable" };
 }

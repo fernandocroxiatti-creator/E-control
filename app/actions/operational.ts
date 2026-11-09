@@ -1,13 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSupabaseEnv } from "@/lib/supabase/env";
+import { getSiteUrl, getSupabaseEnv } from "@/lib/supabase/env";
 import { isAuthorizedSupabaseTarget } from "@/lib/supabase/homologation-env";
 import { createClient } from "@/lib/supabase/server";
 
 type ActionState = { status: "idle" | "success" | "error"; message?: string };
 export const operationalIdle: ActionState = { status: "idle" };
+export type EmployeeInvitationActionState = ActionState & { invitationLink?: string; expiresAt?: string };
+export type EmployeeInvitationAcceptState = { status: "idle" | "accepted" | "rejected" | "error"; message?: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TOKEN = /^[0-9a-f]{64}$/;
 
 async function operationalClient() {
   const env = getSupabaseEnv();
@@ -20,6 +23,10 @@ async function operationalClient() {
 function value(form: FormData, key: string, max = 500) { const raw = form.get(key); return typeof raw === "string" ? raw.trim().slice(0, max) : ""; }
 function decimal(input: string) { const parsed = Number(input.replace(",", ".")); return Number.isFinite(parsed) && parsed >= 0 ? parsed : null; }
 function requestId(form: FormData) { const id = value(form, "request_id", 36); return UUID.test(id) ? id : null; }
+function employeeBranchIds(form: FormData) {
+  const ids = form.getAll("branch_id").filter((candidate): candidate is string => typeof candidate === "string" && UUID.test(candidate));
+  return ids.length && new Set(ids).size === ids.length ? ids : null;
+}
 function purchaseItems(form: FormData) {
   const raw = value(form, "items", 20000);
   try {
@@ -133,6 +140,92 @@ export async function setOperationalMembershipStatusAction(_: ActionState, form:
     revalidatePath("/operacional/equipe"); revalidatePath("/dashboard");
     return { status: "success", message: status === "suspended" ? "Vínculo suspenso e auditado." : "Vínculo revogado e auditado." };
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function createEmployeeInvitationAction(_: EmployeeInvitationActionState, form: FormData): Promise<EmployeeInvitationActionState> {
+  try {
+    const client = await operationalClient();
+    const tenantId = value(form, "tenant_id", 36); const recipientEmail = value(form, "recipient_email", 254).toLowerCase();
+    const id = requestId(form); const branchIds = employeeBranchIds(form);
+    if (!client || !UUID.test(tenantId) || !id || !branchIds || recipientEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      return { status: "error", message: "Informe e-mail, ao menos uma filial autorizada e dados válidos." };
+    }
+    const { data, error } = await client.rpc("company_create_employee_invitation", {
+      p_tenant_id: tenantId, p_recipient_email: recipientEmail, p_branch_ids: branchIds, p_request_id: id,
+    });
+    if (error || !Array.isArray(data) || data.length !== 1) return { status: "error", message: "O convite não foi emitido. A permissão da empresa e as filiais são verificadas pelo banco." };
+    const result = data[0] as { invitation_token?: unknown; expires_at?: unknown };
+    if (typeof result.invitation_token !== "string" || !TOKEN.test(result.invitation_token) || typeof result.expires_at !== "string") {
+      return { status: "error", message: "O convite não foi confirmado. Nenhum link foi exibido." };
+    }
+    const inviteUrl = new URL("/convites/funcionario/aceitar", getSiteUrl());
+    inviteUrl.hash = new URLSearchParams({ token: result.invitation_token }).toString();
+    revalidatePath("/operacional/equipe");
+    return { status: "success", message: "Convite criado. Copie o link agora e envie somente ao destinatário por um canal seguro.", invitationLink: inviteUrl.toString(), expiresAt: result.expires_at };
+  } catch { return { status: "error", message: "Não foi possível concluir a emissão do convite." }; }
+}
+
+export async function revokeEmployeeInvitationAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const invitationId = value(form, "invitation_id", 36);
+    if (!client || !UUID.test(tenantId) || !UUID.test(invitationId)) return { status: "error", message: "Ação indisponível ou convite inválido." };
+    const { data, error } = await client.rpc("company_revoke_employee_invitation", { p_tenant_id: tenantId, p_invitation_id: invitationId });
+    if (error || data !== "revoked") return { status: "error", message: "O convite não foi revogado. Atualize a lista antes de tentar novamente." };
+    revalidatePath("/operacional/equipe"); return { status: "success", message: "Convite revogado e auditado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a revogação." }; }
+}
+
+export async function activateEmployeeMembershipAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const membershipId = value(form, "membership_id", 36);
+    if (!client || !UUID.test(tenantId) || !UUID.test(membershipId)) return { status: "error", message: "Ação indisponível ou vínculo inválido." };
+    const { data, error } = await client.rpc("company_activate_employee_membership", { p_tenant_id: tenantId, p_membership_id: membershipId });
+    if (error || data !== "active") return { status: "error", message: "O vínculo não foi ativado. A ativação exige uma filial ativa e autorização empresarial." };
+    revalidatePath("/operacional/equipe"); revalidatePath("/dashboard"); return { status: "success", message: "Vínculo ativado e auditado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a ativação." }; }
+}
+
+export async function setOperationalMembershipRoleAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const membershipId = value(form, "membership_id", 36);
+    const roleKey = value(form, "role_key", 64); const operation = value(form, "operation", 16); const branchId = value(form, "branch_id", 36) || null;
+    const roles = ["company_manager", "branch_supervisor", "branch_operator"];
+    if (!client || !UUID.test(tenantId) || !UUID.test(membershipId) || !roles.includes(roleKey) || !["assign", "revoke"].includes(operation) || (branchId && !UUID.test(branchId))) {
+      return { status: "error", message: "Ação indisponível ou dados de papel inválidos." };
+    }
+    const rpc = operation === "assign" ? "assign_company_membership_role" : "revoke_company_membership_role";
+    const { data, error } = await client.rpc(rpc, { p_tenant_id: tenantId, p_membership_id: membershipId, p_role_key: roleKey, p_branch_id: branchId });
+    const expected = operation === "assign" ? "assigned" : "revoked";
+    if (error || data !== expected) return { status: "error", message: "A alteração de papel foi recusada. O banco bloqueia autoelevação e delegação acima da autoridade efetiva." };
+    revalidatePath("/operacional/equipe"); return { status: "success", message: operation === "assign" ? "Papel atribuído e auditado." : "Papel revogado e auditado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a alteração de papel." }; }
+}
+
+export async function setOperationalBranchAccessAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const membershipId = value(form, "membership_id", 36); const branchId = value(form, "branch_id", 36); const status = value(form, "status", 16);
+    if (!client || !UUID.test(tenantId) || !UUID.test(membershipId) || !UUID.test(branchId) || !["active", "revoked"].includes(status)) return { status: "error", message: "Ação indisponível ou filial inválida." };
+    const { data, error } = await client.rpc("set_company_member_branch_access", { p_tenant_id: tenantId, p_membership_id: membershipId, p_branch_id: branchId, p_status: status });
+    if (error || data !== status) return { status: "error", message: "O acesso de filial não foi alterado. A filial e a autoridade do solicitante são verificadas pelo banco." };
+    revalidatePath("/operacional/equipe"); revalidatePath("/dashboard"); return { status: "success", message: status === "active" ? "Filial autorizada e auditada." : "Acesso à filial revogado e auditado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a alteração de filial." }; }
+}
+
+export async function acceptEmployeeInvitationAction(_: EmployeeInvitationAcceptState, form: FormData): Promise<EmployeeInvitationAcceptState> {
+  const token = value(form, "invitation_token", 64);
+  if (!TOKEN.test(token)) return { status: "rejected", message: "Este convite não é válido ou já não pode ser utilizado." };
+  try {
+    const client = await operationalClient();
+    if (!client) return { status: "error", message: "Entre na sua conta e aguarde a habilitação explícita do ambiente antes de aceitar o convite." };
+    const { data, error } = await client.rpc("accept_company_employee_invitation", { p_invitation_token: token });
+    if (error || !Array.isArray(data) || data.length !== 1) return { status: "error", message: "Não foi possível validar o convite. Nenhum vínculo foi confirmado." };
+    const outcome = (data[0] as { outcome?: unknown }).outcome;
+    if (outcome === "pending_approval") {
+      revalidatePath("/dashboard"); return { status: "accepted", message: "Convite aceito. Seu vínculo e suas filiais aguardam aprovação do administrador da empresa." };
+    }
+    if (outcome === "expired") return { status: "rejected", message: "Este convite expirou. Solicite um novo convite." };
+    return { status: "rejected", message: "Este convite não é válido para esta conta ou já foi utilizado/revogado." };
+  } catch { return { status: "error", message: "Não foi possível confirmar a aceitação. Atualize o estado antes de tentar novamente." }; }
 }
 
 export async function setOperationalEntityStatusAction(_: ActionState, form: FormData): Promise<ActionState> {

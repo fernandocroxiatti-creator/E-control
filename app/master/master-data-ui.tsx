@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { MasterAuditItem, MasterBranch, MasterCatalogItem, MasterCompany, MasterCompanyAccessItem, MasterMembership, MasterOverview } from "@/lib/master/read-model";
+import type { CompanyAdminInvitation, MasterAccessControlEntry, MasterAuditItem, MasterBranch, MasterCatalogItem, MasterCompany, MasterCompanyAccessItem, MasterMembership, MasterOverview } from "@/lib/master/read-model";
 
 export function PageHeading({ title, description, meta }: { title: string; description: string; meta?: string }) {
   return <div className="master-heading-row"><div><p className="master-eyebrow">ADMINISTRAÇÃO SAAS</p><h1>{title}</h1><p className="master-subtitle">{description}</p></div>{meta && <span className="master-status">{meta}</span>}</div>;
@@ -35,15 +35,26 @@ export function MembershipTable({ rows, query = "" }: { rows: MasterMembership[]
   return <div className="master-table-wrap" role="region" aria-label="Tabela de vínculos empresariais" tabIndex={0}><table className="master-table master-table--memberships"><thead><tr><th>Usuário</th><th>Vínculo</th><th>Escopo de filiais</th><th>Papéis e permissões</th><th>Desde</th></tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.display_name ?? "anonymous"}:${row.created_at}:${index}`}><td><strong>{row.display_name?.trim() || "Identidade vinculada"}</strong><small className="master-table-subline">Conta Auth vinculada; e-mail não consultado</small></td><td><StatusBadge value={row.status} /></td><td>{row.branch_access_mode === "all_branches" ? "Todas as filiais" : "Somente filiais atribuídas"}</td><td><span className="master-muted">Não expostos pela API segura atual</span></td><td>{formatDate(row.created_at)}</td></tr>)}</tbody></table></div>;
 }
 
-export function CompanyActivationSummary({ company, access }: { company: MasterCompany; access: MasterCompanyAccessItem[] | null }) {
+export function CompanyActivationSummary({ company, access, invitations = [], accessMatrix = [], operationalEnabled = false }: { company: MasterCompany; access: MasterCompanyAccessItem[] | null; invitations?: CompanyAdminInvitation[]; accessMatrix?: MasterAccessControlEntry[]; operationalEnabled?: boolean }) {
   const operational = access?.filter((item) => ["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N"].includes(item.transaction_code)) ?? [];
   const enabled = operational.filter((item) => item.enabled).map((item) => item.transaction_code);
   const globallyReady = operational.filter((item) => item.approval_state === "approved" && item.permission_approval_state === "approved").map((item) => item.transaction_code);
+  const ownerApproved = accessMatrix.some((entry) => entry.entry_type === "role" && entry.role_key === "company_owner" && entry.approval_state === "approved");
+  const ownerGrants = accessMatrix.filter((entry) => entry.entry_type === "role_permission" && entry.role_key === "company_owner").length;
+  const acceptedInvitation = invitations.some((invitation) => invitation.status === "accepted");
   return <div className="master-activation-summary">
-    <p><strong>Empresa:</strong> {company.status === "active" ? "ativa" : "indisponível"} · <strong>Filiais:</strong> {company.branch_count} · <strong>Vínculos ativos:</strong> {company.active_membership_count}</p>
+    <ul className="master-checklist" aria-label="Checklist de ativação empresarial">
+      <li>{company.status === "active" ? "✓" : "○"} Empresa ativa</li>
+      <li>{company.branch_count > 0 ? "✓" : "○"} Filial ativa cadastrada</li>
+      <li>{ownerApproved ? "✓" : "○"} Papel company_owner aprovado globalmente</li>
+      <li>{acceptedInvitation ? "✓" : "○"} Convite do proprietário aceito</li>
+      <li>{company.active_membership_count > 0 ? "✓" : "○"} Vínculo empresarial ativo</li>
+      <li>{ownerGrants > 0 ? "✓" : "○"} Grants configurados para o papel ({ownerGrants})</li>
+      <li>{enabled.length ? "✓" : "○"} Transações disponíveis para esta empresa: {enabled.length ? enabled.join(", ") : "nenhuma"}</li>
+      <li>{operationalEnabled ? "✓" : "○"} Ambiente operacional habilitado</li>
+    </ul>
     <p><strong>Transações globalmente prontas:</strong> {globallyReady.length ? globallyReady.join(", ") : "nenhuma"}.</p>
-    <p><strong>Disponíveis para esta empresa:</strong> {enabled.length ? enabled.join(", ") : "nenhuma"}.</p>
-    {!company.active_membership_count && <p className="master-muted">Próxima pendência: emitir um convite para o proprietário empresarial, com aceite autenticado. A emissão permanece desativada enquanto a flag de convites estiver desligada.</p>}
+    {!acceptedInvitation && <p className="master-muted">Próxima pendência: emitir um convite para o proprietário empresarial e aguardar o aceite autenticado correspondente.</p>}
     {access === null && <p className="master-muted">A disponibilidade empresarial não pôde ser consultada; nenhuma alteração foi liberada.</p>}
   </div>;
 }

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { CompanyAdminInvitationForm, CompanyAdminInvitationTable } from "@/app/master/company-admin-invitations";
-import { getCompanyAdminInvitations, getMasterCompanies, getMasterCompanyAccess, getMasterCompanyInvitationsEnabled, getMasterMemberships } from "@/lib/master/read-model";
+import { getCompanyAdminInvitations, getMasterAccessControlMatrix, getMasterCompanies, getMasterCompanyAccess, getMasterCompanyInvitationsEnabled, getMasterMemberships } from "@/lib/master/read-model";
 import { BackendUnavailable, CompanyActivationSummary, DataPanel, MembershipTable, PageHeading } from "@/app/master/master-data-ui";
+import { getSupabaseEnv } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export default async function MasterUsersPage({ searchParams }: { searchParams: 
     getMasterCompanies(null, null), empresa ? getMasterMemberships(empresa) : Promise.resolve(null),
   ]);
   const invitationsEnabled = await getMasterCompanyInvitationsEnabled();
-  const [invitations, companyAccess] = empresa ? await Promise.all([getCompanyAdminInvitations(empresa), getMasterCompanyAccess(empresa)]) : [null, null];
+  const [invitations, companyAccess, accessMatrix] = empresa ? await Promise.all([getCompanyAdminInvitations(empresa), getMasterCompanyAccess(empresa), getMasterAccessControlMatrix()]) : [null, null, null];
   const selectedCompany = companies.status === "ready" ? companies.data.find((item) => item.company_id === empresa) : undefined;
   const normalizedSearch = busca?.trim().toLocaleLowerCase("pt-BR") ?? "";
   const normalizedInvitationSearch = convite?.trim().toLocaleLowerCase("pt-BR") ?? "";
@@ -31,7 +32,7 @@ export default async function MasterUsersPage({ searchParams }: { searchParams: 
     </DataPanel>
     {empresa && selectedCompany && <>
       <DataPanel title={`Prontidão operacional · ${selectedCompany.legal_name}`} description="As etapas são independentes: consultar esta lista não cria vínculo, papel, grant ou disponibilidade.">
-        <CompanyActivationSummary company={selectedCompany} access={companyAccess?.status === "ready" ? companyAccess.data : null} />
+        <CompanyActivationSummary company={selectedCompany} access={companyAccess?.status === "ready" ? companyAccess.data : null} invitations={invitations?.status === "ready" ? invitations.data : []} accessMatrix={accessMatrix?.status === "ready" ? accessMatrix.data : []} operationalEnabled={Boolean(getSupabaseEnv()?.operationalEnabled)} />
       </DataPanel>
       <DataPanel title={`Convites · ${selectedCompany.legal_name}`} description="Os tokens nunca são exibidos nesta lista. Convites expirados são rejeitados e registrados quando processados.">
         <form className="master-filter-form" method="get"><input type="hidden" name="empresa" value={empresa} /><input type="hidden" name="busca" value={busca ?? ""} /><label>Buscar nos convites visíveis<input name="convite" type="search" maxLength={254} defaultValue={convite ?? ""} placeholder="Destinatário, papel ou situação" /></label><button type="submit">Filtrar</button></form>
