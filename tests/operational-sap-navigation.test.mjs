@@ -7,6 +7,7 @@ const catalogPage = read("app/operacional/cadastros/page.tsx");
 const purchasesPage = read("app/operacional/compras/page.tsx");
 const inventoryPage = read("app/operacional/estoque/page.tsx");
 const dashboard = read("app/components/erp-dashboard.tsx");
+const proxy = read("proxy.ts");
 const migration = read("supabase/migrations/20261109130000_operational_read_authorization_alignment.sql");
 const transactionCatalog = read("lib/master/transaction-resolution.ts");
 const focus = read("lib/operational/transaction-focus.ts");
@@ -42,6 +43,11 @@ test("menu active state follows the current operational route", () => {
   assert.match(dashboard, /overview-tile-action/);
   assert.match(dashboard, /\/operacional\/estoque\?tx=MIGO/);
   assert.match(dashboard, /Em desenvolvimento/);
+});
+
+test("unauthenticated operational routes preserve their exact internal return path", () => {
+  assert.match(proxy, /pathname\.startsWith\("\/operacional\/"\)/);
+  assert.match(proxy, /loginUrl\.searchParams\.set\("next", `\$\{request\.nextUrl\.pathname\}\$\{request\.nextUrl\.search\}`\)/);
 });
 
 test("read-alignment migration is narrow, authenticated and fail-closed", () => {
