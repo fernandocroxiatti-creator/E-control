@@ -23,13 +23,15 @@ export default async function OperationalWorkOrdersPage({ searchParams }: { sear
     listOperationalWorkOrders(selected.tenantId, selected.branchId, { status: selectedStatus, page: currentPage }),
     listOperationalParties(selected.tenantId, { search: null, partyType: "customer", status: "active", page: 1 }),
   ]) : [];
-  // When writes are globally disabled we intentionally do not call the new
-  // RPC. The UI must distinguish that policy gate from a missing migration.
-  const foundationAvailable = !enabled || orders?.status === "ready";
+  // A denied ZOS read contract is not evidence that the schema is missing.
+  // Production has the foundation installed; the list can still be denied by
+  // the deliberately separate ZOS role grant and company availability.
+  const foundationAvailable = true;
+  const serviceAuthorized = Boolean(selected && enabled && orders?.status === "ready");
   return <>
     <div className="page-heading-row"><div><p className="page-kicker">E-CONTROL / SERVIÇOS</p><h1>Ordens de serviço</h1><p className="page-subtitle">Atendimento, serviços e peças isolados por empresa e filial.</p></div><span className="workspace-badge">{enabled ? "Operacional habilitado" : "Aguardando ativação"}</span></div>
     <form className="master-filter-form" method="get"><label>Contexto<select name="filial" defaultValue={selected?.branchId ?? ""}>{contexts.map((context) => <option key={`${context.tenantId}-${context.branchId}`} value={context.branchId}>{context.companyName} · {context.branchCode} — {context.branchName}</option>)}</select></label><label>Situação<select name="status" defaultValue={selectedStatus ?? ""}><option value="">Todas</option><option value="open">Aberta</option><option value="in_progress">Em andamento</option><option value="closed">Encerrada</option><option value="cancelled">Cancelada</option><option value="reversed">Estornada</option></select></label><button type="submit">Consultar</button></form>
-    {selected ? <WorkOrders tenantId={selected.tenantId} branchId={selected.branchId} enabled={enabled} customers={customers?.status === "ready" ? customers.data.rows : []} orders={orders?.status === "ready" ? orders.data.rows : []} foundationAvailable={foundationAvailable} /> : <p className="master-notice">{operationalContextMessage(access.status)}</p>}
-    <p className="master-notice">A leitura exige ZOS03; abertura exige ZOS01. Reserva, consumo e estorno são auditados e só ficam disponíveis após autorização explícita. <Link href="/operacional/estoque">Estoque</Link> mantém seu próprio controle.</p>
+    {selected ? <WorkOrders tenantId={selected.tenantId} branchId={selected.branchId} enabled={serviceAuthorized} customers={customers?.status === "ready" ? customers.data.rows : []} orders={orders?.status === "ready" ? orders.data.rows : []} foundationAvailable={foundationAvailable} /> : <p className="master-notice">{operationalContextMessage(access.status)}</p>}
+    <p className="master-notice">{enabled && !serviceAuthorized ? "A fundação de O.S. está instalada, mas esta sessão ainda não possui ZOS01/ZOS03 aprovadas, concedidas e disponíveis para a empresa." : "A leitura exige ZOS03; abertura exige ZOS01. Reserva, consumo e estorno são auditados e só ficam disponíveis após autorização explícita."} <Link href="/operacional/estoque">Estoque</Link> mantém seu próprio controle.</p>
   </>;
 }

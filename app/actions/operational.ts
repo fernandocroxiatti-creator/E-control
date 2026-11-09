@@ -91,9 +91,20 @@ export async function createPurchaseOrderAction(_: ActionState, form: FormData):
   try {
     const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const branchId = value(form, "branch_id", 36); const supplierId = value(form, "supplier_id", 36); const id = requestId(form); const items = purchaseItems(form);
     if (!client || !UUID.test(tenantId) || !UUID.test(branchId) || !UUID.test(supplierId) || !id || !items) return { status: "error", message: "Pedido inválido. Informe fornecedor e pelo menos um produto com quantidade e preço válidos." };
-    const { error } = await client.rpc("operational_create_purchase_order", { p_tenant_id: tenantId, p_branch_id: branchId, p_supplier_id: supplierId, p_items: items, p_notes: value(form, "notes", 1000) || null, p_request_id: id });
+    const { data: purchaseOrderId, error } = await client.rpc("operational_create_purchase_order", { p_tenant_id: tenantId, p_branch_id: branchId, p_supplier_id: supplierId, p_items: items, p_notes: value(form, "notes", 1000) || null, p_request_id: id });
     if (error) return { status: "error", message: "Não foi possível criar o pedido. A autorização, a filial, o fornecedor e os produtos são validados pelo banco." };
-    revalidatePath("/operacional/compras"); return { status: "success", message: "Pedido em rascunho criado e auditado." };
+    // ME21N remains usable without ME23N. When the same session also has the
+    // read transaction, show the canonical number returned by the protected
+    // listing contract; otherwise never expose a direct table read.
+    let receipt = "Pedido em rascunho criado e auditado.";
+    if (typeof purchaseOrderId === "string" && UUID.test(purchaseOrderId)) {
+      const { data: rows, error: listError } = await client.rpc("operational_list_purchase_orders", { p_tenant_id: tenantId, p_branch_id: branchId, p_search: null, p_status: null, p_limit: 100, p_offset: 0 });
+      if (!listError && Array.isArray(rows)) {
+        const created = rows.find((row) => row && typeof row === "object" && (row as { purchase_order_id?: unknown }).purchase_order_id === purchaseOrderId) as { order_number?: unknown } | undefined;
+        if (typeof created?.order_number === "number") receipt = `Pedido #${created.order_number} criado em rascunho e auditado.`;
+      }
+    }
+    revalidatePath("/operacional/compras"); return { status: "success", message: receipt };
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
 }
 

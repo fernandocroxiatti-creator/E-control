@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { signOutAction } from "@/app/actions/auth";
 import { lookupTransactionCode } from "@/app/actions/transaction-lookup";
@@ -43,6 +43,7 @@ const tiles = [
 
 export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated = false, activeSection = "overview", transactionContexts = [], operationalContextStatus = "no_active_membership", operationalEnabled = false, children }: { email: string; showMasterAdmin?: boolean; passwordUpdated?: boolean; activeSection?: string; transactionContexts?: AuthorizedTransactionContext[]; operationalContextStatus?: OperationalContextStatus; operationalEnabled?: boolean; children?: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [transactionCode, setTransactionCode] = useState("");
@@ -102,6 +103,12 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
 
   const availableCompanies = [...new Map(transactionContexts.map((context) => [context.tenantId, context.companyName])).entries()];
   const availableBranches = transactionContexts.filter((context) => context.tenantId === selectedTenantId);
+  const activeModule = pathname?.startsWith("/operacional/cadastros") ? "catalog"
+    : pathname?.startsWith("/operacional/estoque") ? "inventory"
+      : pathname?.startsWith("/operacional/compras") ? "purchases"
+        : pathname?.startsWith("/operacional/ordens-servico") ? "services"
+          : pathname?.startsWith("/operacional/equipe") ? "users"
+            : activeSection;
 
   return (
     <div className="erp-shell">
@@ -119,11 +126,11 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
           {filteredModules.map((item) => (
             <div className="nav-item-wrap" key={item.id}>
               {item.status === "overview" ? (
-                <a className={`module-link${activeSection === "overview" ? " is-active" : ""}`} href="/dashboard" aria-current={activeSection === "overview" ? "page" : undefined} onClick={() => setMenuOpen(false)}>
+                <a className={`module-link${activeModule === "overview" ? " is-active" : ""}`} href="/dashboard" aria-current={activeModule === "overview" ? "page" : undefined} onClick={() => setMenuOpen(false)}>
                   <Icon name={item.icon} /> <span>{item.label}</span>
                 </a>
               ) : item.status === "route" ? (
-                <a className={`module-link${activeSection === item.id ? " is-active" : ""}`} href={item.href ?? "/dashboard"} aria-current={activeSection === item.id ? "page" : undefined} onClick={() => setMenuOpen(false)}>
+                <a className={`module-link${activeModule === item.id ? " is-active" : ""}`} href={item.href ?? "/dashboard"} aria-current={activeModule === item.id ? "page" : undefined} onClick={() => setMenuOpen(false)}>
                   <Icon name={item.icon} /> <span>{item.label}</span>
                 </a>
               ) : (
@@ -222,7 +229,7 @@ function DashboardOverview({ transactionContexts, operationalContextStatus, oper
               <div className="tile-icon"><Icon name={tile.icon} /></div>
               <h3>{tile.title}</h3>
               <p>{operationalReady ? "Disponível conforme suas permissões efetivas." : activeContext ? "Empresa reconhecida; aguardando ativação operacional." : "Exige vínculo empresarial e filial autorizada."}</p>
-              <span className="tile-status"><span className="status-dot" /> {operationalReady ? "Verificar permissões" : activeContext ? "Aguardando ativação" : "Acesso pendente"}</span>
+              <span className="tile-status"><span className="status-dot" /> {operationalReady ? "Acesso validado ao abrir" : activeContext ? "Aguardando ativação" : "Acesso pendente"}</span>
             </article>
           ))}
         </div>

@@ -16,32 +16,32 @@ export const erpTransactionCatalog = {
   BP01: {
     code: "BP01", moduleCode: "MDM", moduleName: "Cadastros", name: "Clientes e fornecedores",
     description: "Consulta e gestão de parceiros comerciais autorizados.",
-    permissionKey: "transaction.masterdata.party.manage", route: "/operacional/cadastros",
+    permissionKey: "transaction.masterdata.party.manage", route: "/operacional/cadastros?tx=BP01",
   },
   MM01: {
     code: "MM01", moduleCode: "MDM", moduleName: "Estoque e produtos", name: "Cadastro de produtos",
     description: "Consulta e gestão do catálogo de produtos.",
-    permissionKey: "transaction.masterdata.catalog.product.manage", route: "/operacional/cadastros?item_type=product",
+    permissionKey: "transaction.masterdata.catalog.product.manage", route: "/operacional/cadastros?tx=MM01",
   },
   SV01: {
     code: "SV01", moduleCode: "MDM", moduleName: "Cadastros", name: "Cadastro de serviços",
     description: "Consulta e gestão do catálogo de serviços.",
-    permissionKey: "transaction.masterdata.catalog.service.manage", route: "/operacional/cadastros?item_type=service",
+    permissionKey: "transaction.masterdata.catalog.service.manage", route: "/operacional/cadastros?tx=SV01",
   },
   MIGO: {
     code: "MIGO", moduleCode: "INV", moduleName: "Estoque e produtos", name: "Movimentação de estoque",
     description: "Entradas, saídas e ajustes de estoque autorizados.",
-    permissionKey: "transaction.inventory.stock.move", route: "/operacional/estoque",
+    permissionKey: "transaction.inventory.stock.move", route: "/operacional/estoque?tx=MIGO",
   },
   ME21N: {
     code: "ME21N", moduleCode: "PUR", moduleName: "Compras", name: "Criar pedido de compra",
     description: "Criação de pedidos de compra em rascunho.",
-    permissionKey: "transaction.purchasing.purchase_order.create", route: "/operacional/compras",
+    permissionKey: "transaction.purchasing.purchase_order.create", route: "/operacional/compras?tx=ME21N",
   },
   ME23N: {
     code: "ME23N", moduleCode: "PUR", moduleName: "Compras", name: "Consultar pedidos de compra",
     description: "Consulta dos pedidos de compra autorizados.",
-    permissionKey: "transaction.purchasing.purchase_order.read", route: "/operacional/compras",
+    permissionKey: "transaction.purchasing.purchase_order.read", route: "/operacional/compras?tx=ME23N",
   },
   MM02: { code: "MM02", moduleCode: "MDM", moduleName: "Estoque e produtos", name: "Alterar produtos", description: "Alteração autorizada de produtos cadastrados.", permissionKey: "transaction.masterdata.catalog.product.update", route: "/operacional/cadastros?item_type=product" },
   MM03: { code: "MM03", moduleCode: "MDM", moduleName: "Estoque e produtos", name: "Consultar produtos", description: "Consulta autorizada do catálogo de produtos.", permissionKey: "transaction.masterdata.catalog.product.read", route: "/operacional/cadastros?item_type=product" },

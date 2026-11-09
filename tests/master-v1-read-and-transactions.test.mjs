@@ -59,7 +59,7 @@ test("transaction authorization calls the authenticated tenant RPC only with val
     },
   };
   assert.deepEqual(await resolveTransactionForSession(client, "me21n", company, branch), {
-    status: "authorized", code: "ME21N", route: "/operacional/compras", name: "Criar pedido de compra",
+    status: "authorized", code: "ME21N", route: "/operacional/compras?tx=ME21N", name: "Criar pedido de compra",
   });
   assert.deepEqual(calls, [{
     name: "authorize_company_transaction",
