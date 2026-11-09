@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { signOutAction } from "@/app/actions/auth";
@@ -31,15 +32,28 @@ const modules: ModuleItem[] = [
   { id: "settings", label: "Configurações", icon: "settings", status: "development" },
 ];
 
-const tiles = [
-  { title: "Empresas", icon: "building" },
-  { title: "Filiais", icon: "building" },
-  { title: "Estoque", icon: "box" },
-  { title: "Compras", icon: "cart" },
-  { title: "Vendas", icon: "receipt" },
-  { title: "Financeiro", icon: "wallet" },
-  { title: "Relatórios", icon: "chart" },
+type DashboardTile = {
+  title: string;
+  icon: string;
+  href?: string;
+  status: "available" | "authorized" | "development";
+};
+
+const tiles: DashboardTile[] = [
+  { title: "Empresas", icon: "building", href: "/empresas", status: "available" },
+  { title: "Filiais", icon: "building", href: "/empresas/filiais", status: "available" },
+  { title: "Estoque", icon: "box", href: "/operacional/estoque?tx=MIGO", status: "authorized" },
+  { title: "Compras", icon: "cart", href: "/operacional/compras", status: "authorized" },
+  { title: "Vendas", icon: "receipt", status: "development" },
+  { title: "Financeiro", icon: "wallet", status: "development" },
+  { title: "Relatórios", icon: "chart", status: "development" },
 ];
+
+function withOperationalContext(href: string, context: AuthorizedTransactionContext | undefined) {
+  if (!context || !href.startsWith("/operacional/")) return href;
+  const separator = href.includes("?") ? "&" : "?";
+  return `${href}${separator}${new URLSearchParams({ empresa: context.tenantId, filial: context.branchId }).toString()}`;
+}
 
 export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated = false, activeSection = "overview", transactionContexts = [], operationalContextStatus = "no_active_membership", operationalEnabled = false, children }: { email: string; showMasterAdmin?: boolean; passwordUpdated?: boolean; activeSection?: string; transactionContexts?: AuthorizedTransactionContext[]; operationalContextStatus?: OperationalContextStatus; operationalEnabled?: boolean; children?: React.ReactNode }) {
   const router = useRouter();
@@ -103,6 +117,7 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
 
   const availableCompanies = [...new Map(transactionContexts.map((context) => [context.tenantId, context.companyName])).entries()];
   const availableBranches = transactionContexts.filter((context) => context.tenantId === selectedTenantId);
+  const selectedContext = transactionContexts.find((context) => context.tenantId === selectedTenantId && context.branchId === selectedBranchId);
   const activeModule = pathname?.startsWith("/operacional/cadastros") ? "catalog"
     : pathname?.startsWith("/operacional/estoque") ? "inventory"
       : pathname?.startsWith("/operacional/compras") ? "purchases"
@@ -130,7 +145,7 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
                   <Icon name={item.icon} /> <span>{item.label}</span>
                 </a>
               ) : item.status === "route" ? (
-                <a className={`module-link${activeModule === item.id ? " is-active" : ""}`} href={item.href ?? "/dashboard"} aria-current={activeModule === item.id ? "page" : undefined} onClick={() => setMenuOpen(false)}>
+                <a className={`module-link${activeModule === item.id ? " is-active" : ""}`} href={withOperationalContext(item.href ?? "/dashboard", selectedContext)} aria-current={activeModule === item.id ? "page" : undefined} onClick={() => setMenuOpen(false)}>
                   <Icon name={item.icon} /> <span>{item.label}</span>
                 </a>
               ) : (
@@ -198,15 +213,15 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
         <main id="main-content" className="erp-content">
           {passwordUpdated && <p className="form-message success dashboard-password-message" role="status">Senha atualizada.</p>}
           <div id="transaction-result" className={`transaction-feedback${transactionMessage ? " is-visible" : ""}`} role="status" aria-live="polite">{transactionMessage}</div>
-          {children ?? <DashboardOverview transactionContexts={transactionContexts} operationalContextStatus={operationalContextStatus} operationalEnabled={operationalEnabled} />}
+          {children ?? <DashboardOverview transactionContexts={transactionContexts} selectedContext={selectedContext} operationalContextStatus={operationalContextStatus} operationalEnabled={operationalEnabled} />}
         </main>
       </div>
     </div>
   );
 }
 
-function DashboardOverview({ transactionContexts, operationalContextStatus, operationalEnabled }: { transactionContexts: AuthorizedTransactionContext[]; operationalContextStatus: OperationalContextStatus; operationalEnabled: boolean }) {
-  const activeContext = transactionContexts[0];
+function DashboardOverview({ transactionContexts, selectedContext, operationalContextStatus, operationalEnabled }: { transactionContexts: AuthorizedTransactionContext[]; selectedContext: AuthorizedTransactionContext | undefined; operationalContextStatus: OperationalContextStatus; operationalEnabled: boolean }) {
+  const activeContext = selectedContext ?? transactionContexts[0];
   const operationalReady = operationalEnabled && Boolean(activeContext);
   return (
     <>
@@ -224,14 +239,19 @@ function DashboardOverview({ transactionContexts, operationalContextStatus, oper
       <section className="module-overview" aria-labelledby="modules-title">
         <div className="section-heading"><div><h2 id="modules-title">Áreas de gestão</h2><p>Atalhos exibem o estado de autorização real da sessão; módulos futuros permanecem identificados.</p></div><span className="section-count">{tiles.length} áreas</span></div>
         <div className="overview-grid">
-          {tiles.map((tile) => (
-            <article className="overview-tile" key={tile.title}>
-              <div className="tile-icon"><Icon name={tile.icon} /></div>
-              <h3>{tile.title}</h3>
-              <p>{operationalReady ? "Disponível conforme suas permissões efetivas." : activeContext ? "Empresa reconhecida; aguardando ativação operacional." : "Exige vínculo empresarial e filial autorizada."}</p>
-              <span className="tile-status"><span className="status-dot" /> {operationalReady ? "Acesso validado ao abrir" : activeContext ? "Aguardando ativação" : "Acesso pendente"}</span>
-            </article>
-          ))}
+          {tiles.map((tile) => {
+            const isOperational = tile.status === "authorized";
+            const available = tile.status === "available" || (isOperational && operationalReady);
+            const href = tile.href ? withOperationalContext(tile.href, selectedContext ?? activeContext) : null;
+            const description = tile.status === "development" ? "Módulo em desenvolvimento; ainda não há operações disponíveis."
+              : isOperational && !operationalReady ? "Exige empresa, filial e autorização efetiva para abrir."
+                : isOperational ? "Abrir e validar a transação conforme suas permissões efetivas."
+                  : "Abrir a área de administração correspondente.";
+            const state = tile.status === "development" ? "Em desenvolvimento" : available ? "Abrir módulo" : "Acesso pendente";
+            const content = <><div className="tile-icon"><Icon name={tile.icon} /></div><h3>{tile.title}</h3><p>{description}</p><span className="tile-status"><span className="status-dot" /> {state}</span></>;
+            return available && href ? <Link className="overview-tile overview-tile-action" key={tile.title} href={href} aria-label={`Abrir ${tile.title}`}>{content}</Link>
+              : <article className="overview-tile is-unavailable" key={tile.title} aria-label={`${tile.title}: ${state}`}>{content}</article>;
+          })}
         </div>
       </section>
       <footer className="erp-footer"><span>eControll ERP</span><span>{operationalReady ? "Contexto empresarial autorizado" : activeContext ? "Contexto empresarial reconhecido · operações protegidas" : "Nenhum contexto empresarial autorizado"}</span></footer>

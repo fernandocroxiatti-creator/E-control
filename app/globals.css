@@ -117,8 +117,11 @@ h1{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;font-size:clamp(1.8re
 .section-heading p{margin:.3rem 0 0;color:#8a9892;font-size:.75rem}
 .section-count{padding:.34rem .5rem;border:1px solid #e6ece9;border-radius:.45rem;background:#fff;color:#7e8d86;font-size:.65rem;font-weight:650}
 .overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.85rem}
-.overview-tile{min-height:9.5rem;padding:1rem;border:1px solid #e4ebe7;border-radius:.8rem;background:#fff;transition:transform .17s ease,box-shadow .17s ease,border-color .17s ease}
-.overview-tile:hover{transform:translateY(-2px);border-color:#d3e5da;box-shadow:0 .6rem 1.8rem #234c3810}
+.overview-tile{display:block;min-height:9.5rem;padding:1rem;border:1px solid #e4ebe7;border-radius:.8rem;background:#fff;color:inherit;transition:transform .17s ease,box-shadow .17s ease,border-color .17s ease}
+.overview-tile:hover{transform:translateY(-2px);border-color:#d3e5da;box-shadow:0 .6rem 1.8rem #234c3810;text-decoration:none}
+.overview-tile-action{cursor:pointer}
+.overview-tile-action:focus-visible{outline:3px solid #75bda3;outline-offset:3px}
+.overview-tile.is-unavailable{background:#fbfcfb;opacity:.78}
 .tile-icon{display:grid;width:2.1rem;height:2.1rem;place-items:center;border-radius:.6rem;background:#f0f7f3;color:#388065}
 .tile-icon .ui-icon{width:17px;height:17px}
 .overview-tile h3{margin:.8rem 0 .28rem;color:#344a41;font-size:.8rem}

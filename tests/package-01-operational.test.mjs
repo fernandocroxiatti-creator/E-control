@@ -85,6 +85,7 @@ test("browser-facing operational actions remain server-session and explicit-flag
 
 test("dashboard exposes an authorized business context without bypassing the operational flag", () => {
   assert.match(dashboard, /operationalEnabled = false/);
+  assert.match(dashboard, /const activeContext = selectedContext \?\? transactionContexts\[0\]/);
   assert.match(dashboard, /const operationalReady = operationalEnabled && Boolean\(activeContext\)/);
   assert.match(dashboard, /Acesso empresarial ativo/);
   assert.match(dashboard, /Operações aguardando habilitação/);

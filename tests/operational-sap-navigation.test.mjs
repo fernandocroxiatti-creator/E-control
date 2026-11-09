@@ -27,10 +27,21 @@ test("focused pages authorize the requested transaction on the server", () => {
   assert.match(purchasesPage, /allowRead/);
 });
 
+test("inventory requires MIGO even on its generic route and uses only MIGO-authorized read models", () => {
+  assert.match(inventoryPage, /authorizeRouteTransaction\(client, "MIGO"/);
+  assert.doesNotMatch(inventoryPage, /listOperationalProductOptions/);
+  assert.match(inventoryPage, /Não foi possível carregar o saldo da filial selecionada/);
+  assert.doesNotMatch(inventoryPage, /migration de alinhamento de leitura preparada/);
+});
+
 test("menu active state follows the current operational route", () => {
   assert.match(dashboard, /usePathname/);
   for (const section of ["cadastros", "estoque", "compras", "ordens-servico"]) assert.match(dashboard, new RegExp(`/operacional/${section}`));
-  assert.match(dashboard, /Acesso validado ao abrir/);
+  assert.match(dashboard, /Abrir e validar a transação conforme suas permissões efetivas/);
+  assert.match(dashboard, /withOperationalContext/);
+  assert.match(dashboard, /overview-tile-action/);
+  assert.match(dashboard, /\/operacional\/estoque\?tx=MIGO/);
+  assert.match(dashboard, /Em desenvolvimento/);
 });
 
 test("read-alignment migration is narrow, authenticated and fail-closed", () => {
