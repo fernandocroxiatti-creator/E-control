@@ -97,5 +97,7 @@ SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/master-membership-authorization-read-api-behavior.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261109130000_operational_read_authorization_alignment.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/operational-read-authorization-alignment.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261110100000_inventory_work_order_read_models.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/package-05-inventory-work-order-read-models.sql" >/dev/null
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'
-echo 'PASS: Packages 01, 03 and 04 pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'
+echo 'PASS: Packages 01, 03, 04 and 05 pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'

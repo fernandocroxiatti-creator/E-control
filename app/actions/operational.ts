@@ -41,6 +41,22 @@ function purchaseItems(form: FormData) {
     return items.every(Boolean) && new Set(items.map((item) => item!.item_id)).size === items.length ? items : null;
   } catch { return null; }
 }
+function workOrderLines(form: FormData) {
+  const raw = value(form, "lines", 30000);
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length > 100) return null;
+    const lines = parsed.map((line) => {
+      if (!line || typeof line !== "object" || Array.isArray(line)) return null;
+      const row = line as Record<string, unknown>; const itemId = typeof row.item_id === "string" ? row.item_id : "";
+      const lineType = typeof row.line_type === "string" ? row.line_type : "";
+      const quantity = Number(row.quantity); const unitPrice = Number(row.unit_price); const discountAmount = Number(row.discount_amount ?? 0);
+      return UUID.test(itemId) && ["service", "part"].includes(lineType) && Number.isFinite(quantity) && quantity > 0 && Number.isFinite(unitPrice) && unitPrice >= 0 && Number.isFinite(discountAmount) && discountAmount >= 0 && discountAmount <= quantity * unitPrice
+        ? { item_id: itemId, line_type: lineType, quantity, unit_price: unitPrice, discount_amount: discountAmount } : null;
+    });
+    return lines.every(Boolean) ? lines : null;
+  } catch { return null; }
+}
 
 export async function createBusinessPartyAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
@@ -129,6 +145,46 @@ export async function recordInventoryMovementAction(_: ActionState, form: FormDa
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
 }
 
+export async function createInventoryTransferAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const sourceBranchId = value(form, "source_branch_id", 36); const destinationBranchId = value(form, "destination_branch_id", 36); const itemId = value(form, "item_id", 36); const quantity = decimal(value(form, "quantity", 32)); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(sourceBranchId) || !UUID.test(destinationBranchId) || !UUID.test(itemId) || !id || quantity === null || quantity <= 0) return { status: "error", message: "Informe origem, destino, produto e quantidade válidos." };
+    const { error } = await client.rpc("operational_create_inventory_transfer", { p_tenant_id: tenantId, p_source_branch_id: sourceBranchId, p_destination_branch_id: destinationBranchId, p_item_id: itemId, p_quantity: quantity, p_reference_note: value(form, "reference_note", 500) || null, p_request_id: id });
+    if (error) return { status: "error", message: "Transferência recusada. A operação exige acesso às duas filiais, saldo suficiente e identificação idempotente." };
+    revalidatePath("/operacional/estoque"); return { status: "success", message: "Transferência registrada de forma atômica e auditada." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function createInventoryCountAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const branchId = value(form, "branch_id", 36); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(branchId) || !id) return { status: "error", message: "Ação indisponível ou dados inválidos." };
+    const { data, error } = await client.rpc("operational_create_inventory_count", { p_tenant_id: tenantId, p_branch_id: branchId, p_notes: value(form, "notes", 1000) || null, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Não foi possível abrir o inventário. Empresa, filial e autorização são validadas pelo banco." };
+    revalidatePath("/operacional/estoque"); return { status: "success", message: "Inventário físico aberto e auditado. Selecione-o em MI04 para registrar as contagens." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function recordInventoryCountAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const sessionId = value(form, "session_id", 36); const itemId = value(form, "item_id", 36); const quantity = decimal(value(form, "counted_quantity", 32));
+    if (!client || !UUID.test(tenantId) || !UUID.test(sessionId) || !UUID.test(itemId) || quantity === null) return { status: "error", message: "Informe inventário, produto e contagem válidos." };
+    const { data, error } = await client.rpc("operational_record_inventory_count", { p_tenant_id: tenantId, p_session_id: sessionId, p_item_id: itemId, p_counted_quantity: quantity });
+    if (error || data !== "recorded") return { status: "error", message: "Não foi possível registrar a contagem. Somente inventários abertos e produtos ativos são aceitos." };
+    revalidatePath("/operacional/estoque"); return { status: "success", message: "Contagem registrada; nenhum ajuste foi aplicado ainda." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function postInventoryCountAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const sessionId = value(form, "session_id", 36);
+    if (!client || !UUID.test(tenantId) || !UUID.test(sessionId)) return { status: "error", message: "Ação indisponível ou inventário inválido." };
+    const { data, error } = await client.rpc("operational_post_inventory_count", { p_tenant_id: tenantId, p_session_id: sessionId });
+    if (error || !["posted", "unchanged"].includes(typeof data === "string" ? data : "")) return { status: "error", message: "Não foi possível aplicar o inventário. Diferenças são recalculadas sob bloqueio pelo banco." };
+    revalidatePath("/operacional/estoque"); return { status: "success", message: data === "posted" ? "Inventário aplicado e auditado." : "Este inventário já estava aplicado; nenhum ajuste foi repetido." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
 export async function createWorkOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
     const client = await operationalClient();
@@ -138,6 +194,46 @@ export async function createWorkOrderAction(_: ActionState, form: FormData): Pro
     const { error } = await client.rpc("operational_create_work_order", { p_tenant_id: tenantId, p_branch_id: branchId, p_customer_id: customerId, p_equipment_description: value(form, "equipment_description", 500) || null, p_problem_description: problem, p_request_id: id });
     if (error) return { status: "error", message: "Não foi possível abrir a O.S. Empresa, filial, transação e permissão são validadas pelo banco." };
     revalidatePath("/operacional/ordens-servico"); return { status: "success", message: "Ordem de serviço aberta e auditada." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function updateWorkOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const workOrderId = value(form, "work_order_id", 36); const id = requestId(form); const lines = workOrderLines(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(workOrderId) || !id || !lines) return { status: "error", message: "Linhas inválidas. Serviços e peças precisam ter quantidade, preço e desconto válidos." };
+    const { error } = await client.rpc("operational_update_work_order", { p_tenant_id: tenantId, p_work_order_id: workOrderId, p_diagnosis: value(form, "diagnosis", 4000) || null, p_lines: lines, p_request_id: id });
+    if (error) return { status: "error", message: "Não foi possível atualizar a O.S. Reservas ativas, permissões e itens são conferidos pelo banco." };
+    revalidatePath("/operacional/ordens-servico"); return { status: "success", message: "O.S. atualizada e auditada." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function reserveWorkOrderPartsAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const workOrderId = value(form, "work_order_id", 36);
+    if (!client || !UUID.test(tenantId) || !UUID.test(workOrderId)) return { status: "error", message: "Ação indisponível ou ordem inválida." };
+    const { data, error } = await client.rpc("operational_reserve_work_order_parts", { p_tenant_id: tenantId, p_work_order_id: workOrderId });
+    if (error || data !== "reserved") return { status: "error", message: "Não foi possível reservar as peças. O saldo disponível e a autorização continuam protegidos." };
+    revalidatePath("/operacional/ordens-servico"); return { status: "success", message: "Peças reservadas; nenhum saldo foi baixado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function closeWorkOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const workOrderId = value(form, "work_order_id", 36);
+    if (!client || !UUID.test(tenantId) || !UUID.test(workOrderId)) return { status: "error", message: "Ação indisponível ou ordem inválida." };
+    const { data, error } = await client.rpc("operational_close_work_order", { p_tenant_id: tenantId, p_work_order_id: workOrderId });
+    if (error || data !== "closed") return { status: "error", message: "Não foi possível encerrar a O.S. Peças sem reserva não são consumidas." };
+    revalidatePath("/operacional/ordens-servico"); revalidatePath("/operacional/estoque"); return { status: "success", message: "O.S. encerrada; o consumo de peças foi registrado uma única vez." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function reverseWorkOrderConsumptionAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const workOrderId = value(form, "work_order_id", 36);
+    if (!client || !UUID.test(tenantId) || !UUID.test(workOrderId)) return { status: "error", message: "Ação indisponível ou ordem inválida." };
+    const { data, error } = await client.rpc("operational_reverse_work_order_consumption", { p_tenant_id: tenantId, p_work_order_id: workOrderId });
+    if (error || data !== "reversed") return { status: "error", message: "Não foi possível estornar a O.S. Apenas consumo já encerrado pode ser revertido." };
+    revalidatePath("/operacional/ordens-servico"); revalidatePath("/operacional/estoque"); return { status: "success", message: "Consumo estornado e auditado." };
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
 }
 

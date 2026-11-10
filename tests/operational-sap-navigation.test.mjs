@@ -15,7 +15,8 @@ const focus = read("lib/operational/transaction-focus.ts");
 
 test("each published SAP transaction carries a focused route", () => {
   for (const code of ["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N"]) assert.match(transactionCatalog, new RegExp(`${code}:[\\s\\S]{0,400}tx=${code}`));
-  assert.match(focus, /routeTransactions = new Set<OperationalRouteTransaction>\(\["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N"\]\)/);
+  for (const code of ["MB52", "MB51", "MI01", "MI04", "MI07", "ZTR01", "ZOS01", "ZOS02", "ZOS03", "ZOS04"]) assert.match(transactionCatalog, new RegExp(`${code}:[\\s\\S]{0,400}tx=${code}`));
+  assert.match(focus, /routeTransactions = new Set<OperationalRouteTransaction>\(\["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N", "MM02"/);
   assert.match(focus, /return code && routeTransactions\.has/);
 });
 
@@ -29,10 +30,11 @@ test("focused pages authorize the requested transaction on the server", () => {
   assert.match(purchasesPage, /allowRead/);
 });
 
-test("inventory requires MIGO even on its generic route and uses only MIGO-authorized read models", () => {
-  assert.match(inventoryPage, /authorizeRouteTransaction\(client, "MIGO"/);
+test("inventory uses the focused SAP code and never treats a URL as authorization", () => {
+  assert.match(inventoryPage, /authorizeRouteTransaction\(client, requestedTx/);
+  for (const code of ["MIGO", "MB52", "MB51", "MI01", "MI04", "MI07", "ZTR01"]) assert.match(inventoryPage, new RegExp(`"${code}"`));
   assert.doesNotMatch(inventoryPage, /listOperationalProductOptions/);
-  assert.match(inventoryPage, /Não foi possível carregar o saldo da filial selecionada/);
+  assert.match(inventoryPage, /contexto autorizado/);
   assert.doesNotMatch(inventoryPage, /migration de alinhamento de leitura preparada/);
 });
 
