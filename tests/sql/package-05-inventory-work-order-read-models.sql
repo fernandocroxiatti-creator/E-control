@@ -25,7 +25,9 @@ declare
   branch_a constant uuid := 'a2000000-0000-4000-8000-000000000001';
   branch_b constant uuid := 'a2000000-0000-4000-8000-000000000002';
   actor constant uuid := 'a3000000-0000-4000-8000-000000000001';
+  transfer_actor constant uuid := 'a3000000-0000-4000-8000-000000000002';
   membership constant uuid := 'a4000000-0000-4000-8000-000000000001';
+  transfer_membership constant uuid := 'a4000000-0000-4000-8000-000000000002';
   product constant uuid := 'a5000000-0000-4000-8000-000000000001';
   customer constant uuid := 'a6000000-0000-4000-8000-000000000001';
   session_id constant uuid := 'a7000000-0000-4000-8000-000000000001';
@@ -34,6 +36,8 @@ declare
 begin
   insert into auth.users(id,email,email_confirmed_at)
   values(actor,'package05@example.test',clock_timestamp());
+  insert into auth.users(id,email,email_confirmed_at)
+  values(transfer_actor,'package05-transfer@example.test',clock_timestamp());
   insert into public.companies(id,legal_name,status)
   values(tenant_a,'Package 05 Tenant A','active'),(tenant_b,'Package 05 Tenant B','active');
   insert into public.branches(id,tenant_id,code,name,status)
@@ -41,12 +45,16 @@ begin
         (branch_b,tenant_a,'002','Package 05 Branch B','active');
   insert into public.company_memberships(id,tenant_id,user_id,status,branch_access_mode,created_by_user_id)
   values(membership,tenant_a,actor,'active','assigned_only',actor);
+  insert into public.company_memberships(id,tenant_id,user_id,status,branch_access_mode,created_by_user_id)
+  values(transfer_membership,tenant_a,transfer_actor,'active','all_branches',actor);
   insert into public.branch_access(tenant_id,branch_id,membership_id,status,granted_by_user_id)
   values(tenant_a,branch_a,membership,'active',actor);
   insert into public.access_role_definitions(role_key,display_name,scope,approval_state)
   values('package05_role','Package 05 role','company','approved');
   insert into public.membership_role_assignments(tenant_id,membership_id,role_key,branch_id,assigned_by_user_id)
   values(tenant_a,membership,'package05_role',null,actor);
+  insert into public.membership_role_assignments(tenant_id,membership_id,role_key,branch_id,assigned_by_user_id)
+  values(tenant_a,transfer_membership,'package05_role',null,actor);
   update public.permission_definitions set approval_state='approved'
   where permission_key in (
     'transaction.inventory.physical.create','transaction.inventory.physical.count','transaction.inventory.physical.adjust',
@@ -67,6 +75,8 @@ begin
   where transaction_code in ('MI01','MI04','MI07','ZTR01','ZOS03');
   insert into public.catalog_items(id,tenant_id,item_type,code,name,unit_of_measure,request_id,created_by_user_id)
   values(product,tenant_a,'product','P05-PART','Package 05 Part','UN','a8000000-0000-4000-8000-000000000001',actor);
+  insert into public.inventory_balances(tenant_id,branch_id,item_id,quantity)
+  values(tenant_a,branch_a,product,5);
   insert into public.business_parties(id,tenant_id,party_type,legal_name,request_id,created_by_user_id)
   values(customer,tenant_a,'customer','Package 05 Customer','a8000000-0000-4000-8000-000000000002',actor);
   insert into public.inventory_count_sessions(id,tenant_id,branch_id,status,request_id,notes,created_by_user_id)
@@ -147,4 +157,6 @@ begin
 end;
 $security$;
 
-rollback;
+-- Keep these disposable fixtures until the shell harness has executed two
+-- concurrent transfer requests. The Docker container is removed afterwards.
+commit;

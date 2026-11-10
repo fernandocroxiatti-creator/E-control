@@ -99,5 +99,24 @@ SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/operational-read-authorization-alignment.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261110100000_inventory_work_order_read_models.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/package-05-inventory-work-order-read-models.sql" >/dev/null
+run_package05_transfer() {
+  "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select set_config('request.jwt.claim.role','authenticated',false); select set_config('request.jwt.claim.sub','a3000000-0000-4000-8000-000000000002',false); select public.operational_create_inventory_transfer('a1000000-0000-4000-8000-000000000001','a2000000-0000-4000-8000-000000000001','a2000000-0000-4000-8000-000000000002','a5000000-0000-4000-8000-000000000001',1,'Package 05 concurrent transfer','a8000000-0000-4000-8000-000000000006');" >/dev/null
+}
+run_package05_transfer & package05_transfer_one=$!
+run_package05_transfer & package05_transfer_two=$!
+wait "$package05_transfer_one"
+wait "$package05_transfer_two"
+"$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
+do $$
+declare source_balance numeric; destination_balance numeric; transfer_count integer;
+begin
+  select count(*) into transfer_count from public.inventory_transfers where tenant_id='a1000000-0000-4000-8000-000000000001' and request_id='a8000000-0000-4000-8000-000000000006';
+  select quantity into source_balance from public.inventory_balances where tenant_id='a1000000-0000-4000-8000-000000000001' and branch_id='a2000000-0000-4000-8000-000000000001' and item_id='a5000000-0000-4000-8000-000000000001';
+  select quantity into destination_balance from public.inventory_balances where tenant_id='a1000000-0000-4000-8000-000000000001' and branch_id='a2000000-0000-4000-8000-000000000002' and item_id='a5000000-0000-4000-8000-000000000001';
+  if transfer_count<>1 or source_balance<>4 or destination_balance<>1 then
+    raise exception 'Concurrent inventory transfer was not idempotent';
+  end if;
+end $$;
+SQL
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'
 echo 'PASS: Packages 01, 03, 04 and 05 pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'
