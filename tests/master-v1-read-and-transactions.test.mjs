@@ -67,6 +67,44 @@ test("transaction authorization calls the authenticated tenant RPC only with val
   }]);
 });
 
+test("ME23N normalizes lower-case input and remains bound to its read permission route", async () => {
+  const calls = [];
+  const client = {
+    ...authClient(),
+    async rpc(name, args) {
+      calls.push({ name, args });
+      return { data: true, error: null };
+    },
+  };
+  assert.deepEqual(await resolveTransactionForSession(client, " me23n ", company, branch), {
+    status: "authorized", code: "ME23N", route: "/operacional/compras?tx=ME23N", name: "Consultar pedidos de compra",
+  });
+  assert.deepEqual(calls, [{
+    name: "authorize_company_transaction",
+    args: { p_tenant_id: company, p_branch_id: branch, p_transaction_code: "ME23N" },
+  }]);
+});
+
+test("all six SAP codes normalize case and retain their tenant-and-branch RPC context", async () => {
+  for (const code of ["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N"]) {
+    const calls = [];
+    const client = {
+      ...authClient(),
+      async rpc(name, args) {
+        calls.push({ name, args });
+        return { data: true, error: null };
+      },
+    };
+    const result = await resolveTransactionForSession(client, code.toLowerCase(), company, branch);
+    assert.equal(result.status, "authorized");
+    assert.equal(result.code, code);
+    assert.deepEqual(calls, [{
+      name: "authorize_company_transaction",
+      args: { p_tenant_id: company, p_branch_id: branch, p_transaction_code: code },
+    }]);
+  }
+});
+
 test("transaction authorization fails closed on denied, malformed or failed RPC responses", async () => {
   const context = [company, branch];
   const clientWithRpc = (rpc) => ({ ...authClient(), rpc });

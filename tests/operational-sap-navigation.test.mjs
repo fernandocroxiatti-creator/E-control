@@ -6,6 +6,7 @@ const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf
 const catalogPage = read("app/operacional/cadastros/page.tsx");
 const purchasesPage = read("app/operacional/compras/page.tsx");
 const inventoryPage = read("app/operacional/estoque/page.tsx");
+const transactionGateway = read("app/operacional/transacao/page.tsx");
 const dashboard = read("app/components/erp-dashboard.tsx");
 const proxy = read("proxy.ts");
 const migration = read("supabase/migrations/20261109130000_operational_read_authorization_alignment.sql");
@@ -43,6 +44,25 @@ test("menu active state follows the current operational route", () => {
   assert.match(dashboard, /overview-tile-action/);
   assert.match(dashboard, /\/operacional\/estoque\?tx=MIGO/);
   assert.match(dashboard, /Em desenvolvimento/);
+  assert.match(dashboard, /\/operacional\/transacao\?/);
+  assert.match(dashboard, /normalizeTransactionInput/);
+});
+
+test("transaction-code gateway reauthorizes every SAP navigation on the server", () => {
+  assert.match(transactionGateway, /resolveTransactionForSession/);
+  assert.match(transactionGateway, /getSupabaseEnv\(\)\?\.operationalEnabled/);
+  assert.match(transactionGateway, /empresa: search\.empresa/);
+  assert.match(transactionGateway, /filial: search\.filial/);
+  assert.match(transactionGateway, /redirect\(/);
+});
+
+test("empty operational states distinguish absent master data from denied access", () => {
+  assert.match(inventoryPage, /Nenhum produto cadastrado/);
+  assert.match(inventoryPage, /Cadastrar produto \(MM01\)/);
+  assert.match(inventoryPage, /primeiro movimento poderá ser registrado/);
+  assert.match(purchasesPage, /Cadastrar fornecedor \(BP01\)/);
+  assert.match(purchasesPage, /Cadastrar produto \(MM01\)/);
+  assert.match(purchasesPage, /Depois, retorne à ME21N/);
 });
 
 test("unauthenticated operational routes preserve their exact internal return path", () => {

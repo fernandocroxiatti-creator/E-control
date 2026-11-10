@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { signOutAction } from "@/app/actions/auth";
-import { lookupTransactionCode } from "@/app/actions/transaction-lookup";
+import { normalizeTransactionInput } from "@/lib/master/transaction-resolution";
 import { operationalContextMessage, type AuthorizedTransactionContext, type OperationalContextStatus } from "@/lib/companies/authorized-transaction-context";
 
 type ModuleItem = {
@@ -83,11 +83,11 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
     return () => window.removeEventListener("keydown", focusModuleSearch);
   }, []);
 
-  async function handleTransaction(event: React.FormEvent<HTMLFormElement>) {
+  function handleTransaction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const code = transactionCode.trim().toUpperCase();
+    const code = normalizeTransactionInput(transactionCode);
     if (!code) {
-      setTransactionMessage("");
+      setTransactionMessage("Código de transação inválido.");
       return;
     }
 
@@ -95,23 +95,11 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
       setTransactionMessage("Selecione uma empresa e uma filial autorizadas para consultar a transação.");
       return;
     }
-    startTransactionTransition(async () => {
-      try {
-        const result = await lookupTransactionCode(code, selectedTenantId, selectedBranchId);
-        if (result.status === "authorized") {
-          const query = new URLSearchParams({ empresa: selectedTenantId, filial: selectedBranchId });
-          router.push(`${result.route}${result.route.includes("?") ? "&" : "?"}${query.toString()}`);
-          return;
-        }
-        setTransactionMessage(result.status === "disabled" ? "A transação foi autorizada, mas o ambiente operacional ainda não foi habilitado."
-          : result.status === "denied" ? "Acesso negado para esta transação, empresa ou filial."
-            : result.status === "context_required" ? "Selecione uma empresa e uma filial autorizadas."
-              : result.status === "unknown" ? "Transação não encontrada."
-                : result.status === "invalid" ? "Código de transação inválido."
-                  : "Não foi possível verificar a autorização. O acesso permanece negado.");
-      } catch {
-        setTransactionMessage("Não foi possível verificar a autorização. O acesso permanece negado.");
-      }
+    // The gateway repeats the database authorization on the server before it
+    // resolves a target route. The browser never selects an operational page.
+    startTransactionTransition(() => {
+      const query = new URLSearchParams({ codigo: code, empresa: selectedTenantId, filial: selectedBranchId });
+      router.push(`/operacional/transacao?${query.toString()}`);
     });
   }
 
