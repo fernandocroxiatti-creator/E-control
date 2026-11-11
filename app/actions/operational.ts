@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSiteUrl, getSupabaseEnv } from "@/lib/supabase/env";
 import { isAuthorizedSupabaseTarget } from "@/lib/supabase/homologation-env";
 import { createClient } from "@/lib/supabase/server";
+import { authInvitationsEnabled, createAuthAdminClient } from "@/lib/supabase/auth-admin";
 
 type ActionState = { status: "idle" | "success" | "error"; message?: string };
 export const operationalIdle: ActionState = { status: "idle" };
@@ -251,6 +252,8 @@ export async function setOperationalMembershipStatusAction(_: ActionState, form:
 
 export async function createEmployeeInvitationAction(_: EmployeeInvitationActionState, form: FormData): Promise<EmployeeInvitationActionState> {
   try {
+    const authAdmin = authInvitationsEnabled() ? createAuthAdminClient() : null;
+    if (authInvitationsEnabled() && !authAdmin) return { status: "error", message: "O envio de ativação não está configurado neste ambiente. Nenhum convite foi criado." };
     const client = await operationalClient();
     const tenantId = value(form, "tenant_id", 36); const recipientEmail = value(form, "recipient_email", 254).toLowerCase();
     const id = requestId(form); const branchIds = employeeBranchIds(form);
@@ -267,6 +270,18 @@ export async function createEmployeeInvitationAction(_: EmployeeInvitationAction
     }
     const inviteUrl = new URL("/convites/funcionario/aceitar", getSiteUrl());
     inviteUrl.hash = new URLSearchParams({ token: result.invitation_token }).toString();
+    if (authAdmin) {
+      const resetPassword = new URL("/reset-password", getSiteUrl());
+      resetPassword.searchParams.set("next", "/convites/funcionario/aceitar");
+      const activationUrl = new URL("/auth/callback", getSiteUrl());
+      activationUrl.searchParams.set("next", `${resetPassword.pathname}${resetPassword.search}`);
+      const { error: deliveryError } = await authAdmin.auth.admin.inviteUserByEmail(recipientEmail, { redirectTo: activationUrl.toString() });
+      if (deliveryError) {
+        return { status: "error", message: "O convite foi registrado, mas a ativação por e-mail não foi confirmada. Nenhum vínculo foi criado; revogue e reenvie após conferir a configuração de e-mail.", invitationLink: inviteUrl.toString(), expiresAt: result.expires_at };
+      }
+      revalidatePath("/operacional/equipe");
+      return { status: "success", message: "Convite registrado e ativação enviada por e-mail. O vínculo continuará pendente até a aprovação empresarial.", expiresAt: result.expires_at };
+    }
     revalidatePath("/operacional/equipe");
     return { status: "success", message: "Convite criado. Copie o link agora e envie somente ao destinatário por um canal seguro.", invitationLink: inviteUrl.toString(), expiresAt: result.expires_at };
   } catch { return { status: "error", message: "Não foi possível concluir a emissão do convite." }; }
@@ -290,6 +305,16 @@ export async function activateEmployeeMembershipAction(_: ActionState, form: For
     if (error || data !== "active") return { status: "error", message: "O vínculo não foi ativado. A ativação exige uma filial ativa e autorização empresarial." };
     revalidatePath("/operacional/equipe"); revalidatePath("/dashboard"); return { status: "success", message: "Vínculo ativado e auditado." };
   } catch { return { status: "error", message: "Não foi possível concluir a ativação." }; }
+}
+
+export async function reactivateEmployeeMembershipAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const membershipId = value(form, "membership_id", 36);
+    if (!client || !UUID.test(tenantId) || !UUID.test(membershipId)) return { status: "error", message: "Ação indisponível ou vínculo inválido." };
+    const { data, error } = await client.rpc("company_reactivate_employee_membership", { p_tenant_id: tenantId, p_membership_id: membershipId });
+    if (error || data !== "active") return { status: "error", message: "O vínculo não foi reativado. Uma filial ativa e a autorização empresarial são obrigatórias." };
+    revalidatePath("/operacional/equipe"); revalidatePath("/dashboard"); return { status: "success", message: "Vínculo reativado e auditado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a reativação." }; }
 }
 
 export async function setOperationalMembershipRoleAction(_: ActionState, form: FormData): Promise<ActionState> {
@@ -320,17 +345,19 @@ export async function setOperationalBranchAccessAction(_: ActionState, form: For
 
 export async function acceptEmployeeInvitationAction(_: EmployeeInvitationAcceptState, form: FormData): Promise<EmployeeInvitationAcceptState> {
   const token = value(form, "invitation_token", 64);
-  if (!TOKEN.test(token)) return { status: "rejected", message: "Este convite não é válido ou já não pode ser utilizado." };
   try {
     const client = await operationalClient();
     if (!client) return { status: "error", message: "Entre na sua conta e aguarde a habilitação explícita do ambiente antes de aceitar o convite." };
-    const { data, error } = await client.rpc("accept_company_employee_invitation", { p_invitation_token: token });
+    const { data, error } = TOKEN.test(token)
+      ? await client.rpc("accept_company_employee_invitation", { p_invitation_token: token })
+      : await client.rpc("accept_current_company_employee_invitation");
     if (error || !Array.isArray(data) || data.length !== 1) return { status: "error", message: "Não foi possível validar o convite. Nenhum vínculo foi confirmado." };
     const outcome = (data[0] as { outcome?: unknown }).outcome;
     if (outcome === "pending_approval") {
       revalidatePath("/dashboard"); return { status: "accepted", message: "Convite aceito. Seu vínculo e suas filiais aguardam aprovação do administrador da empresa." };
     }
     if (outcome === "expired") return { status: "rejected", message: "Este convite expirou. Solicite um novo convite." };
+    if (outcome === "ambiguous") return { status: "rejected", message: "Há mais de um convite pendente para este e-mail. Use o link seguro correspondente ou solicite revisão ao administrador." };
     return { status: "rejected", message: "Este convite não é válido para esta conta ou já foi utilizado/revogado." };
   } catch { return { status: "error", message: "Não foi possível confirmar a aceitação. Atualize o estado antes de tentar novamente." }; }
 }

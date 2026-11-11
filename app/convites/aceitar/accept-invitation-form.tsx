@@ -16,11 +16,10 @@ export function AcceptCompanyAdminInvitationForm({ authenticated, enabled }: { a
 
   function prepareToken(event: React.FormEvent<HTMLFormElement>) {
     const candidate = new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "";
-    if (!tokenPattern.test(candidate) || !tokenInput.current) {
-      event.preventDefault();
-      setMissingToken(true);
-      return;
-    }
+    if (!tokenInput.current) return;
+    // A Supabase Auth activation link has no application bearer token.  The
+    // database binds that path to the confirmed e-mail of the current session.
+    if (candidate && !tokenPattern.test(candidate)) { event.preventDefault(); setMissingToken(true); return; }
     tokenInput.current.value = candidate;
     // Fragments are never sent to the server. Remove the bearer token from history on submit.
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -31,7 +30,7 @@ export function AcceptCompanyAdminInvitationForm({ authenticated, enabled }: { a
     <p className="eyebrow">Vínculo empresarial</p>
     <h1>Aceitar convite</h1>
     {!enabled && <div className="form-message error" role="status"><p>Os convites empresariais estão desativados neste ambiente. Nenhum vínculo será criado até a habilitação explícita e segura desta funcionalidade.</p></div>}
-    {missingToken && <p className="auth-description" role="alert">O link não contém um convite válido. Abra novamente o link recebido pelo canal de convite.</p>}
+    {missingToken && <p className="auth-description" role="alert">O link contém um convite inválido. Abra novamente o link recebido pelo canal de convite.</p>}
     {enabled && !authenticated && <div className="form-message error" role="status"><p>Entre primeiro com a conta que recebeu o convite. O endereço do convite continua nesta aba.</p><Link href="/login?next=%2Fconvites%2Faceitar" target="_blank" rel="noreferrer">Abrir login em outra aba</Link><button className="secondary-button" type="button" onClick={() => router.refresh()}>Já entrei; verificar sessão</button></div>}
     {enabled && authenticated && state.status !== "accepted" && <form action={action} className="auth-form" onSubmit={prepareToken}>
       <p>Ao confirmar, o sistema valida o e-mail confirmado da sessão e vincula somente o papel empresarial autorizado no convite.</p>

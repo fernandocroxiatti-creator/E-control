@@ -6,6 +6,7 @@ import { getSiteUrl } from "@/lib/supabase/env";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { isAuthorizedSupabaseTarget } from "@/lib/supabase/homologation-env";
 import { createClient } from "@/lib/supabase/server";
+import { authInvitationsEnabled, createAuthAdminClient } from "@/lib/supabase/auth-admin";
 
 export type InvitationActionState = {
   status: "idle" | "success" | "error";
@@ -57,6 +58,10 @@ export async function createCompanyAdminInvitationAction(
   }
 
   try {
+    const authAdmin = authInvitationsEnabled() ? createAuthAdminClient() : null;
+    if (authInvitationsEnabled() && !authAdmin) {
+      return { status: "error", message: "O envio de ativação não está configurado neste ambiente. Nenhum convite empresarial foi criado." };
+    }
     const client = await getInvitationClient(true);
     if (!client) return safeFailure();
     const { data, error } = await client.rpc("master_create_company_admin_invitation", {
@@ -73,6 +78,32 @@ export async function createCompanyAdminInvitationAction(
     // Fragment values are not sent in HTTP requests or server access logs.
     const inviteUrl = new URL("/convites/aceitar", getSiteUrl());
     inviteUrl.hash = new URLSearchParams({ token: result.invitation_token }).toString();
+    if (authAdmin) {
+      const resetPassword = new URL("/reset-password", getSiteUrl());
+      resetPassword.searchParams.set("next", "/convites/aceitar");
+      const activationUrl = new URL("/auth/callback", getSiteUrl());
+      activationUrl.searchParams.set("next", `${resetPassword.pathname}${resetPassword.search}`);
+      const { error: deliveryError } = await authAdmin.auth.admin.inviteUserByEmail(recipientEmail, {
+        redirectTo: activationUrl.toString(),
+      });
+      if (deliveryError) {
+        // The database invitation remains pending and has not granted access.
+        // Return its one-time URL only to the already-authorized Master so the
+        // recipient may still use an existing Auth account safely.
+        return {
+          status: "error",
+          message: "O convite foi registrado, mas a ativação por e-mail não foi confirmada. Nenhum vínculo foi criado; revogue e reenvie após conferir a configuração de e-mail.",
+          invitationLink: inviteUrl.toString(),
+          expiresAt: result.expires_at,
+        };
+      }
+      revalidatePath("/master/administradores");
+      return {
+        status: "success",
+        message: "Convite registrado e ativação enviada por e-mail. O vínculo só será criado após a confirmação autenticada do destinatário.",
+        expiresAt: result.expires_at,
+      };
+    }
     revalidatePath("/master/administradores");
     return {
       status: "success",
@@ -131,7 +162,6 @@ export async function acceptCompanyAdminInvitationAction(
   formData: FormData,
 ): Promise<InvitationAcceptState> {
   const token = value(formData, "invitation_token");
-  if (!TOKEN.test(token)) return { status: "rejected", message: "Este convite não é válido ou já não pode ser utilizado." };
   try {
     const env = getSupabaseEnv();
     if (!env || !isAuthorizedSupabaseTarget(env) || !env.companyManagementEnabled || !env.companyInvitationsEnabled) {
@@ -143,9 +173,9 @@ export async function acceptCompanyAdminInvitationAction(
     if (authError || !authData.user) {
       return { status: "error", message: "Entre na sua conta antes de aceitar o convite." };
     }
-    const { data, error } = await client.rpc("accept_company_admin_invitation", {
-      p_invitation_token: token,
-    });
+    const { data, error } = TOKEN.test(token)
+      ? await client.rpc("accept_company_admin_invitation", { p_invitation_token: token })
+      : await client.rpc("accept_current_company_admin_invitation");
     if (error || !Array.isArray(data) || data.length !== 1) {
       return { status: "error", message: "Não foi possível validar o convite. Nenhum acesso foi confirmado." };
     }
@@ -156,6 +186,9 @@ export async function acceptCompanyAdminInvitationAction(
     }
     if (outcome === "expired") {
       return { status: "rejected", message: "Este convite expirou. Solicite um novo convite ao administrador." };
+    }
+    if (outcome === "ambiguous") {
+      return { status: "rejected", message: "Há mais de um convite pendente para este e-mail. Use o link seguro correspondente ou peça ao administrador para revisar os convites." };
     }
     return { status: "rejected", message: "Este convite não é válido para esta conta ou já foi utilizado/revogado." };
   } catch {

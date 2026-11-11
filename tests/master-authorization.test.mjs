@@ -116,6 +116,7 @@ test("all Admin Master pages inherit the guarded, uncached server layout", () =>
     "empresas/page.tsx",
     "filiais/page.tsx",
     "modulos/page.tsx",
+    "nova-empresa/page.tsx",
     "page.tsx",
     "permissoes/page.tsx",
     "planos/page.tsx",

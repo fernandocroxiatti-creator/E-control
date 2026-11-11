@@ -32,7 +32,9 @@ create function app_private.is_active_company_member(uuid) returns boolean langu
 create function app_private.can_access_branch(uuid,uuid) returns boolean language sql stable as $$ select true $$;
 create function app_private.has_tenant_permission(uuid,text,uuid default null) returns boolean language sql stable as $$ select true $$;
 create function app_private.write_provisioning_audit(text,uuid,uuid,uuid,jsonb) returns void language sql as $$ insert into app_private.provisioning_audit_events(event_key,tenant_id,subject_user_id,actor_user_id,details) values($1,$2,$3,$4,$5) $$;
-create function app_private.assert_current_master() returns uuid language plpgsql stable as $$
+create function app_private.assert_current_master() returns uuid language plpgsql stable security definer
+set search_path = '' set row_security = off
+as $$
 declare actor_id uuid;
 begin
   actor_id := auth.uid();

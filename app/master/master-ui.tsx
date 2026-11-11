@@ -6,6 +6,7 @@ import { BackendUnavailable, DataPanel, MetricCards } from "@/app/master/master-
 
 const masterNavigation = [
   { href: "/master", label: "Visão geral", icon: "⌂" },
+  { href: "/master/nova-empresa", label: "Nova empresa", icon: "+" },
   { href: "/master/empresas", label: "Empresas", icon: "▦" },
   { href: "/master/filiais", label: "Filiais", icon: "⌑" },
   { href: "/master/administradores", label: "Usuários", icon: "♙" },

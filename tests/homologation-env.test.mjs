@@ -6,6 +6,8 @@ import test from "node:test";
 import {
   HOMOLOGATION_PROJECT_ID,
   HOMOLOGATION_SUPABASE_URL,
+  PRODUCTION_CANONICAL_SITE_URL,
+  PRODUCTION_LEGACY_SITE_URL,
   PRODUCTION_PROJECT_ID,
   PRODUCTION_SUPABASE_URL,
   getHomologationSiteUrl,
@@ -16,6 +18,7 @@ import {
   resolvePreviewHomologationSupabaseEnv,
   resolveProductionSupabaseEnv,
   resolveSupabaseEnv,
+  safeInternalPath,
 } from "../lib/supabase/homologation-env.ts";
 
 const projectRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -49,7 +52,7 @@ const productionConfigured = {
   ECONTROLL_PROD_SUPABASE_URL: PRODUCTION_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_URL: PRODUCTION_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_production_test_only",
-  ECONTROLL_PROD_SITE_URL: "https://e-control-delta.vercel.app",
+  ECONTROLL_PROD_SITE_URL: PRODUCTION_CANONICAL_SITE_URL,
 };
 
 test("accepts only exact explicit production config and keeps writes disabled by default", () => {
@@ -89,10 +92,31 @@ test("target routing never falls back between HML and production credentials", a
   assert.equal(resolveSupabaseEnv({}), null);
 });
 
-test("production recovery URL requires exact explicitly enabled domain", () => {
-  assert.equal(getProductionSiteUrl(productionConfigured)?.toString(), "https://e-control-delta.vercel.app/");
+test("production Auth URLs accept only the canonical or legacy host and always emit the canonical host", () => {
+  assert.equal(getProductionSiteUrl(productionConfigured)?.toString(), `${PRODUCTION_CANONICAL_SITE_URL}/`);
+  assert.equal(getProductionSiteUrl({ ...productionConfigured, ECONTROLL_PROD_SITE_URL: PRODUCTION_LEGACY_SITE_URL })?.toString(), `${PRODUCTION_CANONICAL_SITE_URL}/`);
   assert.equal(getProductionSiteUrl({ ...productionConfigured, ECONTROLL_PROD_SITE_URL: "http://localhost:3000" }), null);
+  for (const siteUrl of [
+    "https://econtroll.com.br",
+    "https://login.econtroll.com.br",
+    "https://www.econtroll.com.br.evil.example",
+    "https://www.econtroll.com.br.evil.example/",
+    "https://www.econtroll.com.br/callback",
+    "https://www.econtroll.com.br/?next=https://evil.example",
+    "https://www.econtroll.com.br/#external",
+    "https://attacker@example.com",
+    "https://e-control-delta.vercel.app.evil.example",
+  ]) assert.equal(getProductionSiteUrl({ ...productionConfigured, ECONTROLL_PROD_SITE_URL: siteUrl }), null);
   assert.equal(getProductionSiteUrl({ ...productionConfigured, ECONTROLL_PROD_ENABLED: "false" }), null);
+});
+
+test("Auth callback next values retain only safe internal application paths", () => {
+  for (const path of ["/auth/callback", "/reset-password", "/convites/aceitar", "/convites/funcionario/aceitar?source=email"]) {
+    assert.equal(safeInternalPath(path, "/dashboard"), path);
+  }
+  for (const value of ["https://evil.example", "//evil.example", "\\\\evil.example", "javascript:alert(1)", "", undefined]) {
+    assert.equal(safeInternalPath(value, "/dashboard"), "/dashboard");
+  }
 });
 
 test("management target accepts only resolver-produced exact HML or production identities", () => {

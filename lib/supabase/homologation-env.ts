@@ -3,6 +3,13 @@ export const HOMOLOGATION_SUPABASE_URL = "https://psqetcrjrhbamefpfnje.supabase.
 
 export const PRODUCTION_PROJECT_ID = "wlqsjwofypqxwleacsvh";
 export const PRODUCTION_SUPABASE_URL = "https://wlqsjwofypqxwleacsvh.supabase.co";
+export const PRODUCTION_CANONICAL_SITE_URL = "https://www.econtroll.com.br";
+export const PRODUCTION_LEGACY_SITE_URL = "https://e-control-delta.vercel.app";
+
+const PRODUCTION_AUTH_SITE_URLS = new Set([
+  PRODUCTION_CANONICAL_SITE_URL,
+  PRODUCTION_LEGACY_SITE_URL,
+]);
 
 export type HomologationEnvironment = Record<string, string | undefined>;
 
@@ -156,13 +163,32 @@ export function getHomologationSiteUrl(env: HomologationEnvironment): URL {
 export function getProductionSiteUrl(env: HomologationEnvironment): URL | null {
   if (!resolveProductionSupabaseEnv(env)) return null;
   const configured = env.ECONTROLL_PROD_SITE_URL;
-  if (configured !== "https://e-control-delta.vercel.app") return null;
+  if (!configured) return null;
   try {
     const url = new URL(configured);
-    if (url.protocol === "https:" && url.hostname === "e-control-delta.vercel.app"
-      && !url.port && !url.username && !url.password && url.pathname === "/" && !url.search && !url.hash) return url;
+    if (url.protocol !== "https:" || url.port || url.username || url.password
+      || url.pathname !== "/" || url.search || url.hash
+      || !PRODUCTION_AUTH_SITE_URLS.has(url.origin)) return null;
+    // The legacy Vercel hostname is accepted only to preserve an existing
+    // deployment setting. Auth callbacks are always emitted for the explicit
+    // canonical domain, never from an arbitrary environment value.
+    return new URL(PRODUCTION_CANONICAL_SITE_URL);
   } catch {
     // Invalid site URL fails closed.
   }
   return null;
+}
+
+/** Accepts navigation only inside this application, never an external origin. */
+export function safeInternalPath(value: string | null | undefined, fallback = "/dashboard") {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+    return fallback;
+  }
+
+  try {
+    const resolved = new URL(value, "http://localhost");
+    return resolved.origin === "http://localhost" ? `${resolved.pathname}${resolved.search}${resolved.hash}` : fallback;
+  } catch {
+    return fallback;
+  }
 }

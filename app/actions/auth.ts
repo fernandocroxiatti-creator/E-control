@@ -41,6 +41,7 @@ export async function requestPasswordResetAction(_state: AuthState, formData: Fo
 export async function updatePasswordAction(_state: AuthState, formData: FormData): Promise<AuthState> {
   const password = String(formData.get("password") ?? "");
   const confirmation = String(formData.get("confirmation") ?? "");
+  const next = safeInternalPath(String(formData.get("next") ?? ""));
   if (password.length < 10) return { error: "A senha deve ter pelo menos 10 caracteres." };
   if (password !== confirmation) return { error: "As senhas não coincidem." };
 
@@ -51,7 +52,9 @@ export async function updatePasswordAction(_state: AuthState, formData: FormData
 
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: "Não foi possível atualizar a senha. Solicite um novo link e tente novamente." };
-  redirect("/dashboard?password=updated");
+  const destination = new URL(next, "http://localhost");
+  destination.searchParams.set("password", "updated");
+  redirect(`${destination.pathname}${destination.search}`);
 }
 
 export async function signOutAction() {

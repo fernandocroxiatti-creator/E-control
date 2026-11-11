@@ -13,7 +13,7 @@ export function AuthForm({ action, mode, next }: { action: AuthAction; mode: "lo
 
   return (
     <form action={formAction} className="auth-form">
-      {isLogin && <input type="hidden" name="next" value={next ?? "/dashboard"} />}
+      {(isLogin || isReset) && <input type="hidden" name="next" value={next ?? "/dashboard"} />}
       {!isReset && (
         <label className="field-label" htmlFor="email">
           E-mail

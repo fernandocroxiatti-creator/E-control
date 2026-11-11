@@ -16,9 +16,8 @@ export function AcceptEmployeeInvitationForm({ authenticated, enabled }: { authe
 
   function prepareToken(event: React.FormEvent<HTMLFormElement>) {
     const token = new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "";
-    if (!tokenPattern.test(token) || !tokenInput.current) {
-      event.preventDefault(); setMissingToken(true); return;
-    }
+    if (!tokenInput.current) return;
+    if (token && !tokenPattern.test(token)) { event.preventDefault(); setMissingToken(true); return; }
     tokenInput.current.value = token;
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     setMissingToken(false);

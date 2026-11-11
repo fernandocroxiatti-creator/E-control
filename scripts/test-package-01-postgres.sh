@@ -3,12 +3,19 @@ set -euo pipefail
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
 docker_bin=${DOCKER_BIN:-/Users/nandosouza/.docker/bin/docker}
 container="econtrol-package01-postgres-${RANDOM}${RANDOM}"
-cleanup(){ "$docker_bin" rm -f "$container" >/dev/null 2>&1 || true; }
+onboarding_result_one=''
+onboarding_result_two=''
+cleanup(){
+  "$docker_bin" rm -f "$container" >/dev/null 2>&1 || true
+  [ -z "$onboarding_result_one" ] || rm -f "$onboarding_result_one"
+  [ -z "$onboarding_result_two" ] || rm -f "$onboarding_result_two"
+}
 trap cleanup EXIT
 "$docker_bin" run -d --rm --name "$container" --network none --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=512m -e POSTGRES_PASSWORD=local-test-only postgres:17.11 >/dev/null
 for _ in $(seq 1 30); do "$docker_bin" exec "$container" pg_isready -U postgres -d postgres >/dev/null 2>&1 && break; sleep 1; done
 "$docker_bin" exec "$container" pg_isready -U postgres -d postgres >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/package-01-postgres-bootstrap.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261027180000_company_admin_invitations.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261029130000_operational_erp_foundation.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261029140000_company_membership_operational_management.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261029160000_inventory_history_purchase_foundation.sql" >/dev/null
@@ -99,6 +106,41 @@ SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/operational-read-authorization-alignment.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261110100000_inventory_work_order_read_models.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/package-05-inventory-work-order-read-models.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261110120000_company_onboarding_activation.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/company-onboarding-activation-behavior.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
+insert into auth.users(id,email,email_confirmed_at) values
+  ('c5000000-0000-4000-8000-000000000001','concurrency-master@example.test',clock_timestamp()),
+  ('c5000000-0000-4000-8000-000000000002','concurrency-owner@example.test',clock_timestamp());
+insert into public.companies(id,legal_name,status)
+values ('c6000000-0000-4000-8000-000000000001','Concurrency Company','active');
+insert into public.access_role_definitions(role_key,display_name,scope,approval_state)
+values ('company_owner','Proprietário empresarial','company','approved')
+on conflict (role_key) do update set approval_state='approved';
+insert into app_private.master_admins(user_id,status,authorized_by_user_id,authorization_reason,approval_reference)
+values ('c5000000-0000-4000-8000-000000000001','active','c5000000-0000-4000-8000-000000000001','Local concurrency test','EC-ONB-01-CONCURRENCY');
+select set_config('request.jwt.claim.role','authenticated',false);
+select set_config('request.jwt.claim.sub','c5000000-0000-4000-8000-000000000001',false);
+select invitation_id from public.master_create_company_admin_invitation(
+  'c6000000-0000-4000-8000-000000000001','concurrency-owner@example.test','c7000000-0000-4000-8000-000000000001'
+);
+SQL
+run_onboarding_accept() {
+  "$docker_bin" exec "$container" psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d postgres \
+    -c "select set_config('request.jwt.claim.role','authenticated',false); select set_config('request.jwt.claim.sub','c5000000-0000-4000-8000-000000000002',false); select outcome from public.accept_current_company_admin_invitation();"
+}
+onboarding_result_one=$(mktemp)
+onboarding_result_two=$(mktemp)
+run_onboarding_accept >"$onboarding_result_one" & onboarding_accept_one=$!
+run_onboarding_accept >"$onboarding_result_two" & onboarding_accept_two=$!
+wait "$onboarding_accept_one"
+wait "$onboarding_accept_two"
+if [ "$(grep -h -x 'accepted' "$onboarding_result_one" "$onboarding_result_two" | wc -l | tr -d ' ')" != '1' ]; then
+  echo 'ERROR: concurrent onboarding acceptance did not produce exactly one accepted result' >&2
+  exit 1
+fi
+"$docker_bin" exec "$container" psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  -c "select count(*) from public.company_memberships where tenant_id='c6000000-0000-4000-8000-000000000001' and user_id='c5000000-0000-4000-8000-000000000002' and status='active';" | grep -qx '1'
 run_package05_transfer() {
   "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select set_config('request.jwt.claim.role','authenticated',false); select set_config('request.jwt.claim.sub','a3000000-0000-4000-8000-000000000002',false); select public.operational_create_inventory_transfer('a1000000-0000-4000-8000-000000000001','a2000000-0000-4000-8000-000000000001','a2000000-0000-4000-8000-000000000002','a5000000-0000-4000-8000-000000000001',1,'Package 05 concurrent transfer','a8000000-0000-4000-8000-000000000006');" >/dev/null
 }
@@ -119,4 +161,4 @@ begin
 end $$;
 SQL
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'
-echo 'PASS: Packages 01, 03, 04 and 05 pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'
+echo 'PASS: Packages 01, 03, 04, 05 and authenticated onboarding pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'
