@@ -23,7 +23,15 @@ aprova permissões.
 1. Publicar o código com a flag ausente/`false`. As emissões continuam usando
    exatamente o callback legado.
 2. No Supabase Auth, manter `https://www.econtroll.com.br` como Site URL e
-   adicionar, sem curingas, as três Redirect URLs emitidas pelo novo fluxo:
+   adicionar, sem curingas, as seis Redirect URLs de transição. As três
+   legadas são necessárias enquanto a flag SSR estiver `false`:
+
+   - `https://www.econtroll.com.br/auth/callback?next=%2Freset-password%3Fnext%3D%252Fconvites%252Faceitar`
+   - `https://www.econtroll.com.br/auth/callback?next=%2Freset-password%3Fnext%3D%252Fconvites%252Ffuncionario%252Faceitar`
+   - `https://www.econtroll.com.br/auth/callback?next=%2Freset-password`
+
+   As três SSR passam a ser emitidas somente após a ativação da flag:
+
    - `https://www.econtroll.com.br/auth/confirm?flow=company-owner-invite`
    - `https://www.econtroll.com.br/auth/confirm?flow=employee-invite`
    - `https://www.econtroll.com.br/auth/confirm?flow=password-recovery`
@@ -35,12 +43,21 @@ aprova permissões.
    ```
 
    No template de recuperação, trocar somente `type=invite` por
-   `type=recovery`. Desativar rastreamento de clique para os e-mails Auth do
-   provedor SMTP; ele não pode reescrever o link de confirmação.
+   `type=recovery`. Não trocar os templates até obter confirmação do provedor
+   SMTP de que o link não será reescrito. A opção documentada da Brevo para
+   rastreamento anônimo continua medindo cliques agregados e não prova que o
+   redirecionador foi removido. Para e-mails Auth, exigir link direto ao
+   domínio canônico ou confirmação formal da Brevo de um modo sem click
+   tracking para SMTP/Auth.
 4. Enquanto a flag continua `false`, fazer um único teste com endereço interno
    autorizado. O endpoint aceita o `RedirectTo` legado exato e cria a sessão
    vinculada ao token antes de mostrar a primeira senha.
-5. Testar em navegador limpo, em navegador já autenticado como outro usuário e
+5. O `GET /auth/confirm` apenas mostra uma página sem scripts e sem recursos
+   de terceiros; `verifyOtp` só ocorre após POST same-origin com nonce CSRF de
+   sessão. `HEAD`, `OPTIONS` e métodos não declarados não chegam a `verifyOtp`.
+   Isso reduz o risco de pré-acesso por previewers e scanners comuns,
+   mas não elimina scanners capazes de manter cookies e submeter formulários.
+   Testar em navegador limpo, em navegador já autenticado como outro usuário e
    no Safari do iPhone. Confirmar que o destino é a senha, que o aceite exige
    confirmação e que convite expirado/revogado é recusado.
 6. Depois de aprovar os testes, configurar exclusivamente

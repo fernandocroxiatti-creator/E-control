@@ -54,13 +54,33 @@ test("confirmation accepts only canonical SSR and exact legacy redirects", () =>
   ]) assert.equal(routing.resolveAuthActivationDestination(unsafe, site), null);
 });
 
-test("confirmation endpoint verifies one-time invite or recovery tokens server-side", () => {
+test("confirmation endpoint shows a script-free interstitial on GET and verifies only on POST", () => {
   assert.match(confirmationRoute, /token_hash/);
   assert.match(confirmationRoute, /new Set<EmailOtpType>\(\["invite", "recovery"\]\)/);
-  assert.match(confirmationRoute, /supabase\.auth\.verifyOtp\(\{ token_hash: tokenHash, type \}\)/);
+  const getHandler = confirmationRoute.slice(
+    confirmationRoute.indexOf("export async function GET"),
+    confirmationRoute.indexOf("export function HEAD"),
+  );
+  const postHandler = confirmationRoute.slice(confirmationRoute.indexOf("export async function POST"));
+  assert.doesNotMatch(getHandler, /verifyOtp/);
+  assert.match(postHandler, /supabase\.auth\.verifyOtp\(\{ token_hash: validation\.tokenHash, type: validation\.type \}\)/);
+  assert.match(confirmationRoute, /export function HEAD\(\)[\s\S]*?methodNotAllowed\(\)/);
+  assert.match(confirmationRoute, /export function OPTIONS\(\)[\s\S]*?methodNotAllowed\(\)/);
+  assert.match(confirmationRoute, /"Allow", "GET, POST"/);
   assert.match(confirmationRoute, /!data\.user \|\| !data\.session/);
   assert.match(confirmationRoute, /resolveAuthActivationDestination/);
-  assert.match(confirmationRoute, /NextResponse\.redirect\(new URL\(destination\.destination, getSiteUrl\(\)\)\)/);
+  assert.match(confirmationRoute, /NextResponse\.redirect\(new URL\(validation\.destination\.destination, getSiteUrl\(\)\)\)/);
+  assert.match(confirmationRoute, /randomUUID/);
+  assert.match(confirmationRoute, /httpOnly: true/);
+  assert.match(confirmationRoute, /sameSite: "strict"/);
+  assert.match(confirmationRoute, /validSubmissionCsrf/);
+  assert.match(confirmationRoute, /request\.headers\.get\("origin"\)/);
+  assert.match(confirmationRoute, /"Cache-Control": "no-store, private, max-age=0"/);
+  assert.match(confirmationRoute, /"Referrer-Policy": "no-referrer"/);
+  assert.match(confirmationRoute, /Content-Security-Policy.*default-src 'none'/);
+  assert.doesNotMatch(confirmationRoute, /<script/i);
+  assert.doesNotMatch(confirmationRoute, /onload\s*=/i);
+  assert.doesNotMatch(confirmationRoute, /localStorage|sessionStorage|document\.cookie/);
   assert.doesNotMatch(confirmationRoute, /console\.(?:log|error)/);
   assert.doesNotMatch(confirmationRoute, /service_role|SUPABASE_SERVICE_ROLE_KEY/i);
 });
