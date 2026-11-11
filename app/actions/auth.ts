@@ -1,8 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { AUTH_ACTIVATION_FLOWS, getAuthActivationRedirectUrl } from "@/lib/supabase/auth-activation";
 import { createClient } from "@/lib/supabase/server";
-import { getSiteUrl, safeInternalPath } from "@/lib/supabase/env";
+import { safeInternalPath } from "@/lib/supabase/env";
 
 export type AuthState = { error?: string; success?: string } | null;
 
@@ -31,8 +32,9 @@ export async function requestPasswordResetAction(_state: AuthState, formData: Fo
   const supabase = await createClient();
   if (!supabase) return { error: "A integração ainda não está configurada. Verifique as variáveis públicas do Supabase." };
 
-  const redirectTo = new URL("/auth/callback?next=%2Freset-password", getSiteUrl()).toString();
-  await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: getAuthActivationRedirectUrl(AUTH_ACTIVATION_FLOWS.passwordRecovery),
+  });
 
   // Same response regardless of whether the address belongs to an account.
   return { success: "Se houver uma conta para esse e-mail, você receberá instruções para redefinir a senha." };

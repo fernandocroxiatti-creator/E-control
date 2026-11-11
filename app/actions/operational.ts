@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { AUTH_ACTIVATION_FLOWS, getAuthActivationRedirectUrl } from "@/lib/supabase/auth-activation";
 import { getSiteUrl, getSupabaseEnv } from "@/lib/supabase/env";
 import { isAuthorizedSupabaseTarget } from "@/lib/supabase/homologation-env";
 import { createClient } from "@/lib/supabase/server";
@@ -271,11 +272,9 @@ export async function createEmployeeInvitationAction(_: EmployeeInvitationAction
     const inviteUrl = new URL("/convites/funcionario/aceitar", getSiteUrl());
     inviteUrl.hash = new URLSearchParams({ token: result.invitation_token }).toString();
     if (authAdmin) {
-      const resetPassword = new URL("/reset-password", getSiteUrl());
-      resetPassword.searchParams.set("next", "/convites/funcionario/aceitar");
-      const activationUrl = new URL("/auth/callback", getSiteUrl());
-      activationUrl.searchParams.set("next", `${resetPassword.pathname}${resetPassword.search}`);
-      const { error: deliveryError } = await authAdmin.auth.admin.inviteUserByEmail(recipientEmail, { redirectTo: activationUrl.toString() });
+      const { error: deliveryError } = await authAdmin.auth.admin.inviteUserByEmail(recipientEmail, {
+        redirectTo: getAuthActivationRedirectUrl(AUTH_ACTIVATION_FLOWS.employeeInvite),
+      });
       if (deliveryError) {
         return { status: "error", message: "O convite foi registrado, mas a ativação por e-mail não foi confirmada. Nenhum vínculo foi criado; revogue e reenvie após conferir a configuração de e-mail.", invitationLink: inviteUrl.toString(), expiresAt: result.expires_at };
       }

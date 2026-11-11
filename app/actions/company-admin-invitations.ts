@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireMasterUser } from "@/lib/master/authorization";
+import { AUTH_ACTIVATION_FLOWS, getAuthActivationRedirectUrl } from "@/lib/supabase/auth-activation";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { isAuthorizedSupabaseTarget } from "@/lib/supabase/homologation-env";
@@ -79,12 +80,8 @@ export async function createCompanyAdminInvitationAction(
     const inviteUrl = new URL("/convites/aceitar", getSiteUrl());
     inviteUrl.hash = new URLSearchParams({ token: result.invitation_token }).toString();
     if (authAdmin) {
-      const resetPassword = new URL("/reset-password", getSiteUrl());
-      resetPassword.searchParams.set("next", "/convites/aceitar");
-      const activationUrl = new URL("/auth/callback", getSiteUrl());
-      activationUrl.searchParams.set("next", `${resetPassword.pathname}${resetPassword.search}`);
       const { error: deliveryError } = await authAdmin.auth.admin.inviteUserByEmail(recipientEmail, {
-        redirectTo: activationUrl.toString(),
+        redirectTo: getAuthActivationRedirectUrl(AUTH_ACTIVATION_FLOWS.companyOwnerInvite),
       });
       if (deliveryError) {
         // The database invitation remains pending and has not granted access.

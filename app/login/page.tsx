@@ -20,7 +20,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <p className="eyebrow">Gestão integrada</p>
         <h1 id="login-title">Acesse sua conta</h1>
         <p className="auth-description">Entre no eControll para continuar.</p>
-        {auth === "callback-error" && <p className="form-message error" role="alert">O link de acesso expirou ou não é válido. Solicite uma nova recuperação de senha.</p>}
+        {["callback-error", "invite-invalid", "recovery-invalid"].includes(auth ?? "") && <p className="form-message error" role="alert">O link de acesso expirou, já foi utilizado ou não é válido. Solicite um novo convite ou link de recuperação.</p>}
         <AuthForm action={signInAction} mode="login" next={safeInternalPath(next)} />
         <div className="auth-links"><Link href="/forgot-password">Esqueci minha senha</Link></div>
         <p className="auth-note">O acesso é disponibilizado pela administração do sistema.</p>
