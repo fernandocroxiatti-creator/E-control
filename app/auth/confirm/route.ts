@@ -11,7 +11,11 @@ const CSRF_COOKIE = "econtroll_auth_confirm_csrf";
 const CONFIRMATION_HEADERS = {
   "Cache-Control": "no-store, private, max-age=0",
   "Pragma": "no-cache",
-  "Referrer-Policy": "no-referrer",
+  // `no-referrer` changes Origin to `null` for a navigation-mode form POST in
+  // browsers that implement Fetch's referrer-policy rules. `strict-origin`
+  // retains the canonical HTTPS Origin required by the CSRF gate while never
+  // disclosing this page's token-bearing path or query in Referer.
+  "Referrer-Policy": "strict-origin",
   "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",

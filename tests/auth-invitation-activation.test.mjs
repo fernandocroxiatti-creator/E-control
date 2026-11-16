@@ -80,15 +80,31 @@ test("confirmation endpoint shows a script-free interstitial on GET and verifies
   assert.match(confirmationRoute, /httpOnly: true/);
   assert.match(confirmationRoute, /sameSite: "strict"/);
   assert.match(confirmationRoute, /validSubmissionCsrf/);
-  assert.match(confirmationRoute, /request\.headers\.get\("origin"\)/);
+  assert.match(confirmationRoute, /request\.headers\.get\("origin"\) !== siteUrl\.origin/);
+  assert.match(confirmationRoute, /return !fetchSite \|\| fetchSite === "same-origin"/);
   assert.match(confirmationRoute, /"Cache-Control": "no-store, private, max-age=0"/);
-  assert.match(confirmationRoute, /"Referrer-Policy": "no-referrer"/);
+  assert.match(confirmationRoute, /"Referrer-Policy": "strict-origin"/);
+  assert.doesNotMatch(confirmationRoute, /"Referrer-Policy": "no-referrer"/);
   assert.match(confirmationRoute, /Content-Security-Policy.*default-src 'none'/);
   assert.doesNotMatch(confirmationRoute, /<script/i);
   assert.doesNotMatch(confirmationRoute, /onload\s*=/i);
   assert.doesNotMatch(confirmationRoute, /localStorage|sessionStorage|document\.cookie/);
   assert.doesNotMatch(confirmationRoute, /console\.(?:log|error)/);
   assert.doesNotMatch(confirmationRoute, /service_role|SUPABASE_SERVICE_ROLE_KEY/i);
+});
+
+test("confirmation keeps the strict Origin and CSRF gates while using a token-safe referrer policy", () => {
+  // Contract for sameOriginRequest. The exact Origin check rejects `null`
+  // before verifyOtp, while a canonical same-origin form post is accepted.
+  const canonicalOrigin = "https://www.econtroll.com.br";
+  const allowsPost = (origin, fetchSite) => origin === canonicalOrigin && (!fetchSite || fetchSite === "same-origin");
+
+  assert.equal(allowsPost(canonicalOrigin, "same-origin"), true);
+  assert.equal(allowsPost(canonicalOrigin, undefined), true);
+  assert.equal(allowsPost("null", "same-origin"), false);
+  assert.equal(allowsPost(canonicalOrigin, "cross-site"), false);
+  assert.match(confirmationRoute, /typeof csrf !== "string" \|\| !validSubmissionCsrf\(request\.cookies\.get\(CSRF_COOKIE\)\?\.value, csrf\)/);
+  assert.match(confirmationRoute, /"Referrer-Policy": "strict-origin"/);
 });
 
 test("recovery errors remain visible instead of redirecting an older session to its dashboard", () => {
