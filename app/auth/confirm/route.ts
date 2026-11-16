@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { createServerClient } from "@supabase/ssr";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { resolveAuthActivationDestination } from "@/lib/supabase/auth-activation";
-import { getSiteUrl } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl, getSupabaseEnv } from "@/lib/supabase/env";
 
 const EMAIL_ACTION_TYPES = new Set<EmailOtpType>(["invite", "recovery"]);
 const CSRF_COOKIE = "econtroll_auth_confirm_csrf";
@@ -23,6 +23,10 @@ function failure(reason: "invite-invalid" | "recovery-invalid") {
   applyConfirmationHeaders(response);
   response.cookies.set({ name: CSRF_COOKIE, value: "", path: "/auth/confirm", maxAge: 0 });
   return response;
+}
+
+function failureReason(type: string | null): "invite-invalid" | "recovery-invalid" {
+  return type === "recovery" ? "recovery-invalid" : "invite-invalid";
 }
 
 function applyConfirmationHeaders(response: NextResponse) {
@@ -154,14 +158,18 @@ export function OPTIONS() {
  * Consumes an Auth token only after an explicit same-origin form submission.
  */
 export async function POST(request: NextRequest) {
-  if (!sameOriginRequest(request)) return failure("invite-invalid");
-
   const form = await request.formData();
   const tokenHash = form.get("token_hash");
   const rawType = form.get("type");
   const redirectTo = form.get("redirect_to");
   const csrf = form.get("csrf");
   const type = typeof rawType === "string" ? rawType : null;
+
+  // Parse the submitted type before rejecting Origin/CSRF. This does not
+  // validate or consume the token, but keeps recovery failures distinguishable
+  // from invite failures for the recipient.
+  if (!sameOriginRequest(request)) return failure(failureReason(type));
+
   const validation = validRequest(
     typeof tokenHash === "string" ? tokenHash : null,
     type,
@@ -169,22 +177,39 @@ export async function POST(request: NextRequest) {
   );
 
   if (!validation || typeof csrf !== "string" || !validSubmissionCsrf(request.cookies.get(CSRF_COOKIE)?.value, csrf)) {
-    return failure(type === "recovery" ? "recovery-invalid" : "invite-invalid");
+    return failure(failureReason(type));
   }
 
-  const supabase = await createClient();
-  if (!supabase) return failure(validation.type === "recovery" ? "recovery-invalid" : "invite-invalid");
+  const env = getSupabaseEnv();
+  if (!env) return failure(failureReason(validation.type));
 
-  // verifyOtp replaces a previous browser session with the identity bound to
-  // the one-time link. No browser-supplied e-mail, user ID or return URL is
-  // trusted, and no token is logged or included in the final location.
-  const { data, error } = await supabase.auth.verifyOtp({ token_hash: validation.tokenHash, type: validation.type });
-  if (error || !data.user || !data.session) {
-    return failure(validation.type === "recovery" ? "recovery-invalid" : "invite-invalid");
-  }
-
+  // verifyOtp establishes a new session for the identity bound to the token.
+  // Bind the client directly to this redirect response so its Set-Cookie
+  // headers replace any older browser session before /reset-password loads.
   const response = NextResponse.redirect(new URL(validation.destination.destination, getSiteUrl()));
   applyConfirmationHeaders(response);
+  const supabase = createServerClient(env.url, env.publishableKey, {
+    cookieOptions: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    },
+    cookies: {
+      getAll: () => request.cookies.getAll(),
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      },
+    },
+  });
+
+  // No browser-supplied e-mail, user ID or return URL is trusted, and no token
+  // is logged or included in the final location.
+  const { data, error } = await supabase.auth.verifyOtp({ token_hash: validation.tokenHash, type: validation.type });
+  if (error || !data.user || !data.session) {
+    return failure(failureReason(validation.type));
+  }
+
   response.cookies.set({ name: CSRF_COOKIE, value: "", path: "/auth/confirm", maxAge: 0 });
   return response;
 }

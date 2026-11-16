@@ -8,8 +8,12 @@ import { redirect } from "next/navigation";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; auth?: string }> }) {
   const { next, auth } = await searchParams;
+  const authFailure = ["callback-error", "invite-invalid", "recovery-invalid"].includes(auth ?? "");
   const supabase = await createClient();
-  if (supabase) {
+  // Keep an Auth error visible even when this browser holds an unrelated
+  // session. Otherwise a failed recovery link looks like a successful switch
+  // to the previous user's dashboard.
+  if (supabase && !authFailure) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) redirect(safeInternalPath(next));
   }
@@ -20,7 +24,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <p className="eyebrow">Gestão integrada</p>
         <h1 id="login-title">Acesse sua conta</h1>
         <p className="auth-description">Entre no eControll para continuar.</p>
-        {["callback-error", "invite-invalid", "recovery-invalid"].includes(auth ?? "") && <p className="form-message error" role="alert">O link de acesso expirou, já foi utilizado ou não é válido. Solicite um novo convite ou link de recuperação.</p>}
+        {authFailure && <p className="form-message error" role="alert">O link de acesso expirou, já foi utilizado ou não é válido. Solicite um novo convite ou link de recuperação.</p>}
         <AuthForm action={signInAction} mode="login" next={safeInternalPath(next)} />
         <div className="auth-links"><Link href="/forgot-password">Esqueci minha senha</Link></div>
         <p className="auth-note">O acesso é disponibilizado pela administração do sistema.</p>

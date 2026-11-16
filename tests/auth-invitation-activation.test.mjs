@@ -64,6 +64,12 @@ test("confirmation endpoint shows a script-free interstitial on GET and verifies
   const postHandler = confirmationRoute.slice(confirmationRoute.indexOf("export async function POST"));
   assert.doesNotMatch(getHandler, /verifyOtp/);
   assert.match(postHandler, /supabase\.auth\.verifyOtp\(\{ token_hash: validation\.tokenHash, type: validation\.type \}\)/);
+  assert.match(postHandler, /const form = await request\.formData\(\);[\s\S]*?if \(!sameOriginRequest\(request\)\) return failure\(failureReason\(type\)\);/);
+  assert.match(postHandler, /createServerClient\(env\.url, env\.publishableKey/);
+  assert.match(postHandler, /setAll\(cookiesToSet\)[\s\S]*?response\.cookies\.set\(name, value, options\)/);
+  assert.match(postHandler, /NextResponse\.redirect\(new URL\(validation\.destination\.destination, getSiteUrl\(\)\)\)/);
+  assert.match(postHandler, /if \(error \|\| !data\.user \|\| !data\.session\) \{[\s\S]*?failure\(failureReason\(validation\.type\)\)/);
+  assert.doesNotMatch(postHandler, /\.rpc\(|service_role|SUPABASE_SERVICE_ROLE_KEY/i);
   assert.match(confirmationRoute, /export function HEAD\(\)[\s\S]*?methodNotAllowed\(\)/);
   assert.match(confirmationRoute, /export function OPTIONS\(\)[\s\S]*?methodNotAllowed\(\)/);
   assert.match(confirmationRoute, /"Allow", "GET, POST"/);
@@ -83,6 +89,12 @@ test("confirmation endpoint shows a script-free interstitial on GET and verifies
   assert.doesNotMatch(confirmationRoute, /localStorage|sessionStorage|document\.cookie/);
   assert.doesNotMatch(confirmationRoute, /console\.(?:log|error)/);
   assert.doesNotMatch(confirmationRoute, /service_role|SUPABASE_SERVICE_ROLE_KEY/i);
+});
+
+test("recovery errors remain visible instead of redirecting an older session to its dashboard", () => {
+  assert.match(loginPage, /const authFailure = \["callback-error", "invite-invalid", "recovery-invalid"\]\.includes\(auth \?\? ""\);/);
+  assert.match(loginPage, /if \(supabase && !authFailure\)/);
+  assert.match(loginPage, /\{authFailure && <p className="form-message error"/);
 });
 
 test("owner, employee and recovery e-mails use only the server-selected rollout target", () => {
