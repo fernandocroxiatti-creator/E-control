@@ -18,7 +18,7 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
 
 | Ordem | Fase | Estado |
 |---:|---|---|
-| 1 | Recebimento de compras, estoque e custo médio | Integrada e versionada localmente; aguarda revisão pré-publicação e autorização separada |
+| 1 | Recebimento de compras, estoque e custo médio | Plano de rollout local revisado; aguarda autorizações separadas de publicação, migration e ativação gradual |
 | 2 | Compra direta para O.S. | Não iniciada |
 | 3 | Orçamentos e conversão | Não iniciada |
 | 4 | O.S. completa | Não iniciada |
@@ -42,6 +42,9 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
 - Fases posteriores não criam lançamentos financeiros/fiscais sem regra aprovada.
 - Publicação, migrations remotas, grants e disponibilidade empresarial exigem
   autorização específica, mesmo após o código local estar aprovado.
+- O rollout da Fase 1 é progressivo: backup recuperável, código compatível,
+  migration, verificação de schema, avaliação de saldos legados por ZIV01 e,
+  somente então, ZGR01 para uma empresa/filial piloto explicitamente autorizada.
 
 ## Referências existentes
 

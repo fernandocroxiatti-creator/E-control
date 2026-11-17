@@ -29,10 +29,19 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
   lint, TypeScript, build, diff e segredos: PASS local em 2026-11-17.
 - [~] Planejamento de rollout legado para Production — necessário antes de uma
   autorização de migration; não faz parte da integração local.
+- [x] Plano pré-publicação local: ordem, backup, recuperação, piloto, controles
+  ZIV01/ZGR01 e aceite documentados; nenhuma etapa remota foi executada.
 - [x] Commits locais auditáveis na branch `codex/phase-01-integration`:
   `b176a7e`, `a397e6c` e `def071c`; publicação continua separada.
 - [ ] Revisão pré-publicação, push e deploy autorizados separadamente.
 - [ ] Aprovação e aplicação de migration Production autorizadas separadamente.
+- [ ] Backup Production criptografado, checksum e restauração essencial
+  revalidados imediatamente antes da migration.
+- [ ] Inventário somente leitura dos saldos pendentes e aprovação da janela
+  operacional para avaliação inicial.
+- [ ] Aprovação, disponibilidade e grant ZIV01 apenas para piloto.
+- [ ] Aprovação, disponibilidade e grant ZGR01 apenas após valuations aceitas.
+- [ ] Aceite do piloto, expansão gradual e relatório de auditoria.
 
 ## Fases 2–9
 

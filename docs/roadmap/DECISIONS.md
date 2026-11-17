@@ -74,6 +74,18 @@ posição de valuation e é auditável; nunca será eliminado silenciosamente.
   permissões, grants, flags nem o escopo das fases. Os commits `b176a7e`,
   `a397e6c` e `def071c` apenas versionam a implementação já auditada.
 
+## Condições de rollout registradas (2026-11-17)
+
+- Não é uma nova decisão de negócio: D01–D08 continuam vigentes. A publicação
+  requer backup recuperável verificado, janela operacional e expansão por piloto.
+- Avaliação inicial não pode usar `current_cost` nem ser executada por inferência.
+  Cada custo exige fonte, responsável e autorização administrativa explícita.
+- ZIV01 precede ZGR01 para saldos legados não zerados. Aprovação global,
+  disponibilidade empresarial e grant continuam três controles independentes.
+- Não existe rollback automático seguro depois de fatos novos de valuation ou
+  recebimento; preservar eventos e usar correção forward-only ou recuperação
+  autorizada.
+
 ## Proibido sem nova autorização
 
 Aplicar migrations em Production; habilitar ZGR01; conceder grants; avaliar saldos

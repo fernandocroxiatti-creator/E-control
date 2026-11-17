@@ -73,8 +73,8 @@ contas a pagar, financeiro, caixa, venda, faturamento ou dados de Production.
   plano de janela operacional e aprovação prévia antes de Production.
 
 Fase 1 permanece local, foi **integrada e versionada em branch dedicada** e
-está pronta somente para revisão pré-publicação autorizada. Não está publicada
-ou aplicada em Production.
+possui plano de rollout local revisado. Não está publicada ou aplicada em
+Production.
 
 ## Evidência da auditoria independente definitiva
 
@@ -104,6 +104,51 @@ ou aplicada em Production.
 4. Liberar somente posições `valued`; manter pendências bloqueadas e corrigir a
    origem antes de reabrir movimentos. Em caso de anomalia, suspender a janela e
    usar estorno auditável/recuperação aprovada, nunca exclusão.
+
+## Plano pré-publicação e rollout (não executado)
+
+1. Revalidar `origin/main`, histórico e os quatro commits antes de qualquer push;
+   publicar código apenas por autorização separada. O código falha fechado quando
+   a migration ainda não existe, portanto pode precedê-la sem simular gravações.
+2. Antes da migration, criar backup lógico criptografado, conferir checksum,
+   catálogo e restauração essencial em PostgreSQL descartável. Registrar horário,
+   versão e hash sem registrar credenciais.
+3. Durante janela operacional, aplicar somente a migration da Fase 1 e conferir
+   histórico, objetos, RLS/FORCE RLS, ACLs, `SECURITY DEFINER`, `search_path`,
+   ausência de grants/availabilities automáticos e inexistência de efeitos
+   financeiros. `ALTER TABLE` de constraints e índices pode bloquear escritores;
+   a janela precisa impedir movimentos concorrentes.
+4. Em leitura, inventariar por empresa, filial e produto as posições
+   `valuation_status='pending' and quantity <> 0`. Não estimar a quantidade de
+   Production antes dessa consulta autorizada. Definir fonte documental do custo,
+   responsável e evidência para cada avaliação inicial.
+5. Após autorização administrativa específica, aprovar ZIV01 globalmente,
+   disponibilizá-la somente para a empresa/filial piloto e conceder somente o
+   grant de valuation ao papel piloto. Registrar cada avaliação e validar que
+   todas as posições não zeradas necessárias ficaram `valued` com valor e média
+   não negativos. Não usar `catalog_items.current_cost` como substituto.
+6. Somente depois do inventário aprovado, autorizar separadamente ZGR01, módulo
+   PUR, disponibilidade empresarial e grant de recebimento para o mesmo piloto.
+   Validar recebimento/estorno com dados operacionais previamente autorizados.
+7. Expandir por empresa e filial apenas após aceite documentado. Nenhuma etapa
+   cria contas a pagar, financeiro, caixa ou concessão global.
+
+## Recuperação e interrupção (não executadas)
+
+- Falha antes do `commit` da migration: interromper e preservar o banco anterior;
+  diagnosticar sem reaplicar parcialmente.
+- Falha após `commit` e antes de ativações: manter ZGR01/ZIV01 sem grants e
+  disponibilidade; o código permanece fail-closed. Não tentar remover colunas ou
+  objetos automaticamente.
+- Avaliação inicial errada ou incompleta: interromper a expansão. A RPC aceita
+  apenas posição `pending`, portanto correção de uma avaliação já gravada exige
+  procedimento auditado e autorização nova; não sobrescrever custo.
+- Inconsistência: suspender movimentos do piloto, conservar auditoria/eventos,
+  comparar saldo, valor, média e movimentos; decidir entre correção forward-only
+  aprovada e recuperação pelo backup. Restaurar backup após novas operações perde
+  fatos posteriores e não é rollback automático.
+- Indisponibilidade de interface: reverter somente o deploy de código se o banco
+  permanecer compatível; isso não reverte semântica ou dados da migration.
 
 ## Limite conhecido do contrato atual
 

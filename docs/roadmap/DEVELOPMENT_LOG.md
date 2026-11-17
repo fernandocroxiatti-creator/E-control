@@ -23,6 +23,7 @@
 | 2026-11-17 | Regressão após hardening | PostgreSQL isolado repetido, 148 testes Node, lint, TypeScript, build, diff e varredura de segredos | PASS local; aguarda revisão final |
 | 2026-11-17 | Auditoria independente definitiva | Leitura direta da migration, ações, telas, ACL/RLS e duas execuções novas da suíte PostgreSQL 17.11 descartável | PASS local; GO para integração local, sem mutação remota |
 | 2026-11-17 | Integração local Fase 1 | Worktree limpo `codex/phase-01-integration` criado de `origin/main` em `68b8e900…`; paridade de patches conferida e regressão repetida | Versionado localmente; sem push/remoto |
+| 2026-11-17 | Revisão pré-publicação e plano de rollout | Leitura da migration, schema local, histórico e branch integrada; nenhuma consulta a dados reais | GO apenas para preparação; nenhuma mudança remota autorizada por este registro |
 
 ### Evidência da concorrência cruzada e do hardening
 
@@ -74,6 +75,21 @@
   segredos e PostgreSQL 17.11 com concorrência real: PASS. A instalação via
   lockfile foi necessária pois o novo worktree não possuía `node_modules`.
 - Sem push, deploy, migration remota, grants, flags ou mudança em Production.
+
+### Plano de rollout local revisado (2026-11-17)
+
+- A migration deve ser aplicada somente após backup lógico criptografado, checksum
+  e restauração essencial comprovada em ambiente descartável. Um backup existente
+  não é presumido válido sem nova verificação de integridade.
+- A aplicação é atômica por estar envolvida em `begin`/`commit`; falha durante a
+  migration deve deixar o schema anterior. Após `commit`, não há down migration
+  segura: dados de valuation ou recebimentos novos exigem recuperação aprovada ou
+  correção forward-only auditável, nunca `DROP` automático.
+- Saldos legados recebem `valuation_status='pending'`. Posições pendentes com
+  quantidade diferente de zero bloqueiam movimentos até avaliação inicial ZIV01;
+  posições zeradas podem ser valoradas pelo primeiro inbound com custo explícito.
+- Não aprovar ZIV01/ZGR01, módulos, disponibilidade ou grants até a migration,
+  suas verificações de ACL/RLS e a seleção explícita de empresa/filial piloto.
 
 ### Resultado da revisão independente e correção
 
