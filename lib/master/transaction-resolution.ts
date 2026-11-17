@@ -43,6 +43,16 @@ export const erpTransactionCatalog = {
     description: "Consulta dos pedidos de compra autorizados.",
     permissionKey: "transaction.purchasing.purchase_order.read", route: "/operacional/compras?tx=ME23N",
   },
+  ZGR01: {
+    code: "ZGR01", moduleCode: "PUR", moduleName: "Compras", name: "Receber pedido de compra",
+    description: "Recebimento parcial ou total, custo médio e estorno auditáveis.",
+    permissionKey: "transaction.purchasing.receipt.manage", route: "/operacional/compras?tx=ZGR01",
+  },
+  ZIV01: {
+    code: "ZIV01", moduleCode: "INV", moduleName: "Estoque", name: "Avaliação inicial de estoque",
+    description: "Regularização auditada de saldo legado sem custo confiável.",
+    permissionKey: "transaction.inventory.valuation.initial", route: "/operacional/estoque?tx=ZIV01",
+  },
   MM02: { code: "MM02", moduleCode: "MDM", moduleName: "Estoque e produtos", name: "Alterar produtos", description: "Alteração autorizada de produtos cadastrados.", permissionKey: "transaction.masterdata.catalog.product.update", route: "/operacional/cadastros?tx=MM02&item_type=product" },
   MM03: { code: "MM03", moduleCode: "MDM", moduleName: "Estoque e produtos", name: "Consultar produtos", description: "Consulta autorizada do catálogo de produtos.", permissionKey: "transaction.masterdata.catalog.product.read", route: "/operacional/cadastros?tx=MM03&item_type=product" },
   MB52: { code: "MB52", moduleCode: "INV", moduleName: "Estoque", name: "Saldos por filial", description: "Consulta de saldos por filial autorizada.", permissionKey: "transaction.inventory.balance.read", route: "/operacional/estoque?tx=MB52" },

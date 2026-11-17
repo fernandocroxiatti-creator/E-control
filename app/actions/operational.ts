@@ -43,6 +43,38 @@ function purchaseItems(form: FormData) {
     return items.every(Boolean) && new Set(items.map((item) => item!.item_id)).size === items.length ? items : null;
   } catch { return null; }
 }
+function purchaseReceiptItems(form: FormData) {
+  const raw = value(form, "receipt_items", 20000);
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 100) return null;
+    const items = parsed.map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+      const row = item as Record<string, unknown>;
+      const purchaseOrderItemId = typeof row.purchase_order_item_id === "string" ? row.purchase_order_item_id : "";
+      const quantity = Number(row.quantity); const unitCost = Number(row.effective_unit_cost);
+      const varianceReason = typeof row.variance_reason === "string" ? row.variance_reason.trim().slice(0, 1000) : "";
+      return UUID.test(purchaseOrderItemId) && Number.isFinite(quantity) && quantity > 0 && Number.isFinite(unitCost) && unitCost >= 0
+        ? { purchase_order_item_id: purchaseOrderItemId, quantity, effective_unit_cost: unitCost, variance_reason: varianceReason || null } : null;
+    });
+    return items.every(Boolean) && new Set(items.map((item) => item!.purchase_order_item_id)).size === items.length ? items : null;
+  } catch { return null; }
+}
+function purchaseReceiptReversalItems(form: FormData) {
+  const raw = value(form, "reversal_items", 20000);
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 100) return null;
+    const items = parsed.map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+      const row = item as Record<string, unknown>;
+      const receiptItemId = typeof row.purchase_receipt_item_id === "string" ? row.purchase_receipt_item_id : "";
+      const quantity = Number(row.quantity);
+      return UUID.test(receiptItemId) && Number.isFinite(quantity) && quantity > 0 ? { purchase_receipt_item_id: receiptItemId, quantity } : null;
+    });
+    return items.every(Boolean) && new Set(items.map((item) => item!.purchase_receipt_item_id)).size === items.length ? items : null;
+  } catch { return null; }
+}
 function workOrderLines(form: FormData) {
   const raw = value(form, "lines", 30000);
   try {
@@ -136,13 +168,60 @@ export async function updatePurchaseOrderAction(_: ActionState, form: FormData):
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
 }
 
+export async function submitPurchaseOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const orderId = value(form, "purchase_order_id", 36); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(orderId) || !id) return { status: "error", message: "Pedido ou identificador de confirmação inválido." };
+    const { data, error } = await client.rpc("operational_submit_purchase_order", { p_tenant_id: tenantId, p_purchase_order_id: orderId, p_request_id: id });
+    if (error || data !== "submitted") return { status: "error", message: "Não foi possível enviar o pedido. Apenas rascunhos autorizados podem seguir para recebimento." };
+    revalidatePath("/operacional/compras"); return { status: "success", message: "Pedido enviado para recebimento; nenhum estoque ou financeiro foi lançado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function receivePurchaseOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const orderId = value(form, "purchase_order_id", 36); const id = requestId(form); const items = purchaseReceiptItems(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(orderId) || !id || !items) return { status: "error", message: "Informe linhas, quantidades e custos válidos para o recebimento." };
+    const { data, error } = await client.rpc("operational_receive_purchase_order", { p_tenant_id: tenantId, p_purchase_order_id: orderId, p_lines: items, p_document_number: value(form, "document_number", 120) || null, p_notes: value(form, "notes", 1000) || null, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Recebimento recusado. O pedido, saldo pendente, autorização e custo são conferidos pelo banco." };
+    revalidatePath("/operacional/compras"); revalidatePath("/operacional/estoque"); return { status: "success", message: "Recebimento registrado, auditado e refletido no estoque da filial." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function reversePurchaseReceiptAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const receiptId = value(form, "purchase_receipt_id", 36); const id = requestId(form); const items = purchaseReceiptReversalItems(form); const reason = value(form, "reason", 1000);
+    if (!client || !UUID.test(tenantId) || !UUID.test(receiptId) || !id || !items || !reason) return { status: "error", message: "Informe as quantidades e o motivo do estorno." };
+    const { data, error } = await client.rpc("operational_reverse_purchase_receipt", { p_tenant_id: tenantId, p_purchase_receipt_id: receiptId, p_lines: items, p_reason: reason, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Estorno recusado. Consumo, reserva, transferência ou saldo posterior podem exigir uma correção controlada." };
+    revalidatePath("/operacional/compras"); revalidatePath("/operacional/estoque"); return { status: "success", message: "Estorno registrado como evento reverso e auditável." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function recordInitialInventoryValuationAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const branchId = value(form, "branch_id", 36); const itemId = value(form, "item_id", 36); const cost = decimal(value(form, "unit_cost", 32)); const id = requestId(form); const reason = value(form, "reason", 1000);
+    if (!client || !UUID.test(tenantId) || !UUID.test(branchId) || !UUID.test(itemId) || !id || cost === null || !reason) return { status: "error", message: "Informe produto, custo e justificativa para a avaliação inicial." };
+    const { data, error } = await client.rpc("operational_record_initial_inventory_valuation", { p_tenant_id: tenantId, p_branch_id: branchId, p_item_id: itemId, p_unit_cost: cost, p_reason: reason, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Avaliação recusada. Apenas saldo legado pendente e autorização específica podem ser regularizados." };
+    revalidatePath("/operacional/estoque"); return { status: "success", message: "Avaliação inicial registrada e auditada." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
 export async function recordInventoryMovementAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
     const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const branchId = value(form, "branch_id", 36); const itemId = value(form, "item_id", 36); const id = requestId(form);
-    const type = value(form, "movement_type", 24); const quantity = decimal(value(form, "quantity", 32));
+    const type = value(form, "movement_type", 24); const quantity = decimal(value(form, "quantity", 32)); const unitCost = decimal(value(form, "unit_cost", 32));
     if (!client || !UUID.test(tenantId) || !UUID.test(branchId) || !UUID.test(itemId) || !id || !["initial", "entry", "exit", "adjustment_positive", "adjustment_negative"].includes(type) || quantity === null || quantity <= 0) return { status: "error", message: "Ação indisponível ou dados inválidos." };
-    const { error } = await client.rpc("operational_record_inventory_movement", { p_tenant_id: tenantId, p_branch_id: branchId, p_item_id: itemId, p_movement_type: type, p_quantity: quantity, p_request_id: id, p_reference_note: value(form, "reference_note", 500) || null });
-    if (error) return { status: "error", message: "Movimento recusado. Saldo negativo, duplicidade ou falta de autorização não são aceitos." };
+    const needsCost = ["initial", "entry", "adjustment_positive"].includes(type);
+    // Legacy installations remain usable until the Phase 01 migration is installed.
+    // Once it exists, the database rejects inbound legacy writes without valuation.
+    const rpc = needsCost && unitCost !== null ? "operational_record_inventory_movement_valued" : "operational_record_inventory_movement";
+    const params = rpc === "operational_record_inventory_movement_valued"
+      ? { p_tenant_id: tenantId, p_branch_id: branchId, p_item_id: itemId, p_movement_type: type, p_quantity: quantity, p_unit_cost: unitCost, p_request_id: id, p_reference_note: value(form, "reference_note", 500) || null }
+      : { p_tenant_id: tenantId, p_branch_id: branchId, p_item_id: itemId, p_movement_type: type, p_quantity: quantity, p_request_id: id, p_reference_note: value(form, "reference_note", 500) || null };
+    const { error } = await client.rpc(rpc, params);
+    if (error) return { status: "error", message: "Movimento recusado. Saldo negativo, custo pendente, duplicidade ou falta de autorização não são aceitos." };
     revalidatePath("/operacional/estoque"); return { status: "success", message: "Movimento registrado e auditado." };
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
 }
@@ -182,6 +261,7 @@ export async function postInventoryCountAction(_: ActionState, form: FormData): 
     const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const sessionId = value(form, "session_id", 36);
     if (!client || !UUID.test(tenantId) || !UUID.test(sessionId)) return { status: "error", message: "Ação indisponível ou inventário inválido." };
     const { data, error } = await client.rpc("operational_post_inventory_count", { p_tenant_id: tenantId, p_session_id: sessionId });
+    if (error?.code === "40001") return { status: "error", message: "O estoque foi alterado após esta contagem. Atualize os dados e realize uma nova contagem antes de confirmar." };
     if (error || !["posted", "unchanged"].includes(typeof data === "string" ? data : "")) return { status: "error", message: "Não foi possível aplicar o inventário. Diferenças são recalculadas sob bloqueio pelo banco." };
     revalidatePath("/operacional/estoque"); return { status: "success", message: data === "posted" ? "Inventário aplicado e auditado." : "Este inventário já estava aplicado; nenhum ajuste foi repetido." };
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }

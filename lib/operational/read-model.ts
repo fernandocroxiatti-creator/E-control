@@ -6,7 +6,10 @@ export type OperationalParty = { party_id: string; party_type: "customer" | "sup
 export type OperationalItem = { item_id: string; item_type: "product" | "service"; code: string; name: string; category: string | null; unit_of_measure: string; current_cost: number; selling_price: number; minimum_stock: number; reorder_point: number; status: "active" | "inactive"; created_at: string };
 export type OperationalStock = { item_id: string; code: string; name: string; quantity: number; minimum_stock: number; reorder_point: number; below_reorder_point: boolean };
 export type OperationalInventoryMovement = { movement_id: string; item_id: string; item_code: string; item_name: string; movement_type: "initial" | "entry" | "exit" | "adjustment_positive" | "adjustment_negative" | "transfer_out" | "transfer_in" | "physical_count_in" | "physical_count_out" | "service_consumption" | "service_reversal"; quantity: number; balance_after: number; reference_note: string | null; created_at: string };
-export type OperationalPurchaseOrder = { purchase_order_id: string; order_number: number; supplier_id: string; supplier_name: string; status: "draft" | "submitted" | "cancelled"; total_amount: number; item_count: number; items: Array<{ item_id: string; quantity: number; unit_price: number }>; created_at: string; updated_at: string };
+export type OperationalPurchaseOrder = { purchase_order_id: string; order_number: number; supplier_id: string; supplier_name: string; status: "draft" | "submitted" | "partially_received" | "received" | "cancelled"; total_amount: number; item_count: number; items: Array<{ item_id: string; quantity: number; unit_price: number }>; created_at: string; updated_at: string };
+export type OperationalPurchaseReceivingOrder = { purchase_order_id: string; order_number: number; status: "submitted" | "partially_received" | "received"; supplier_name: string; items: Array<{ purchase_order_item_id: string; item_id: string; item_code: string; item_name: string; ordered_quantity: number; received_quantity: number; pending_quantity: number; ordered_unit_price: number }>; created_at: string; updated_at: string };
+export type OperationalPurchaseReceipt = { purchase_receipt_id: string; receipt_number: number; purchase_order_id: string; status: "posted" | "partially_reversed" | "reversed"; document_number: string | null; notes: string | null; items: Array<{ purchase_receipt_item_id: string; item_id: string; received_quantity: number; effective_unit_cost: number; received_value: number; reversed_quantity: number; variance_reason: string | null }>; created_at: string };
+export type OperationalInventoryValuation = { item_id: string; item_code: string; item_name: string; quantity: number; valuation_status: "pending" | "valued"; stock_value: number | null; average_unit_cost: number | null; valuation_updated_at: string | null };
 export type OperationalWorkOrder = { work_order_id: string; order_number: number; customer_name: string; status: "open" | "in_progress" | "closed" | "cancelled" | "reversed"; total_amount: number; created_at: string; updated_at: string };
 export type OperationalInventoryCountSession = { count_session_id: string; status: "open" | "posted"; notes: string | null; created_at: string; posted_at: string | null; line_count: number };
 export type OperationalRead<T> = { status: "ready"; data: T } | { status: "unavailable" };
@@ -79,6 +82,25 @@ export async function listOperationalPurchaseOrders(tenantId: string, branchId: 
   const result = await read<unknown>("operational_list_purchase_orders", { p_tenant_id: tenantId, p_branch_id: branchId, p_search: options.search, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
   return result.status === "ready" && records<OperationalPurchaseOrder>(result.data, ["purchase_order_id", "order_number", "supplier_id", "supplier_name", "status", "total_amount", "item_count", "items", "created_at", "updated_at"])
     ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
+}
+
+/** Phase 01 reads intentionally become unavailable until its migration is installed. */
+export async function listOperationalPurchaseReceiving(tenantId: string, branchId: string): Promise<OperationalRead<OperationalPurchaseReceivingOrder[]>> {
+  const result = await read<unknown>("operational_list_purchase_receiving", { p_tenant_id: tenantId, p_branch_id: branchId, p_limit: 50, p_offset: 0 });
+  return result.status === "ready" && records<OperationalPurchaseReceivingOrder>(result.data, ["purchase_order_id", "order_number", "status", "supplier_name", "items", "created_at", "updated_at"])
+    ? { status: "ready", data: result.data } : { status: "unavailable" };
+}
+
+export async function listOperationalPurchaseReceipts(tenantId: string, branchId: string): Promise<OperationalRead<OperationalPurchaseReceipt[]>> {
+  const result = await read<unknown>("operational_list_purchase_receipts", { p_tenant_id: tenantId, p_branch_id: branchId, p_purchase_order_id: null, p_limit: 50, p_offset: 0 });
+  return result.status === "ready" && records<OperationalPurchaseReceipt>(result.data, ["purchase_receipt_id", "receipt_number", "purchase_order_id", "status", "items", "created_at"])
+    ? { status: "ready", data: result.data } : { status: "unavailable" };
+}
+
+export async function listOperationalInventoryValuation(tenantId: string, branchId: string): Promise<OperationalRead<OperationalInventoryValuation[]>> {
+  const result = await read<unknown>("operational_list_inventory_valuation", { p_tenant_id: tenantId, p_branch_id: branchId, p_limit: 100, p_offset: 0 });
+  return result.status === "ready" && records<OperationalInventoryValuation>(result.data, ["item_id", "item_code", "item_name", "quantity", "valuation_status", "stock_value", "average_unit_cost", "valuation_updated_at"])
+    ? { status: "ready", data: result.data } : { status: "unavailable" };
 }
 
 export async function listOperationalWorkOrders(tenantId: string, branchId: string, options: { status?: string | null; page?: number }): Promise<OperationalPage<OperationalWorkOrder>> {
