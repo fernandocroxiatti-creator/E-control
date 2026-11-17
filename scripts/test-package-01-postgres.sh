@@ -160,5 +160,220 @@ begin
   end if;
 end $$;
 SQL
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261116180000_purchase_receipt_inventory_valuation.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/purchase-receipt-inventory-valuation-behavior.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/purchase-receipt-inventory-valuation-concurrency-setup.sql" >/dev/null
+
+# These are distinct PostgreSQL client sessions.  The test-only trigger pauses
+# the first writer *after* the production RPC acquires its inventory lock; the
+# second writer therefore contends for the real lock rather than running in a
+# sequential mock.  lock_timeout/statement_timeout turn any deadlock or hang
+# into a failing test.
+run_phase01_receipt() {
+  local item="$1" request_id="$2" pause="$3" label="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select public.operational_receive_purchase_order('ca100000-0000-4000-8000-000000000001','ca700000-0000-4000-8000-00000000000${item}',jsonb_build_array(jsonb_build_object('purchase_order_item_id','ca710000-0000-4000-8000-00000000000${item}','quantity',4,'effective_unit_cost',14)),'CONC-${item}','Phase01 concurrency receipt','cab00000-0000-4000-8000-00000000000${request_id}');
+commit;
+SQL
+}
+run_phase01_transfer() {
+  local item="$1" request_id="$2" pause="$3" label="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select public.operational_create_inventory_transfer('ca100000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000002','ca500000-0000-4000-8000-00000000000${item}',3,'Phase01 concurrency transfer','cac00000-0000-4000-8000-00000000000${request_id}');
+commit;
+SQL
+}
+run_phase01_count_post() {
+  local count_request="$1" _unused="$2" pause="$3" label="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select public.operational_post_inventory_count('ca100000-0000-4000-8000-000000000001',(select id from public.inventory_count_sessions where tenant_id='ca100000-0000-4000-8000-000000000001' and request_id='ca940000-0000-4000-8000-00000000000${count_request}'));
+commit;
+SQL
+}
+run_phase01_work_order_close() {
+  local order_request="$1" _unused="$2" pause="$3" label="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select public.operational_close_work_order('ca100000-0000-4000-8000-000000000001',(select id from public.work_orders where tenant_id='ca100000-0000-4000-8000-000000000001' and request_id='ca950000-0000-4000-8000-00000000000${order_request}'));
+commit;
+SQL
+}
+run_phase01_hard_receipt() {
+  local order="$1" request_id="$2" pause="$3" label="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select public.operational_receive_purchase_order('ca100000-0000-4000-8000-000000000001','ca700000-0000-4000-8000-000000000${order}',jsonb_build_array(jsonb_build_object('purchase_order_item_id','ca710000-0000-4000-8000-000000000${order}','quantity',4,'effective_unit_cost',14)),'HARD-CONC-${order}','hardening concurrency','caa00000-0000-4000-8000-000000000${request_id}');
+commit;
+SQL
+}
+run_phase01_hard_reverse() {
+  local order="$1" request_id="$2" pause="$3" label="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select public.operational_reverse_purchase_receipt('ca100000-0000-4000-8000-000000000001',(select id from public.purchase_receipts where purchase_order_id='ca700000-0000-4000-8000-000000000${order}'),jsonb_build_array(jsonb_build_object('purchase_receipt_item_id',(select item.id from public.purchase_receipt_items item join public.purchase_receipts receipt on receipt.id=item.purchase_receipt_id where receipt.purchase_order_id='ca700000-0000-4000-8000-000000000${order}' order by item.item_id limit 1),'quantity',1)),'hardening concurrency','cab00000-0000-4000-8000-000000000${request_id}');
+commit;
+SQL
+}
+run_phase01_hard_multi_receipt() {
+  local order="$1" request_id="$2" pause="$3" label="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select public.operational_receive_purchase_order('ca100000-0000-4000-8000-000000000001','ca700000-0000-4000-8000-000000000${order}',(select jsonb_agg(jsonb_build_object('purchase_order_item_id',id,'quantity',4,'effective_unit_cost',10) order by case when '${order}'='011' then item_id end asc,case when '${order}'='012' then item_id end desc) from public.purchase_order_items where purchase_order_id='ca700000-0000-4000-8000-000000000${order}'),'HARD-MULTI-${order}','hardening multi receipt','cac00000-0000-4000-8000-000000000${request_id}');
+commit;
+SQL
+}
+run_phase01_hard_multi_reverse() {
+  local order="$1" request_id="$2" pause="$3" label="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select public.operational_reverse_purchase_receipt('ca100000-0000-4000-8000-000000000001',(select id from public.purchase_receipts where purchase_order_id='ca700000-0000-4000-8000-000000000${order}'),(select jsonb_agg(jsonb_build_object('purchase_receipt_item_id',item.id,'quantity',1) order by case when '${order}'='013' then item.item_id end asc,case when '${order}'='014' then item.item_id end desc) from public.purchase_receipt_items item join public.purchase_receipts receipt on receipt.id=item.purchase_receipt_id where receipt.purchase_order_id='ca700000-0000-4000-8000-000000000${order}'),'hardening multi reversal','cad00000-0000-4000-8000-000000000${request_id}');
+commit;
+SQL
+}
+run_phase01_hard_work_order_close() {
+  local pause="$1" label="$2"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select public.operational_close_work_order('ca100000-0000-4000-8000-000000000001',(select id from public.work_orders where request_id='ca990000-0000-4000-8000-000000000015'));
+commit;
+SQL
+}
+wait_phase01_pause() {
+  local label="$1"
+  for _ in $(seq 1 80); do
+    if "$docker_bin" exec "$container" psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select count(*) from pg_catalog.pg_stat_activity where application_name='${label}' and wait_event='PgSleep';" | grep -qx '1'; then
+      return 0
+    fi
+    sleep 0.05
+  done
+  echo "ERROR: concurrency barrier did not observe ${label} holding the real inventory lock" >&2
+  return 1
+}
+run_phase01_pair() {
+  local first_name="$1" second_name="$2"
+  shift 2
+  local label="phase01-${first_name}-${second_name}-${RANDOM}"
+  echo "CONCURRENCY: ${first_name} holds the product lock while ${second_name} waits"
+  "$1" "$2" "$3" on "$label" & local first_pid=$!
+  wait_phase01_pause "$label"
+  "$4" "$5" "$6" off "${label}-second" & local second_pid=$!
+  wait "$first_pid"
+  wait "$second_pid"
+}
+
+# A: receipt x transfer, in both serializable outcomes.
+run_phase01_pair receipt transfer run_phase01_receipt 1 1 run_phase01_transfer 1 1
+run_phase01_pair transfer receipt run_phase01_transfer 2 2 run_phase01_receipt 2 2
+# B: receipt first must make the existing physical count stale; it must not
+# overwrite the received balance.  The fresh re-count below is the required
+# revalidation.  Count-first then receipt is also exercised successfully.
+echo 'CONCURRENCY: receipt holds the product lock while inventory count waits (stale count expected)'
+stale_label="phase01-receipt-count-${RANDOM}"
+run_phase01_receipt 3 3 on "$stale_label" & receipt_stale_pid=$!
+wait_phase01_pause "$stale_label"
+set +e
+run_phase01_count_post 1 ignored off "${stale_label}-second" & stale_count_pid=$!
+wait "$receipt_stale_pid"; receipt_stale_status=$?
+wait "$stale_count_pid"; stale_count_status=$?
+set -e
+if [ "$receipt_stale_status" -ne 0 ] || [ "$stale_count_status" -eq 0 ]; then
+  echo 'ERROR: receipt/count stale-snapshot handling did not produce the expected conflict' >&2
+  exit 1
+fi
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
+select set_config('request.jwt.claim.role','authenticated',false);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',false);
+select public.operational_record_inventory_count('ca100000-0000-4000-8000-000000000001',(select id from public.inventory_count_sessions where tenant_id='ca100000-0000-4000-8000-000000000001' and request_id='ca940000-0000-4000-8000-000000000001'),'ca500000-0000-4000-8000-000000000003',8);
+select public.operational_post_inventory_count('ca100000-0000-4000-8000-000000000001',(select id from public.inventory_count_sessions where tenant_id='ca100000-0000-4000-8000-000000000001' and request_id='ca940000-0000-4000-8000-000000000001'));
+SQL
+run_phase01_pair inventory-count receipt run_phase01_count_post 2 ignored run_phase01_receipt 4 4
+# C: receipt x actual reservation consumption, in both outcomes.
+run_phase01_pair receipt work-order-close run_phase01_receipt 5 5 run_phase01_work_order_close 5 ignored
+run_phase01_pair work-order-close receipt run_phase01_work_order_close 6 ignored run_phase01_receipt 6 6
+# D: reversal and a later receipt contend on the same balance but both facts are
+# safe: inbound-only history does not make the original receipt ambiguous.
+run_phase01_pair receipt-reversal receipt run_phase01_hard_reverse 007 701 run_phase01_hard_receipt 008 702
+# E: two documents list the same products in inverse item order.  Both sessions
+# must acquire advisory locks by position, not by the incoming JSON/line UUID.
+run_phase01_pair multi-receipt-one multi-receipt-two run_phase01_hard_multi_receipt 011 711 run_phase01_hard_multi_receipt 012 712
+run_phase01_pair multi-reversal-one multi-reversal-two run_phase01_hard_multi_reverse 013 721 run_phase01_hard_multi_reverse 014 722
+# F: a transfer that commits first is a real contending outbound event.  The
+# reversal must wait for the inventory lock, then fail closed with the D05
+# business state (55000), never through a deadlock or timeout.
+echo 'CONCURRENCY: transfer holds the product lock while receipt reversal waits (D05 block expected)'
+hard_block_label="phase01-transfer-reversal-${RANDOM}"
+run_phase01_transfer 8 8 on "$hard_block_label" & hard_transfer_pid=$!
+wait_phase01_pause "$hard_block_label"
+set +e
+run_phase01_hard_reverse 009 731 off "${hard_block_label}-reverse" & hard_reverse_pid=$!
+wait "$hard_transfer_pid"; hard_transfer_status=$?
+wait "$hard_reverse_pid"; hard_reverse_status=$?
+set -e
+if [ "$hard_transfer_status" -ne 0 ] || [ "$hard_reverse_status" -eq 0 ]; then
+  echo 'ERROR: transfer/reversal D05 handling did not produce the expected business rejection' >&2
+  exit 1
+fi
+echo 'CONCURRENCY: O.S. consumption holds the product lock while receipt reversal waits (D05 block expected)'
+hard_os_label="phase01-consumption-reversal-${RANDOM}"
+run_phase01_hard_work_order_close on "$hard_os_label" & hard_close_pid=$!
+wait_phase01_pause "$hard_os_label"
+set +e
+run_phase01_hard_reverse 010 741 off "${hard_os_label}-reverse" & hard_os_reverse_pid=$!
+wait "$hard_close_pid"; hard_close_status=$?
+wait "$hard_os_reverse_pid"; hard_os_reverse_status=$?
+set -e
+if [ "$hard_close_status" -ne 0 ] || [ "$hard_os_reverse_status" -eq 0 ]; then
+  echo 'ERROR: consumption/reversal D05 handling did not produce the expected business rejection' >&2
+  exit 1
+fi
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/purchase-receipt-inventory-valuation-concurrency-assertions.sql" >/dev/null
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'
-echo 'PASS: Packages 01, 03, 04, 05 and authenticated onboarding pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'
+echo 'PASS: Packages 01, 03, 04, 05, Phase 01 purchase valuation, real cross-session concurrency and authenticated onboarding pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'

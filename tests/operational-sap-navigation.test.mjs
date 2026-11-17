@@ -14,9 +14,9 @@ const transactionCatalog = read("lib/master/transaction-resolution.ts");
 const focus = read("lib/operational/transaction-focus.ts");
 
 test("each published SAP transaction carries a focused route", () => {
-  for (const code of ["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N"]) assert.match(transactionCatalog, new RegExp(`${code}:[\\s\\S]{0,400}tx=${code}`));
+  for (const code of ["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N", "ZGR01", "ZIV01"]) assert.match(transactionCatalog, new RegExp(`${code}:[\\s\\S]{0,400}tx=${code}`));
   for (const code of ["MB52", "MB51", "MI01", "MI04", "MI07", "ZTR01", "ZOS01", "ZOS02", "ZOS03", "ZOS04"]) assert.match(transactionCatalog, new RegExp(`${code}:[\\s\\S]{0,400}tx=${code}`));
-  assert.match(focus, /routeTransactions = new Set<OperationalRouteTransaction>\(\["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N", "MM02"/);
+  assert.match(focus, /routeTransactions = new Set<OperationalRouteTransaction>\(\["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N", "ZGR01", "ZIV01", "MM02"/);
   assert.match(focus, /return code && routeTransactions\.has/);
 });
 
@@ -32,7 +32,7 @@ test("focused pages authorize the requested transaction on the server", () => {
 
 test("inventory uses the focused SAP code and never treats a URL as authorization", () => {
   assert.match(inventoryPage, /authorizeRouteTransaction\(client, requestedTx/);
-  for (const code of ["MIGO", "MB52", "MB51", "MI01", "MI04", "MI07", "ZTR01"]) assert.match(inventoryPage, new RegExp(`"${code}"`));
+  for (const code of ["MIGO", "MB52", "MB51", "MI01", "MI04", "MI07", "ZTR01", "ZIV01"]) assert.match(inventoryPage, new RegExp(`"${code}"`));
   assert.doesNotMatch(inventoryPage, /listOperationalProductOptions/);
   assert.match(inventoryPage, /contexto autorizado/);
   assert.doesNotMatch(inventoryPage, /migration de alinhamento de leitura preparada/);

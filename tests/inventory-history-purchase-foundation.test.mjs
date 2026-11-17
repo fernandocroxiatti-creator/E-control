@@ -61,5 +61,5 @@ test("browser code uses server actions, the production flag and the authorized R
   assert.match(inventory, /Tipo de movimento/);
   assert.match(ui, /InventoryMovementHistory/);
   assert.match(purchases, /PurchaseOrders/);
-  assert.match(purchases, /ME21N e ME23N aprovadas/);
+  assert.match(purchases, /ME21N e ME23N/);
 });
