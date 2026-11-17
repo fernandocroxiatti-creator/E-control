@@ -32,8 +32,17 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
 - [x] Plano pré-publicação local: ordem, backup, recuperação, piloto, controles
   ZIV01/ZGR01 e aceite documentados; nenhuma etapa remota foi executada.
 - [x] Commits locais auditáveis na branch `codex/phase-01-integration`:
-  `b176a7e`, `a397e6c` e `def071c`; publicação continua separada.
-- [ ] Revisão pré-publicação, push e deploy autorizados separadamente.
+  `b176a7e`, `a397e6c`, `def071c`, `a9e3ec5` e `0073dd0`; publicação continua separada.
+- [x] Correção local de idempotência para custo derivado: modo de entrada de
+  custo persistido, replay derivado idêntico, alternância derivado↔explícito,
+  custo explícito divergente, referência normalizada e namespace por operação
+  implementados e confirmados em concorrência real. A barreira usa
+  `application_name` de até 63 bytes, rejeita ausência de sessão e passou em
+  duas execuções PostgreSQL 17 descartáveis, incluindo as duas ordens de
+  movimento×transferência com mesmo `request_id`.
+- [x] Auditoria final pré-commit: PostgreSQL 17.11 isolado, 30 cenários
+  concorrentes reais, Node 148/148, lint, TypeScript, build, `bash -n`, diff e
+  auditoria de segredos aprovados; **GO apenas para o sexto commit local**.
 - [ ] Aprovação e aplicação de migration Production autorizadas separadamente.
 - [ ] Backup Production criptografado, checksum e restauração essencial
   revalidados imediatamente antes da migration.
@@ -53,4 +62,4 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
 | Migration | Estado |
 |---|---|
 | Até `20261110120000` | Aplicada/confirmada anteriormente; não reaplicar |
-| `20261116180000_purchase_receipt_inventory_valuation.sql` | Hardening local validado; SHA-256 `f8838d357e68556db1c0fa36ec333b5f0ccde7de449c1b968ca0ea3fb67318d2`; não aplicada em Production |
+| `20261116180000_purchase_receipt_inventory_valuation.sql` | Hardening de idempotência local auditado e pronto para sexto commit; SHA-256 `f7a8e4648e82cbffadcbb6d23d192912d02ba93aa4ef449dffe62502ccdbcda3`; não aplicada em Production |

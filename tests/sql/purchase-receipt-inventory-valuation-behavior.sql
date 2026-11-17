@@ -179,6 +179,99 @@ begin
 end;
 $d05_traceability$;
 
+-- A request identifier is a complete command identity, not merely a duplicate
+-- suppression key.  These sequential probes assert SQLSTATE 23505 for every
+-- caller-controlled difference while preserving a same-payload replay.
+do $idempotency_payloads$
+<<idempotency_payloads>>
+declare
+  tenant_id constant uuid := 'f1000000-0000-4000-8000-000000000001';
+  branch_id constant uuid := 'f2000000-0000-4000-8000-000000000001';
+  branch_two_id constant uuid := 'f2000000-0000-4000-8000-000000000002';
+  actor_id constant uuid := 'f3000000-0000-4000-8000-000000000001';
+  movement_item uuid := 'f5000000-0000-4000-8000-000000000007';
+  transfer_item_one uuid := 'f5000000-0000-4000-8000-000000000008';
+  transfer_item_two uuid := 'f5000000-0000-4000-8000-000000000009';
+  valuation_item uuid := 'f5000000-0000-4000-8000-000000000010';
+  valuation_other_item uuid := 'f5000000-0000-4000-8000-000000000011';
+  explicit_item uuid := 'f5000000-0000-4000-8000-000000000012';
+  namespace_item uuid := 'f5000000-0000-4000-8000-000000000013';
+  movement_one uuid; movement_two uuid; transfer_one uuid; transfer_two uuid; event_one uuid; event_two uuid;
+begin
+  insert into public.catalog_items(id,tenant_id,item_type,code,name,unit_of_measure,current_cost,selling_price,minimum_stock,reorder_point,request_id,created_by_user_id)
+  values
+    (movement_item,tenant_id,'product','IDEM-MOVE','Idempotent movement','UN',0,20,0,0,'f7000000-0000-4000-8000-000000000201',actor_id),
+    (transfer_item_one,tenant_id,'product','IDEM-TRF-1','Idempotent transfer one','UN',0,20,0,0,'f7000000-0000-4000-8000-000000000202',actor_id),
+    (transfer_item_two,tenant_id,'product','IDEM-TRF-2','Idempotent transfer two','UN',0,20,0,0,'f7000000-0000-4000-8000-000000000203',actor_id),
+    (valuation_item,tenant_id,'product','IDEM-VAL-1','Idempotent valuation one','UN',0,20,0,0,'f7000000-0000-4000-8000-000000000204',actor_id),
+    (valuation_other_item,tenant_id,'product','IDEM-VAL-2','Idempotent valuation two','UN',0,20,0,0,'f7000000-0000-4000-8000-000000000205',actor_id),
+    (explicit_item,tenant_id,'product','IDEM-EXPLICIT','Explicit-cost replay','UN',0,20,0,0,'f7000000-0000-4000-8000-000000000206',actor_id),
+    (namespace_item,tenant_id,'product','IDEM-NAMESPACE','Request namespace','UN',0,20,0,0,'f7000000-0000-4000-8000-000000000207',actor_id);
+
+  select movement_id into movement_one from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'initial',10,10,'f7000000-0000-4000-8000-000000000210','Opening movement');
+  select movement_id into movement_two from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'initial',10,10,'f7000000-0000-4000-8000-000000000210','Opening movement');
+  if movement_one<>movement_two or (select count(*) from public.inventory_movements movement where movement.tenant_id=idempotency_payloads.tenant_id and movement.request_id='f7000000-0000-4000-8000-000000000210')<>1 then raise exception 'same movement payload was not idempotent'; end if;
+  begin perform public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'initial',10,11,'f7000000-0000-4000-8000-000000000210','Opening movement'); raise exception 'movement accepted a different cost for the same request id'; exception when unique_violation then null; end;
+  begin perform public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'initial',10,10,'f7000000-0000-4000-8000-000000000210','Changed reference'); raise exception 'movement accepted a different reference for the same request id'; exception when unique_violation then null; end;
+  begin perform public.operational_record_inventory_movement_valued(tenant_id,branch_two_id,movement_item,'initial',10,10,'f7000000-0000-4000-8000-000000000210','Opening movement'); raise exception 'movement accepted a different branch for the same request id'; exception when unique_violation then null; end;
+  begin perform public.operational_record_inventory_movement_valued(tenant_id,branch_id,transfer_item_one,'initial',10,10,'f7000000-0000-4000-8000-000000000210','Opening movement'); raise exception 'movement accepted a different product for the same request id'; exception when unique_violation then null; end;
+  begin perform public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'initial',9,10,'f7000000-0000-4000-8000-000000000210','Opening movement'); raise exception 'movement accepted a different quantity for the same request id'; exception when unique_violation then null; end;
+
+  -- An omitted cost is a distinct, persisted command mode. The applied moving
+  -- average is server-derived and must not make an identical replay fail.
+  select movement_id into movement_one from public.operational_record_inventory_movement(tenant_id,branch_id,movement_item,'entry',1,'f7000000-0000-4000-8000-000000000232',null);
+  select movement_id into movement_two from public.operational_record_inventory_movement(tenant_id,branch_id,movement_item,'entry',1,'f7000000-0000-4000-8000-000000000232',null);
+  if movement_one<>movement_two or (select count(*) from public.inventory_movements movement where movement.tenant_id=idempotency_payloads.tenant_id and movement.request_id='f7000000-0000-4000-8000-000000000232' and movement.unit_cost_input_mode='derived')<>1 then raise exception 'derived-cost movement replay was not idempotent'; end if;
+  begin perform * from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'entry',1,10,'f7000000-0000-4000-8000-000000000232',null); raise exception 'derived-cost movement accepted an explicit-cost replay'; exception when unique_violation then null; end;
+
+  perform * from public.operational_record_inventory_movement_valued(tenant_id,branch_id,explicit_item,'initial',5,10,'f7000000-0000-4000-8000-000000000231','Explicit opening');
+  select movement_id into movement_one from public.operational_record_inventory_movement_valued(tenant_id,branch_id,explicit_item,'entry',1,11,'f7000000-0000-4000-8000-000000000233','Explicit replay');
+  select movement_id into movement_two from public.operational_record_inventory_movement_valued(tenant_id,branch_id,explicit_item,'entry',1,11,'f7000000-0000-4000-8000-000000000233','Explicit replay');
+  if movement_one<>movement_two or (select count(*) from public.inventory_movements movement where movement.tenant_id=idempotency_payloads.tenant_id and movement.request_id='f7000000-0000-4000-8000-000000000233' and movement.unit_cost_input_mode='explicit')<>1 then raise exception 'explicit-cost movement replay was not idempotent'; end if;
+  begin perform * from public.operational_record_inventory_movement(tenant_id,branch_id,explicit_item,'entry',1,'f7000000-0000-4000-8000-000000000233','Explicit replay'); raise exception 'explicit-cost movement accepted an omitted-cost replay'; exception when unique_violation then null; end;
+  begin perform * from public.operational_record_inventory_movement_valued(tenant_id,branch_id,explicit_item,'entry',1,12,'f7000000-0000-4000-8000-000000000233','Explicit replay'); raise exception 'explicit-cost movement accepted a divergent cost'; exception when unique_violation then null; end;
+
+  select movement_id into movement_one from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'entry',1,10,'f7000000-0000-4000-8000-000000000234',null);
+  select movement_id into movement_two from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'entry',1,10,'f7000000-0000-4000-8000-000000000234','');
+  if movement_one<>movement_two then raise exception 'NULL and empty references were not equivalent'; end if;
+  select movement_id into movement_one from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'entry',1,10,'f7000000-0000-4000-8000-000000000235',null);
+  select movement_id into movement_two from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'entry',1,10,'f7000000-0000-4000-8000-000000000235','   ');
+  if movement_one<>movement_two then raise exception 'NULL and whitespace references were not equivalent'; end if;
+  select movement_id into movement_one from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'entry',1,10,'f7000000-0000-4000-8000-000000000236','  Normalized reference  ');
+  select movement_id into movement_two from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'entry',1,10,'f7000000-0000-4000-8000-000000000236','Normalized reference');
+  if movement_one<>movement_two then raise exception 'trim-equivalent references were not idempotent'; end if;
+  perform * from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'entry',1,10,'f7000000-0000-4000-8000-000000000237','Reference one');
+  begin perform * from public.operational_record_inventory_movement_valued(tenant_id,branch_id,movement_item,'entry',1,10,'f7000000-0000-4000-8000-000000000237','Reference two'); raise exception 'movement accepted a semantically different reference'; exception when unique_violation then null; end;
+
+  -- Request namespaces are endpoint-local: the same UUID may identify one
+  -- inventory movement and one transfer without either operation returning or
+  -- mutating the other's fact.
+  perform * from public.operational_record_inventory_movement_valued(tenant_id,branch_id,namespace_item,'initial',5,10,'f7000000-0000-4000-8000-000000000238','Namespace opening');
+  perform * from public.operational_record_inventory_movement_valued(tenant_id,branch_id,namespace_item,'entry',1,10,'f7000000-0000-4000-8000-000000000239','Namespace movement');
+  select public.operational_create_inventory_transfer(tenant_id,branch_id,branch_two_id,namespace_item,1,'Namespace transfer','f7000000-0000-4000-8000-000000000239') into transfer_one;
+  if transfer_one is null or (select count(*) from public.inventory_movements movement where movement.tenant_id=idempotency_payloads.tenant_id and movement.request_id='f7000000-0000-4000-8000-000000000239')<>1 or (select count(*) from public.inventory_transfers transfer where transfer.tenant_id=idempotency_payloads.tenant_id and transfer.request_id='f7000000-0000-4000-8000-000000000239')<>1 then raise exception 'operation-local request namespaces mixed or duplicated facts'; end if;
+
+  perform public.operational_record_inventory_movement_valued(tenant_id,branch_id,transfer_item_one,'initial',20,10,'f7000000-0000-4000-8000-000000000211','Transfer opening one');
+  perform public.operational_record_inventory_movement_valued(tenant_id,branch_id,transfer_item_two,'initial',20,10,'f7000000-0000-4000-8000-000000000212','Transfer opening two');
+  select public.operational_create_inventory_transfer(tenant_id,branch_id,branch_two_id,transfer_item_one,2,'Transfer reference one','f7000000-0000-4000-8000-000000000220') into transfer_one;
+  select public.operational_create_inventory_transfer(tenant_id,branch_id,branch_two_id,transfer_item_one,2,'Transfer reference one','f7000000-0000-4000-8000-000000000220') into transfer_two;
+  if transfer_one<>transfer_two or (select count(*) from public.inventory_transfers transfer where transfer.tenant_id=idempotency_payloads.tenant_id and transfer.request_id='f7000000-0000-4000-8000-000000000220')<>1 then raise exception 'same transfer payload was not idempotent'; end if;
+  begin perform public.operational_create_inventory_transfer(tenant_id,branch_id,branch_two_id,transfer_item_one,2,'Different reference','f7000000-0000-4000-8000-000000000220'); raise exception 'transfer accepted a different reference for the same request id'; exception when unique_violation then null; end;
+  begin perform public.operational_create_inventory_transfer(tenant_id,branch_id,branch_two_id,transfer_item_one,3,'Transfer reference one','f7000000-0000-4000-8000-000000000220'); raise exception 'transfer accepted a different quantity for the same request id'; exception when unique_violation then null; end;
+  begin perform public.operational_create_inventory_transfer(tenant_id,branch_id,branch_two_id,transfer_item_two,2,'Transfer reference one','f7000000-0000-4000-8000-000000000220'); raise exception 'transfer accepted a different product for the same request id'; exception when unique_violation then null; end;
+  begin perform public.operational_create_inventory_transfer(tenant_id,branch_two_id,branch_id,transfer_item_one,2,'Transfer reference one','f7000000-0000-4000-8000-000000000220'); raise exception 'transfer accepted different branches for the same request id'; exception when unique_violation then null; end;
+
+  insert into public.inventory_balances(tenant_id,branch_id,item_id,quantity) values(tenant_id,branch_id,valuation_item,3);
+  select public.operational_record_initial_inventory_valuation(tenant_id,branch_id,valuation_item,7,'Opening valuation verified','f7000000-0000-4000-8000-000000000230') into event_one;
+  select public.operational_record_initial_inventory_valuation(tenant_id,branch_id,valuation_item,7,'Opening valuation verified','f7000000-0000-4000-8000-000000000230') into event_two;
+  if event_one<>event_two or (select count(*) from public.inventory_valuation_events event where event.tenant_id=idempotency_payloads.tenant_id and event.request_id='f7000000-0000-4000-8000-000000000230')<>1 then raise exception 'same initial valuation payload was not idempotent'; end if;
+  begin perform public.operational_record_initial_inventory_valuation(tenant_id,branch_id,valuation_item,8,'Opening valuation verified','f7000000-0000-4000-8000-000000000230'); raise exception 'initial valuation accepted a different cost for the same request id'; exception when unique_violation then null; end;
+  begin perform public.operational_record_initial_inventory_valuation(tenant_id,branch_id,valuation_item,7,'Different reason','f7000000-0000-4000-8000-000000000230'); raise exception 'initial valuation accepted a different reason for the same request id'; exception when unique_violation then null; end;
+  begin perform public.operational_record_initial_inventory_valuation(tenant_id,branch_two_id,valuation_item,7,'Opening valuation verified','f7000000-0000-4000-8000-000000000230'); raise exception 'initial valuation accepted a different branch for the same request id'; exception when unique_violation then null; end;
+  begin perform public.operational_record_initial_inventory_valuation(tenant_id,branch_id,valuation_other_item,7,'Opening valuation verified','f7000000-0000-4000-8000-000000000230'); raise exception 'initial valuation accepted a different product for the same request id'; exception when unique_violation then null; end;
+end;
+$idempotency_payloads$;
+
 do $legacy_and_security$
 <<legacy_and_security>>
 declare

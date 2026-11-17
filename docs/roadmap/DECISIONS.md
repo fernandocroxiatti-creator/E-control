@@ -74,6 +74,77 @@ posição de valuation e é auditável; nunca será eliminado silenciosamente.
   permissões, grants, flags nem o escopo das fases. Os commits `b176a7e`,
   `a397e6c` e `def071c` apenas versionam a implementação já auditada.
 
+## Hardening de idempotência (2026-11-17)
+
+- Não é decisão comercial nova e não altera D01–D08. O contrato técnico de
+  `request_id` foi explicitado: payload normalizado igual é replay; divergência
+  é `23505`, nunca retorno silencioso de um fato diferente.
+- Normalização aprovada para esta implementação: `btrim` em referência e razão;
+  referência vazia equivale a `NULL`. Quantidade aceita no ledger tem no máximo
+  quatro casas decimais e custo informado no máximo oito; excesso de precisão é
+  inválido, não arredondado para comparação.
+- O custo médio, `unit_cost`, `total_value`, snapshot de valuation e auditoria
+  persistidos continuam imutáveis. O snapshot de quantidade de ZIV01 é produzido
+  pelo saldo bloqueado pelo servidor, não um campo reutilizável do cliente.
+- Os cinco commits anteriores permanecem: `b176a7e`, `a397e6c`, `def071c`,
+  `a9e3ec5`, `0073dd0`. O hardening atual é alteração local não versionada e
+  requer nova auditoria antes de qualquer push.
+
+## Achado da auditoria independente de idempotência (2026-11-17)
+
+- D01–D08 permanecem inalteradas. A implementação atual não pode ser aprovada:
+  quando uma entrada pública não envia custo e o banco deriva a média móvel,
+  o replay igual deve comparar a ausência de custo informado como ausência de
+  campo de payload, não como divergência em relação ao custo calculado e
+  persistido. Hoje ela falha com `23505`.
+- A próxima correção deve preservar a comparação obrigatória de custo para
+  endpoints que o recebem do cliente e acrescentar testes para custo derivado,
+  `NULL`/vazio/espaços em referência e escopo de `request_id` entre operações.
+  Isso é correção de contrato técnico, não uma nova decisão de negócio.
+
+## Correção técnica de custo derivado (2026-11-17)
+
+- Não altera D01–D08. `unit_cost_input_mode` registra a intenção recebida:
+  `explicit` para custo fornecido e `derived` para custo omitido. O modo integra
+  o payload canônico de idempotência; portanto uma chamada derivada e outra
+  explícita nunca são consideradas equivalentes apenas porque chegam ao mesmo
+  valor numérico.
+- No modo derivado, o custo aplicado continua sendo snapshot imutável e auditável
+  da média móvel bloqueada, mas não é campo comparado ao `NULL` do replay. No
+  modo explícito, custo com mais de oito casas é rejeitado e o valor original é
+  comparado integralmente.
+- `request_id` é único por `(tenant, operação)` — não globalmente entre tabelas.
+  A implementação e os testes tratam reuso entre movimento e transferência como
+  comandos independentes, sem compartilhamento de resultado ou mutação cruzada.
+
+## Registro factual da auditoria final de custo derivado (2026-11-17)
+
+- Não é decisão comercial nova e não altera D01–D08. A auditoria identificou
+  que o runner de concorrência precisa limitar deterministicamente o
+  `application_name` usado como barreira a 63 bytes ou menos. Até nova execução
+  com código de saída zero, a cobertura concorrente adicionada para custo
+  derivado permanece pendente de confirmação independente.
+
+## Correção factual da barreira de concorrência (2026-11-17)
+
+- Não altera D01–D08. O runner usa agora um `application_name` ASCII curto,
+  determinístico e único por execução, validado em bytes contra o limite de 63
+  do PostgreSQL. A barreira exige exatamente uma sessão em `PgSleep`; uma
+  sessão inexistente é rejeitada explicitamente.
+- Dois cenários reais usam o mesmo `request_id` em movimento e transferência,
+  nas duas ordens de contenção. O contrato continua sendo namespace por
+  empresa+operação, sem reaproveitamento de fato entre tabelas.
+
+## Auditoria final pré-commit aprovada (2026-11-17)
+
+- A auditoria independente confirmou, sem alterar D01–D08, que o modo
+  `explicit`/`derived`, o namespace `(empresa, tipo de operação)`, a
+  normalização de payload e a barreira PostgreSQL corrigida preservam o contrato
+  de idempotência.
+- Foram aprovados 30 cenários concorrentes reais em PostgreSQL isolado, além de
+  Node 148/148, lint, TypeScript, build, `bash -n`, diff e auditoria de
+  segredos. Production permanece inalterada e a Fase 2 não foi iniciada.
+
 ## Condições de rollout registradas (2026-11-17)
 
 - Não é uma nova decisão de negócio: D01–D08 continuam vigentes. A publicação

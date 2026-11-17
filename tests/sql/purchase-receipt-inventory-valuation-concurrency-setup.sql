@@ -9,7 +9,8 @@ insert into public.companies(id,legal_name,status)
   values ('ca100000-0000-4000-8000-000000000001','Phase 01 Concurrency Company','active');
 insert into public.branches(id,tenant_id,code,name,status) values
   ('ca200000-0000-4000-8000-000000000001','ca100000-0000-4000-8000-000000000001','001','Origin','active'),
-  ('ca200000-0000-4000-8000-000000000002','ca100000-0000-4000-8000-000000000001','002','Destination','active');
+  ('ca200000-0000-4000-8000-000000000002','ca100000-0000-4000-8000-000000000001','002','Destination','active'),
+  ('ca200000-0000-4000-8000-000000000003','ca100000-0000-4000-8000-000000000001','003','Alternate','active');
 insert into public.company_memberships(id,tenant_id,user_id,status,branch_access_mode,created_by_user_id)
   values ('ca400000-0000-4000-8000-000000000001','ca100000-0000-4000-8000-000000000001','ca300000-0000-4000-8000-000000000001','active','all_branches','ca300000-0000-4000-8000-000000000001');
 insert into public.access_role_definitions(role_key,display_name,scope,approval_state)
@@ -20,6 +21,7 @@ insert into public.membership_role_assignments(tenant_id,membership_id,role_key,
 update public.permission_definitions set approval_state='approved' where permission_key in (
   'transaction.inventory.stock.move','transaction.inventory.transfer',
   'transaction.inventory.physical.create','transaction.inventory.physical.count','transaction.inventory.physical.adjust',
+  'transaction.inventory.valuation.initial',
   'transaction.service_order.create','transaction.service_order.update','transaction.service_order.close',
   'transaction.purchasing.purchase_order.create','transaction.purchasing.purchase_order.read',
   'transaction.purchasing.receipt.manage'
@@ -28,12 +30,13 @@ insert into public.role_permission_grants(role_key,permission_key)
   select 'phase01_concurrency_role',permission_key from public.permission_definitions where permission_key in (
     'transaction.inventory.stock.move','transaction.inventory.transfer',
     'transaction.inventory.physical.create','transaction.inventory.physical.count','transaction.inventory.physical.adjust',
+    'transaction.inventory.valuation.initial',
     'transaction.service_order.create','transaction.service_order.update','transaction.service_order.close',
     'transaction.purchasing.purchase_order.create','transaction.purchasing.purchase_order.read',
     'transaction.purchasing.receipt.manage'
   ) on conflict do nothing;
 update public.erp_transaction_authorization_catalog set approval_state='approved' where transaction_code in
-  ('MIGO','ZTR01','MI01','MI04','MI07','ZOS01','ZOS02','ZOS04','ME21N','ME23N','ZGR01');
+  ('MIGO','ZTR01','MI01','MI04','MI07','ZIV01','ZOS01','ZOS02','ZOS04','ME21N','ME23N','ZGR01');
 insert into public.company_module_availability(tenant_id,module_code,enabled,changed_by_user_id) values
   ('ca100000-0000-4000-8000-000000000001','INV',true,'ca300000-0000-4000-8000-000000000001'),
   ('ca100000-0000-4000-8000-000000000001','PUR',true,'ca300000-0000-4000-8000-000000000001'),
@@ -41,7 +44,7 @@ insert into public.company_module_availability(tenant_id,module_code,enabled,cha
 insert into public.company_transaction_availability(tenant_id,transaction_code,enabled,changed_by_user_id)
   select 'ca100000-0000-4000-8000-000000000001',transaction_code,true,'ca300000-0000-4000-8000-000000000001'
   from public.erp_transaction_authorization_catalog
-  where transaction_code in ('MIGO','ZTR01','MI01','MI04','MI07','ZOS01','ZOS02','ZOS04','ME21N','ME23N','ZGR01');
+  where transaction_code in ('MIGO','ZTR01','MI01','MI04','MI07','ZIV01','ZOS01','ZOS02','ZOS04','ME21N','ME23N','ZGR01');
 
 insert into public.business_parties(id,tenant_id,party_type,legal_name,request_id,created_by_user_id) values
   ('ca600000-0000-4000-8000-000000000001','ca100000-0000-4000-8000-000000000001','supplier','Phase 01 Concurrency Supplier','ca900000-0000-4000-8000-000000000001','ca300000-0000-4000-8000-000000000001'),
@@ -59,6 +62,17 @@ insert into public.purchase_order_items(id,tenant_id,purchase_order_id,line_numb
 select set_config('request.jwt.claim.role','authenticated',false);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',false);
 select public.operational_record_inventory_movement_valued('ca100000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000001',('ca500000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,'initial',10,10,('ca930000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,'Phase01 concurrency opening') from generate_series(1,6) n;
+
+-- Dedicated positions for same-request concurrent replay tests.  They are not
+-- reused by the receipt/transfer/O.S. fixtures below, so their invariants stay
+-- attributable to idempotency rather than another business workflow.
+insert into public.catalog_items(id,tenant_id,item_type,code,name,unit_of_measure,current_cost,selling_price,minimum_stock,reorder_point,request_id,created_by_user_id)
+  select ('ca500000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,'ca100000-0000-4000-8000-000000000001','product',format('IDEM-CONC-%s',n),format('Phase 01 Idempotency Product %s',n),'UN',0,30,0,0,('ca915000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,'ca300000-0000-4000-8000-000000000001'
+  from generate_series(14,21) n;
+select public.operational_record_inventory_movement_valued('ca100000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000001',('ca500000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,'initial',20,10,('ca935000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,'Idempotency concurrency opening') from generate_series(14,16) n;
+insert into public.inventory_balances(tenant_id,branch_id,item_id,quantity)
+  select 'ca100000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000001',('ca500000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,3
+  from generate_series(17,21) n;
 
 select public.operational_create_inventory_count('ca100000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000001','Phase01 concurrency count', 'ca940000-0000-4000-8000-000000000001');
 select public.operational_create_inventory_count('ca100000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000001','Phase01 concurrency count', 'ca940000-0000-4000-8000-000000000002');
@@ -81,6 +95,22 @@ begin
 end;
 $fn$;
 create trigger phase01_test_pause_inventory_write before insert on public.inventory_movements for each row execute function app_private.phase01_test_pause_inventory_write();
+
+create function app_private.phase01_test_pause_transfer_write() returns trigger language plpgsql set search_path='' as $fn$
+begin
+  if current_setting('phase01.test_pause',true)='on' then perform pg_catalog.pg_sleep(0.75); end if;
+  return new;
+end;
+$fn$;
+create trigger phase01_test_pause_transfer_write before insert on public.inventory_transfers for each row execute function app_private.phase01_test_pause_transfer_write();
+
+create function app_private.phase01_test_pause_valuation_write() returns trigger language plpgsql set search_path='' as $fn$
+begin
+  if current_setting('phase01.test_pause',true)='on' then perform pg_catalog.pg_sleep(0.75); end if;
+  return new;
+end;
+$fn$;
+create trigger phase01_test_pause_valuation_write before insert on public.inventory_valuation_events for each row execute function app_private.phase01_test_pause_valuation_write();
 
 -- Additional fixtures for the hardening scenarios.  They deliberately share
 -- stock positions while retaining independent documents, so the runner can

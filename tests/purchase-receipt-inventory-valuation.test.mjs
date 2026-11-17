@@ -27,6 +27,12 @@ test("Phase 01 migration implements valued, idempotent receipts and safe reversa
     "operational_receive_purchase_order", "operational_reverse_purchase_receipt",
     "operational_record_initial_inventory_valuation", "purchase_receipt_reversal",
     "pg_advisory_xact_lock", "Purchase receipt request identifier belongs to a different payload",
+    "Inventory transfer request identifier belongs to a different payload",
+    "Initial valuation request identifier belongs to a different payload",
+    "inventory-request:", "inventory-valuation-request:",
+    "unit_cost_input_mode", "input_cost_mode='explicit'",
+    "Inventory quantity precision exceeds four decimal places",
+    "Initial valuation cost precision exceeds eight decimal places",
     "Receipt quantity exceeds the remaining quantity", "would violate reserved or unavailable inventory",
     "average_unit_cost", "stock_value", "partially_received",
   ]) assert.ok(migration.includes(needle), needle);
@@ -51,9 +57,10 @@ test("new server actions use protected RPCs and routes fail closed until migrati
   assert.ok(actions.includes("O estoque foi alterado após esta contagem"));
   assert.ok(runner.includes("20261116180000_purchase_receipt_inventory_valuation.sql"));
   for (const needle of ["moving average receipt valuation", "over-receipt was accepted", "legacy pending valuation", "broad receipt RPC grant detected", "D05 accepted reversal after later outbound", "D05 accepted reversal after transfer", "D05 accepted reversal with active reservation"]) assert.ok(behavior.includes(needle), needle);
-  for (const needle of ["receipt-reversal", "multi-receipt-one", "multi-reversal-one", "transfer/reversal D05 handling"]) assert.ok(runner.includes(needle), needle);
+  for (const needle of ["receipt-reversal", "multi-receipt-one", "multi-reversal-one", "transfer/reversal D05 handling", "phase01_validate_session_label", "phase01_new_barrier", "phase01_assert_barrier_absent", "PostgreSQL application_name must be 1..63 bytes", "run_phase01_idempotent_movement", "run_phase01_idempotent_derived_movement", "movement-derived-same", "run_phase01_idempotent_transfer", "run_phase01_idempotent_valuation", "run_phase01_namespace_movement", "run_phase01_namespace_transfer", "ns-move-first", "ns-transfer-first", "Concurrent request namespaces did not retain exactly one fact per operation", "for idempotency_case in same cost reference branch product quantity", "divergent movement request was accepted", "exception when unique_violation then null"]) assert.ok(runner.includes(needle), needle);
+  for (const needle of ["derived-cost movement replay was not idempotent", "derived-cost movement accepted an explicit-cost replay", "explicit-cost movement accepted an omitted-cost replay", "NULL and empty references were not equivalent", "NULL and whitespace references were not equivalent", "operation-local request namespaces mixed or duplicated facts"]) assert.ok(behavior.includes(needle), needle);
 });
 
 test("migration digest is stable for this local review", () => {
-  assert.equal(createHash("sha256").update(migration).digest("hex"), "f8838d357e68556db1c0fa36ec333b5f0ccde7de449c1b968ca0ea3fb67318d2");
+  assert.equal(createHash("sha256").update(migration).digest("hex"), "f7a8e4648e82cbffadcbb6d23d192912d02ba93aa4ef449dffe62502ccdbcda3");
 });

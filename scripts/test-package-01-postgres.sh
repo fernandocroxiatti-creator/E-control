@@ -286,11 +286,63 @@ select public.operational_close_work_order('ca100000-0000-4000-8000-000000000001
 commit;
 SQL
 }
+phase01_barrier_sequence=0
+phase01_barrier_seen='|'
+phase01_barrier_label=''
+
+# PostgreSQL stores application_name in a 64-byte field including the trailing
+# NUL.  Keep the test identifier below 63 bytes in the shell too; otherwise a
+# valid paused backend is silently truncated and the observation probe looks
+# for a different name.
+phase01_validate_session_label() {
+  local label="$1" bytes
+  bytes=$(LC_ALL=C printf '%s' "$label" | wc -c | tr -d ' ')
+  if [ "$bytes" -eq 0 ] || [ "$bytes" -gt 63 ]; then
+    echo "ERROR: PostgreSQL application_name must be 1..63 bytes (got ${bytes})" >&2
+    return 1
+  fi
+}
+
+phase01_new_barrier() {
+  local scenario="$1"
+  if [[ ! "$scenario" =~ ^[a-z0-9-]+$ ]]; then
+    echo "ERROR: invalid Phase 01 barrier scenario ${scenario}" >&2
+    return 1
+  fi
+  phase01_barrier_sequence=$((phase01_barrier_sequence + 1))
+  phase01_barrier_label=$(printf 'p01-%s-%03d' "$scenario" "$phase01_barrier_sequence")
+  phase01_validate_session_label "$phase01_barrier_label" || return 1
+  case "$phase01_barrier_seen" in
+    *"|${phase01_barrier_label}|"*)
+      echo "ERROR: duplicate Phase 01 barrier identifier ${phase01_barrier_label}" >&2
+      return 1
+      ;;
+  esac
+  phase01_barrier_seen="${phase01_barrier_seen}${phase01_barrier_label}|"
+}
+
+phase01_assert_barrier_absent() {
+  local label="$1" observed
+  phase01_validate_session_label "$label" || return 1
+  observed=$("$docker_bin" exec "$container" psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select count(*) from pg_catalog.pg_stat_activity where application_name='${label}' and wait_event='PgSleep';") || return 1
+  if [ "$observed" != '0' ]; then
+    echo "ERROR: nonexistent concurrency barrier ${label} was unexpectedly observed" >&2
+    return 1
+  fi
+}
+
 wait_phase01_pause() {
-  local label="$1"
-  for _ in $(seq 1 80); do
-    if "$docker_bin" exec "$container" psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select count(*) from pg_catalog.pg_stat_activity where application_name='${label}' and wait_event='PgSleep';" | grep -qx '1'; then
+  local label="$1" attempts="${2:-80}" observed
+  phase01_validate_session_label "$label" || return 1
+  for _ in $(seq 1 "$attempts"); do
+    observed=$("$docker_bin" exec "$container" psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select count(*) from pg_catalog.pg_stat_activity where application_name='${label}' and wait_event='PgSleep';") || return 1
+    if [ "$observed" = '1' ]; then
+      echo "BARRIER: observed ${label} in pg_stat_activity"
       return 0
+    fi
+    if [ "$observed" != '0' ]; then
+      echo "ERROR: concurrency barrier ${label} matched ${observed} sessions" >&2
+      return 1
     fi
     sleep 0.05
   done
@@ -298,25 +350,47 @@ wait_phase01_pause() {
   return 1
 }
 run_phase01_pair() {
-  local first_name="$1" second_name="$2"
-  shift 2
-  local label="phase01-${first_name}-${second_name}-${RANDOM}"
+  local scenario="$1" first_name="$2" second_name="$3" label second_label
+  shift 3
+  phase01_new_barrier "$scenario" || return 1
+  label="$phase01_barrier_label"
+  second_label="${label}-second"
+  phase01_validate_session_label "$second_label" || return 1
   echo "CONCURRENCY: ${first_name} holds the product lock while ${second_name} waits"
   "$1" "$2" "$3" on "$label" & local first_pid=$!
   wait_phase01_pause "$label"
-  "$4" "$5" "$6" off "${label}-second" & local second_pid=$!
+  "$4" "$5" "$6" off "$second_label" & local second_pid=$!
   wait "$first_pid"
   wait "$second_pid"
 }
 
+# A missing backend must never be accepted as evidence.  The two identifiers
+# also prove that separate scenarios cannot confuse the pg_stat_activity probe.
+phase01_new_barrier barrier-probe-a
+barrier_probe_a="$phase01_barrier_label"
+phase01_new_barrier barrier-probe-b
+barrier_probe_b="$phase01_barrier_label"
+if [ "$barrier_probe_a" = "$barrier_probe_b" ]; then
+  echo 'ERROR: distinct concurrency scenarios received the same barrier identifier' >&2
+  exit 1
+fi
+phase01_assert_barrier_absent "$barrier_probe_a"
+if wait_phase01_pause "$barrier_probe_a" 1 >/dev/null 2>&1; then
+  echo 'ERROR: an absent concurrency barrier produced a false PASS' >&2
+  exit 1
+fi
+echo 'BARRIER: absent and distinct identifiers were validated'
+
 # A: receipt x transfer, in both serializable outcomes.
-run_phase01_pair receipt transfer run_phase01_receipt 1 1 run_phase01_transfer 1 1
-run_phase01_pair transfer receipt run_phase01_transfer 2 2 run_phase01_receipt 2 2
+run_phase01_pair rt-1 receipt transfer run_phase01_receipt 1 1 run_phase01_transfer 1 1
+run_phase01_pair tr-2 transfer receipt run_phase01_transfer 2 2 run_phase01_receipt 2 2
 # B: receipt first must make the existing physical count stale; it must not
 # overwrite the received balance.  The fresh re-count below is the required
 # revalidation.  Count-first then receipt is also exercised successfully.
 echo 'CONCURRENCY: receipt holds the product lock while inventory count waits (stale count expected)'
-stale_label="phase01-receipt-count-${RANDOM}"
+phase01_new_barrier receipt-count-stale
+stale_label="$phase01_barrier_label"
+phase01_validate_session_label "${stale_label}-second"
 run_phase01_receipt 3 3 on "$stale_label" & receipt_stale_pid=$!
 wait_phase01_pause "$stale_label"
 set +e
@@ -334,22 +408,24 @@ select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001'
 select public.operational_record_inventory_count('ca100000-0000-4000-8000-000000000001',(select id from public.inventory_count_sessions where tenant_id='ca100000-0000-4000-8000-000000000001' and request_id='ca940000-0000-4000-8000-000000000001'),'ca500000-0000-4000-8000-000000000003',8);
 select public.operational_post_inventory_count('ca100000-0000-4000-8000-000000000001',(select id from public.inventory_count_sessions where tenant_id='ca100000-0000-4000-8000-000000000001' and request_id='ca940000-0000-4000-8000-000000000001'));
 SQL
-run_phase01_pair inventory-count receipt run_phase01_count_post 2 ignored run_phase01_receipt 4 4
+run_phase01_pair count-receipt inventory-count receipt run_phase01_count_post 2 ignored run_phase01_receipt 4 4
 # C: receipt x actual reservation consumption, in both outcomes.
-run_phase01_pair receipt work-order-close run_phase01_receipt 5 5 run_phase01_work_order_close 5 ignored
-run_phase01_pair work-order-close receipt run_phase01_work_order_close 6 ignored run_phase01_receipt 6 6
+run_phase01_pair receipt-os receipt work-order-close run_phase01_receipt 5 5 run_phase01_work_order_close 5 ignored
+run_phase01_pair os-receipt work-order-close receipt run_phase01_work_order_close 6 ignored run_phase01_receipt 6 6
 # D: reversal and a later receipt contend on the same balance but both facts are
 # safe: inbound-only history does not make the original receipt ambiguous.
-run_phase01_pair receipt-reversal receipt run_phase01_hard_reverse 007 701 run_phase01_hard_receipt 008 702
+run_phase01_pair reversal-receipt receipt-reversal receipt run_phase01_hard_reverse 007 701 run_phase01_hard_receipt 008 702
 # E: two documents list the same products in inverse item order.  Both sessions
 # must acquire advisory locks by position, not by the incoming JSON/line UUID.
-run_phase01_pair multi-receipt-one multi-receipt-two run_phase01_hard_multi_receipt 011 711 run_phase01_hard_multi_receipt 012 712
-run_phase01_pair multi-reversal-one multi-reversal-two run_phase01_hard_multi_reverse 013 721 run_phase01_hard_multi_reverse 014 722
+run_phase01_pair multi-receipt multi-receipt-one multi-receipt-two run_phase01_hard_multi_receipt 011 711 run_phase01_hard_multi_receipt 012 712
+run_phase01_pair multi-reversal multi-reversal-one multi-reversal-two run_phase01_hard_multi_reverse 013 721 run_phase01_hard_multi_reverse 014 722
 # F: a transfer that commits first is a real contending outbound event.  The
 # reversal must wait for the inventory lock, then fail closed with the D05
 # business state (55000), never through a deadlock or timeout.
 echo 'CONCURRENCY: transfer holds the product lock while receipt reversal waits (D05 block expected)'
-hard_block_label="phase01-transfer-reversal-${RANDOM}"
+phase01_new_barrier transfer-reversal
+hard_block_label="$phase01_barrier_label"
+phase01_validate_session_label "${hard_block_label}-reverse"
 run_phase01_transfer 8 8 on "$hard_block_label" & hard_transfer_pid=$!
 wait_phase01_pause "$hard_block_label"
 set +e
@@ -362,7 +438,9 @@ if [ "$hard_transfer_status" -ne 0 ] || [ "$hard_reverse_status" -eq 0 ]; then
   exit 1
 fi
 echo 'CONCURRENCY: O.S. consumption holds the product lock while receipt reversal waits (D05 block expected)'
-hard_os_label="phase01-consumption-reversal-${RANDOM}"
+phase01_new_barrier consumption-reversal
+hard_os_label="$phase01_barrier_label"
+phase01_validate_session_label "${hard_os_label}-reverse"
 run_phase01_hard_work_order_close on "$hard_os_label" & hard_close_pid=$!
 wait_phase01_pause "$hard_os_label"
 set +e
@@ -374,6 +452,204 @@ if [ "$hard_close_status" -ne 0 ] || [ "$hard_os_reverse_status" -eq 0 ]; then
   echo 'ERROR: consumption/reversal D05 handling did not produce the expected business rejection' >&2
   exit 1
 fi
+
+# Same request identifiers are serialized by their own advisory locks before a
+# position lock. The first session pauses at the real insert trigger; the
+# second is therefore genuinely concurrent, not a sequential replay. Divergent
+# replays catch only SQLSTATE 23505 inside SQL, so a timeout, deadlock or any
+# other error still fails the runner.
+run_phase01_idempotent_movement() {
+  local case_id="$1" role="$2" pause="$3" label="$4"
+  local branch='ca200000-0000-4000-8000-000000000001' item='ca500000-0000-4000-8000-000000000014' quantity=1 cost=11 reference='Idempotent movement' request='cae00000-0000-4000-8000-000000000801' conflict=false
+  case "${case_id}:${role}" in
+    same:*) ;;
+    cost:primary) request='cae00000-0000-4000-8000-000000000802'; cost=12 ;;
+    cost:secondary) request='cae00000-0000-4000-8000-000000000802'; cost=13; conflict=true ;;
+    reference:primary) request='cae00000-0000-4000-8000-000000000803'; reference='Reference one' ;;
+    reference:secondary) request='cae00000-0000-4000-8000-000000000803'; reference='Reference two'; conflict=true ;;
+    branch:primary) request='cae00000-0000-4000-8000-000000000804'; cost=14 ;;
+    branch:secondary) request='cae00000-0000-4000-8000-000000000804'; branch='ca200000-0000-4000-8000-000000000002'; cost=14; conflict=true ;;
+    product:primary) request='cae00000-0000-4000-8000-000000000805'; cost=15 ;;
+    product:secondary) request='cae00000-0000-4000-8000-000000000805'; item='ca500000-0000-4000-8000-000000000015'; cost=15; conflict=true ;;
+    quantity:primary) request='cae00000-0000-4000-8000-000000000806'; cost=16 ;;
+    quantity:secondary) request='cae00000-0000-4000-8000-000000000806'; quantity=2; cost=16; conflict=true ;;
+    *) echo "ERROR: unknown idempotent movement case ${case_id}:${role}" >&2; return 1 ;;
+  esac
+  local statement="select * from public.operational_record_inventory_movement_valued('ca100000-0000-4000-8000-000000000001','${branch}','${item}','entry',${quantity},${cost},'${request}','${reference}');"
+  if [ "$conflict" = true ]; then statement="do \$idempotency\$ begin perform * from public.operational_record_inventory_movement_valued('ca100000-0000-4000-8000-000000000001','${branch}','${item}','entry',${quantity},${cost},'${request}','${reference}'); raise exception 'divergent movement request was accepted'; exception when unique_violation then null; end \$idempotency\$;"; fi
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+${statement}
+commit;
+SQL
+}
+
+run_phase01_idempotent_derived_movement() {
+  local _case_id="$1" _role="$2" pause="$3" label="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select * from public.operational_record_inventory_movement('ca100000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000001','ca500000-0000-4000-8000-000000000014','entry',1,'cae00000-0000-4000-8000-000000000807',null);
+commit;
+SQL
+}
+
+run_phase01_idempotent_transfer() {
+  local case_id="$1" role="$2" pause="$3" label="$4"
+  local source='ca200000-0000-4000-8000-000000000001' destination='ca200000-0000-4000-8000-000000000002' item='ca500000-0000-4000-8000-000000000015' quantity=1 reference='Idempotent transfer' request='cae00000-0000-4000-8000-000000000811' conflict=false
+  case "${case_id}:${role}" in
+    same:*) ;;
+    reference:primary) request='cae00000-0000-4000-8000-000000000812'; reference='Transfer one' ;;
+    reference:secondary) request='cae00000-0000-4000-8000-000000000812'; reference='Transfer two'; conflict=true ;;
+    quantity:primary) request='cae00000-0000-4000-8000-000000000813' ;;
+    quantity:secondary) request='cae00000-0000-4000-8000-000000000813'; quantity=2; conflict=true ;;
+    product:primary) request='cae00000-0000-4000-8000-000000000814' ;;
+    product:secondary) request='cae00000-0000-4000-8000-000000000814'; item='ca500000-0000-4000-8000-000000000016'; conflict=true ;;
+    branch:primary) request='cae00000-0000-4000-8000-000000000815' ;;
+    branch:secondary) request='cae00000-0000-4000-8000-000000000815'; destination='ca200000-0000-4000-8000-000000000003'; conflict=true ;;
+    *) echo "ERROR: unknown idempotent transfer case ${case_id}:${role}" >&2; return 1 ;;
+  esac
+  local statement="select public.operational_create_inventory_transfer('ca100000-0000-4000-8000-000000000001','${source}','${destination}','${item}',${quantity},'${reference}','${request}');"
+  if [ "$conflict" = true ]; then statement="do \$idempotency\$ begin perform public.operational_create_inventory_transfer('ca100000-0000-4000-8000-000000000001','${source}','${destination}','${item}',${quantity},'${reference}','${request}'); raise exception 'divergent transfer request was accepted'; exception when unique_violation then null; end \$idempotency\$;"; fi
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+${statement}
+commit;
+SQL
+}
+
+run_phase01_idempotent_valuation() {
+  local case_id="$1" role="$2" pause="$3" label="$4"
+  local branch='ca200000-0000-4000-8000-000000000001' item='ca500000-0000-4000-8000-000000000017' cost=7 reason='Opening valuation' request='cae00000-0000-4000-8000-000000000821' conflict=false
+  case "${case_id}:${role}" in
+    same:*) ;;
+    cost:primary) request='cae00000-0000-4000-8000-000000000822'; item='ca500000-0000-4000-8000-000000000018' ;;
+    cost:secondary) request='cae00000-0000-4000-8000-000000000822'; item='ca500000-0000-4000-8000-000000000018'; cost=8; conflict=true ;;
+    reason:primary) request='cae00000-0000-4000-8000-000000000823'; item='ca500000-0000-4000-8000-000000000019' ;;
+    reason:secondary) request='cae00000-0000-4000-8000-000000000823'; item='ca500000-0000-4000-8000-000000000019'; reason='Changed reason'; conflict=true ;;
+    branch:primary) request='cae00000-0000-4000-8000-000000000824'; item='ca500000-0000-4000-8000-000000000020' ;;
+    branch:secondary) request='cae00000-0000-4000-8000-000000000824'; item='ca500000-0000-4000-8000-000000000020'; branch='ca200000-0000-4000-8000-000000000002'; conflict=true ;;
+    product:primary) request='cae00000-0000-4000-8000-000000000825'; item='ca500000-0000-4000-8000-000000000021' ;;
+    product:secondary) request='cae00000-0000-4000-8000-000000000825'; item='ca500000-0000-4000-8000-000000000017'; conflict=true ;;
+    *) echo "ERROR: unknown idempotent valuation case ${case_id}:${role}" >&2; return 1 ;;
+  esac
+  local statement="select public.operational_record_initial_inventory_valuation('ca100000-0000-4000-8000-000000000001','${branch}','${item}',${cost},'${reason}','${request}');"
+  if [ "$conflict" = true ]; then statement="do \$idempotency\$ begin perform public.operational_record_initial_inventory_valuation('ca100000-0000-4000-8000-000000000001','${branch}','${item}',${cost},'${reason}','${request}'); raise exception 'divergent valuation request was accepted'; exception when unique_violation then null; end \$idempotency\$;"; fi
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+${statement}
+commit;
+SQL
+}
+
+# The request UUID is scoped by operation.  These two pairs use the same UUID
+# in one movement and one transfer, but start them in both real contention
+# orders.  The public RPCs must each retain their own fact and valuation.
+run_phase01_namespace_movement() {
+  local case_id="$1" _role="$2" pause="$3" label="$4" request
+  case "$case_id" in
+    first) request='cae00000-0000-4000-8000-000000000831' ;;
+    second) request='cae00000-0000-4000-8000-000000000832' ;;
+    *) echo "ERROR: unknown namespace movement case ${case_id}" >&2; return 1 ;;
+  esac
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select * from public.operational_record_inventory_movement_valued('ca100000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000001','ca500000-0000-4000-8000-000000000016','entry',1,11,'${request}','Namespace concurrent movement');
+commit;
+SQL
+}
+
+run_phase01_namespace_transfer() {
+  local case_id="$1" _role="$2" pause="$3" label="$4" request
+  case "$case_id" in
+    first) request='cae00000-0000-4000-8000-000000000831' ;;
+    second) request='cae00000-0000-4000-8000-000000000832' ;;
+    *) echo "ERROR: unknown namespace transfer case ${case_id}" >&2; return 1 ;;
+  esac
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
+select set_config('phase01.test_pause','$pause',true);
+set local application_name='$label';
+select public.operational_create_inventory_transfer('ca100000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000002','ca500000-0000-4000-8000-000000000016',1,'Namespace concurrent transfer','${request}');
+commit;
+SQL
+}
+
+for idempotency_case in same cost reference branch product quantity; do
+  run_phase01_pair "mv-${idempotency_case}" "movement-${idempotency_case}" "movement-${idempotency_case}-replay" run_phase01_idempotent_movement "$idempotency_case" primary run_phase01_idempotent_movement "$idempotency_case" secondary
+done
+run_phase01_pair mv-derived "movement-derived-same" "movement-derived-same-replay" run_phase01_idempotent_derived_movement same primary run_phase01_idempotent_derived_movement same secondary
+for idempotency_case in same reference quantity product branch; do
+  run_phase01_pair "tr-${idempotency_case}" "transfer-${idempotency_case}" "transfer-${idempotency_case}-replay" run_phase01_idempotent_transfer "$idempotency_case" primary run_phase01_idempotent_transfer "$idempotency_case" secondary
+done
+for idempotency_case in same cost reason branch product; do
+  run_phase01_pair "val-${idempotency_case}" "valuation-${idempotency_case}" "valuation-${idempotency_case}-replay" run_phase01_idempotent_valuation "$idempotency_case" primary run_phase01_idempotent_valuation "$idempotency_case" secondary
+done
+run_phase01_pair ns-move-first movement transfer run_phase01_namespace_movement first primary run_phase01_namespace_transfer first secondary
+run_phase01_pair ns-transfer-first transfer movement run_phase01_namespace_transfer second primary run_phase01_namespace_movement second secondary
+
+"$docker_bin" exec "$container" psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select count(*) from public.inventory_movements where tenant_id='ca100000-0000-4000-8000-000000000001' and request_id='cae00000-0000-4000-8000-000000000807' and unit_cost_input_mode='derived';" | grep -qx '1'
+
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
+do $$
+declare movement_rows integer; movement_ids integer; transfer_rows integer; transfer_ids integer; quantity_total numeric; value_total numeric;
+begin
+  select count(*),count(distinct id) into movement_rows,movement_ids
+    from public.inventory_movements
+   where tenant_id='ca100000-0000-4000-8000-000000000001'
+     and request_id in ('cae00000-0000-4000-8000-000000000831','cae00000-0000-4000-8000-000000000832');
+  select count(*),count(distinct id) into transfer_rows,transfer_ids
+    from public.inventory_transfers
+   where tenant_id='ca100000-0000-4000-8000-000000000001'
+     and request_id in ('cae00000-0000-4000-8000-000000000831','cae00000-0000-4000-8000-000000000832');
+  if movement_rows<>2 or movement_ids<>2 or transfer_rows<>2 or transfer_ids<>2 then
+    raise exception 'Concurrent request namespaces did not retain exactly one fact per operation';
+  end if;
+  if exists(
+    select 1 from public.inventory_movements movement
+    join public.inventory_transfers transfer on transfer.id=movement.id
+   where movement.tenant_id='ca100000-0000-4000-8000-000000000001'
+  ) then
+    raise exception 'Concurrent request namespaces reused an identifier across fact tables';
+  end if;
+  select coalesce(sum(quantity),0),coalesce(sum(stock_value),0) into quantity_total,value_total
+    from public.inventory_balances
+   where tenant_id='ca100000-0000-4000-8000-000000000001'
+     and branch_id in ('ca200000-0000-4000-8000-000000000001','ca200000-0000-4000-8000-000000000002')
+     and item_id='ca500000-0000-4000-8000-000000000016';
+  if quantity_total<>22 or value_total<>222 then
+    raise exception 'Concurrent request namespaces lost inventory quantity or valuation (% / %)',quantity_total,value_total;
+  end if;
+end $$;
+SQL
+
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/purchase-receipt-inventory-valuation-concurrency-assertions.sql" >/dev/null
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'
 echo 'PASS: Packages 01, 03, 04, 05, Phase 01 purchase valuation, real cross-session concurrency and authenticated onboarding pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'

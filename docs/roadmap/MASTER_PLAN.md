@@ -18,7 +18,7 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
 
 | Ordem | Fase | Estado |
 |---:|---|---|
-| 1 | Recebimento de compras, estoque e custo médio | Plano de rollout local revisado; aguarda autorizações separadas de publicação, migration e ativação gradual |
+| 1 | Recebimento de compras, estoque e custo médio | Hardening local de idempotência e concorrência aprovado em auditoria independente; pronto somente para o sexto commit local. Publicação, migration e ativação gradual permanecem pendentes de autorização. |
 | 2 | Compra direta para O.S. | Não iniciada |
 | 3 | Orçamentos e conversão | Não iniciada |
 | 4 | O.S. completa | Não iniciada |
@@ -39,6 +39,13 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
   existir; locks advisory de posição `(empresa, filial, produto)` ordenados;
   linhas de documento; linha de saldo. D05 falha fechada: reserva ativa ou saída
   posterior bloqueia estorno sem rastreabilidade por lote.
+- Um `request_id` é a identidade integral de um comando: repetição com payload
+  normalizado idêntico retorna o fato existente; qualquer diferença relevante
+  falha com `23505`. Esse contrato vale para movimento avaliado, transferência
+  e avaliação inicial, inclusive sob concorrência real. O namespace é
+  `(empresa, tipo de operação)`: o mesmo UUID pode existir em operações distintas,
+  mas nunca mistura ou retorna fatos entre tabelas. Custo calculado pelo servidor
+  não é campo do payload e não pode fazer um replay idêntico falhar.
 - Fases posteriores não criam lançamentos financeiros/fiscais sem regra aprovada.
 - Publicação, migrations remotas, grants e disponibilidade empresarial exigem
   autorização específica, mesmo após o código local estar aprovado.

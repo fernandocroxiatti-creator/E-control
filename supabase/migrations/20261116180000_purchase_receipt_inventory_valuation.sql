@@ -49,6 +49,10 @@ alter table public.inventory_balances add constraint inventory_balances_valuatio
 
 alter table public.inventory_movements
   add column unit_cost_applied numeric(24,8),
+  -- `explicit` records a cost supplied to the valuation command; `derived`
+  -- records a command that deliberately omitted it and used the locked branch
+  -- moving average. Legacy facts remain NULL and are never replayed silently.
+  add column unit_cost_input_mode text check(unit_cost_input_mode is null or unit_cost_input_mode in ('explicit','derived')),
   add column value_delta numeric(24,8),
   add column stock_value_after numeric(24,8),
   add column average_unit_cost_after numeric(24,8),
@@ -321,20 +325,44 @@ create function app_private.apply_inventory_valuation_delta(
 )
 returns table(movement_id uuid,balance_after numeric,stock_value_after numeric,average_unit_cost_after numeric,applied_unit_cost numeric,applied_value numeric)
 language plpgsql volatile security definer set search_path='' set row_security=off as $fn$
-declare balance public.inventory_balances%rowtype; delta numeric; new_quantity numeric; new_value numeric; inbound boolean; selected_cost numeric; selected_value numeric; existing public.inventory_movements%rowtype;
+declare balance public.inventory_balances%rowtype; delta numeric; new_quantity numeric; new_value numeric; inbound boolean; selected_cost numeric; selected_value numeric; normalized_reference text; input_cost_mode text; existing public.inventory_movements%rowtype;
 begin
   if p_quantity is null or p_quantity<=0 or p_request_id is null or p_movement_type not in ('initial','entry','exit','adjustment_positive','adjustment_negative','transfer_out','transfer_in','physical_count_in','physical_count_out','service_consumption','service_reversal','purchase_receipt','purchase_receipt_reversal') then raise exception 'Invalid inventory valuation delta' using errcode='22023'; end if;
-  if p_unit_cost is not null and p_unit_cost<0 then raise exception 'Invalid inventory unit cost' using errcode='22023'; end if;
+  -- The ledger persists quantity at four and cost at eight decimal places.  A
+  -- request with more precision is rejected, never silently rounded into a
+  -- value that could look equal during an idempotent replay comparison.
+  if p_quantity<>pg_catalog.round(p_quantity,4) then raise exception 'Inventory quantity precision exceeds four decimal places' using errcode='22023'; end if;
+  if p_unit_cost is not null and (p_unit_cost<0 or p_unit_cost<>pg_catalog.round(p_unit_cost,8)) then raise exception 'Invalid inventory unit cost precision' using errcode='22023'; end if;
+  inbound:=p_movement_type in ('initial','entry','adjustment_positive','transfer_in','physical_count_in','service_reversal','purchase_receipt');
+  normalized_reference:=nullif(pg_catalog.btrim(p_reference),'');
+  -- Persist the caller contract, not merely the calculated cost. A non-null
+  -- parameter is an explicit cost input; a NULL parameter requests derivation
+  -- from the locked branch valuation. They must never be interchangeable on a
+  -- replay, even if their numeric result happens to be equal.
+  input_cost_mode:=case when p_unit_cost is null then 'derived' else 'explicit' end;
+  -- One request key serializes across every branch/product combination before
+  -- any position lock. This makes a conflicting concurrent replay reach the
+  -- explicit payload comparison rather than racing a unique index insertion.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('inventory-request:'||p_tenant_id::text||':'||p_request_id::text,0));
   perform app_private.lock_inventory_position(p_tenant_id,p_branch_id,p_item_id);
   select * into existing from public.inventory_movements where tenant_id=p_tenant_id and request_id=p_request_id;
   if found then
-    if existing.branch_id<>p_branch_id or existing.item_id<>p_item_id or existing.movement_type<>p_movement_type or existing.quantity<>p_quantity then raise exception 'Inventory request identifier belongs to a different payload' using errcode='23505'; end if;
+    if existing.branch_id is distinct from p_branch_id
+       or existing.item_id is distinct from p_item_id
+       or existing.movement_type is distinct from p_movement_type
+       or existing.quantity is distinct from p_quantity
+       or existing.reference_note is distinct from normalized_reference
+       or existing.source_document_id is distinct from p_source_document_id
+       or existing.created_by_user_id is distinct from p_actor_id
+       or existing.unit_cost_input_mode is distinct from input_cost_mode
+       or (input_cost_mode='explicit' and existing.unit_cost_applied is distinct from p_unit_cost) then
+      raise exception 'Inventory request identifier belongs to a different payload' using errcode='23505';
+    end if;
     return query select existing.id,existing.balance_after,existing.stock_value_after,existing.average_unit_cost_after,existing.unit_cost_applied,existing.value_delta; return;
   end if;
   if not exists(select 1 from public.catalog_items where tenant_id=p_tenant_id and id=p_item_id and item_type='product' and status='active') or not exists(select 1 from public.branches where tenant_id=p_tenant_id and id=p_branch_id and status='active') then raise exception 'Active branch and product in this company are required' using errcode='23503'; end if;
   insert into public.inventory_balances(tenant_id,branch_id,item_id,quantity) values(p_tenant_id,p_branch_id,p_item_id,0) on conflict do nothing;
   select * into balance from public.inventory_balances where tenant_id=p_tenant_id and branch_id=p_branch_id and item_id=p_item_id for update;
-  inbound:=p_movement_type in ('initial','entry','adjustment_positive','transfer_in','physical_count_in','service_reversal','purchase_receipt');
   delta:=case when inbound then p_quantity else -p_quantity end;
   new_quantity:=balance.quantity+delta;
   if new_quantity<0 then raise exception 'Negative inventory is not allowed' using errcode='23514'; end if;
@@ -357,8 +385,8 @@ begin
     update public.inventory_balances set quantity=new_quantity,valuation_status='valued',stock_value=new_value,average_unit_cost=pg_catalog.round(new_value/new_quantity,8),valuation_updated_at=pg_catalog.clock_timestamp(),updated_at=pg_catalog.clock_timestamp() where tenant_id=p_tenant_id and branch_id=p_branch_id and item_id=p_item_id;
   end if;
   select * into balance from public.inventory_balances where tenant_id=p_tenant_id and branch_id=p_branch_id and item_id=p_item_id;
-  insert into public.inventory_movements(tenant_id,branch_id,item_id,movement_type,quantity,balance_after,reference_note,request_id,created_by_user_id,unit_cost_applied,value_delta,stock_value_after,average_unit_cost_after,source_document_id)
-  values(p_tenant_id,p_branch_id,p_item_id,p_movement_type,p_quantity,balance.quantity,nullif(pg_catalog.btrim(p_reference),''),p_request_id,p_actor_id,selected_cost,case when inbound then selected_value else -selected_value end,balance.stock_value,balance.average_unit_cost,p_source_document_id)
+  insert into public.inventory_movements(tenant_id,branch_id,item_id,movement_type,quantity,balance_after,reference_note,request_id,created_by_user_id,unit_cost_applied,unit_cost_input_mode,value_delta,stock_value_after,average_unit_cost_after,source_document_id)
+  values(p_tenant_id,p_branch_id,p_item_id,p_movement_type,p_quantity,balance.quantity,normalized_reference,p_request_id,p_actor_id,selected_cost,input_cost_mode,case when inbound then selected_value else -selected_value end,balance.stock_value,balance.average_unit_cost,p_source_document_id)
   returning id into movement_id;
   balance_after:=balance.quantity; stock_value_after:=balance.stock_value; average_unit_cost_after:=balance.average_unit_cost; applied_unit_cost:=selected_cost; applied_value:=selected_value; return next;
 end;
@@ -441,17 +469,31 @@ $fn$;
 
 create or replace function public.operational_create_inventory_transfer(p_tenant_id uuid,p_source_branch_id uuid,p_destination_branch_id uuid,p_item_id uuid,p_quantity numeric,p_reference_note text,p_request_id uuid)
 returns uuid language plpgsql volatile security definer set search_path='' set row_security=off as $fn$
-declare actor uuid; transfer_id uuid; origin_result record; destination_result record;
+declare actor uuid; transfer_id uuid; normalized_reference text; existing public.inventory_transfers%rowtype; origin_result record; destination_result record;
 begin
   actor:=app_private.assert_operational_permission(p_tenant_id,'transaction.inventory.transfer',p_source_branch_id);
   if not app_private.can_access_branch(p_tenant_id,p_destination_branch_id) or not exists(select 1 from public.branches where tenant_id=p_tenant_id and id in (p_source_branch_id,p_destination_branch_id) and status='active' group by tenant_id having count(*)=2) or p_source_branch_id=p_destination_branch_id or p_item_id is null or p_quantity is null or p_quantity<=0 or p_request_id is null then raise exception 'Invalid or unauthorized inventory transfer' using errcode='42501'; end if;
+  if p_quantity<>pg_catalog.round(p_quantity,4) then raise exception 'Transfer quantity precision exceeds four decimal places' using errcode='22023'; end if;
+  normalized_reference:=nullif(pg_catalog.btrim(p_reference_note),'');
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('inventory-transfer:'||p_tenant_id::text||':'||p_request_id::text,0));
-  select id into transfer_id from public.inventory_transfers where tenant_id=p_tenant_id and request_id=p_request_id;
-  if found then return transfer_id; end if;
+  select * into existing from public.inventory_transfers where tenant_id=p_tenant_id and request_id=p_request_id;
+  if found then
+    if existing.source_branch_id is distinct from p_source_branch_id
+       or existing.destination_branch_id is distinct from p_destination_branch_id
+       or existing.item_id is distinct from p_item_id
+       or existing.quantity is distinct from p_quantity
+       or existing.reference_note is distinct from normalized_reference
+       or existing.created_by_user_id is distinct from actor
+       or existing.unit_cost is null
+       or existing.total_value is null then
+      raise exception 'Inventory transfer request identifier belongs to a different payload' using errcode='23505';
+    end if;
+    return existing.id;
+  end if;
   if not exists(select 1 from public.catalog_items where tenant_id=p_tenant_id and id=p_item_id and item_type='product' and status='active') then raise exception 'Active product in this company required' using errcode='23503'; end if;
   perform app_private.lock_inventory_position(p_tenant_id,least(p_source_branch_id,p_destination_branch_id),p_item_id);
   perform app_private.lock_inventory_position(p_tenant_id,greatest(p_source_branch_id,p_destination_branch_id),p_item_id);
-  insert into public.inventory_transfers(tenant_id,source_branch_id,destination_branch_id,item_id,quantity,request_id,reference_note,created_by_user_id) values(p_tenant_id,p_source_branch_id,p_destination_branch_id,p_item_id,p_quantity,p_request_id,nullif(pg_catalog.btrim(p_reference_note),''),actor) returning id into transfer_id;
+  insert into public.inventory_transfers(tenant_id,source_branch_id,destination_branch_id,item_id,quantity,request_id,reference_note,created_by_user_id) values(p_tenant_id,p_source_branch_id,p_destination_branch_id,p_item_id,p_quantity,p_request_id,normalized_reference,actor) returning id into transfer_id;
   select * into origin_result from app_private.apply_inventory_valuation_delta(p_tenant_id,p_source_branch_id,p_item_id,'transfer_out',p_quantity,pg_catalog.gen_random_uuid(),actor,'Transfer '||transfer_id::text,null,transfer_id);
   select * into destination_result from app_private.apply_inventory_valuation_delta(p_tenant_id,p_destination_branch_id,p_item_id,'transfer_in',p_quantity,pg_catalog.gen_random_uuid(),actor,'Transfer '||transfer_id::text,origin_result.applied_unit_cost,transfer_id);
   update public.inventory_transfers set unit_cost=origin_result.applied_unit_cost,total_value=origin_result.applied_value where id=transfer_id;
@@ -702,20 +744,35 @@ $fn$;
 
 create function public.operational_record_initial_inventory_valuation(p_tenant_id uuid,p_branch_id uuid,p_item_id uuid,p_unit_cost numeric,p_reason text,p_request_id uuid)
 returns uuid language plpgsql volatile security definer set search_path='' set row_security=off as $fn$
-declare actor uuid; balance public.inventory_balances%rowtype; event_id uuid; total_value numeric;
+declare actor uuid; balance public.inventory_balances%rowtype; existing public.inventory_valuation_events%rowtype; event_id uuid; total_value numeric; normalized_reason text;
 begin
   actor:=app_private.assert_operational_permission(p_tenant_id,'transaction.inventory.valuation.initial',p_branch_id);
   if p_item_id is null or p_request_id is null or p_unit_cost is null or p_unit_cost<0 or pg_catalog.length(pg_catalog.btrim(coalesce(p_reason,''))) not between 1 and 1000 then raise exception 'Invalid initial inventory valuation request' using errcode='22023'; end if;
+  if p_unit_cost<>pg_catalog.round(p_unit_cost,8) then raise exception 'Initial valuation cost precision exceeds eight decimal places' using errcode='22023'; end if;
+  normalized_reason:=pg_catalog.btrim(p_reason);
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('inventory-valuation-request:'||p_tenant_id::text||':'||p_request_id::text,0));
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('inventory-valuation:'||p_tenant_id::text||':'||p_branch_id::text||':'||p_item_id::text,0));
-  select id into event_id from public.inventory_valuation_events where tenant_id=p_tenant_id and request_id=p_request_id;
-  if found then return event_id; end if;
+  select * into existing from public.inventory_valuation_events where tenant_id=p_tenant_id and request_id=p_request_id;
+  if found then
+    -- quantity_at_valuation is a server-side snapshot, not caller input.  The
+    -- immutable event retains it while all caller-controlled fields must match.
+    if existing.event_type<>'initial_valuation'
+       or existing.branch_id is distinct from p_branch_id
+       or existing.item_id is distinct from p_item_id
+       or existing.unit_cost is distinct from p_unit_cost
+       or existing.reason is distinct from normalized_reason
+       or existing.created_by_user_id is distinct from actor then
+      raise exception 'Initial valuation request identifier belongs to a different payload' using errcode='23505';
+    end if;
+    return existing.id;
+  end if;
   perform app_private.lock_inventory_position(p_tenant_id,p_branch_id,p_item_id);
   insert into public.inventory_balances(tenant_id,branch_id,item_id,quantity) values(p_tenant_id,p_branch_id,p_item_id,0) on conflict do nothing;
   select * into balance from public.inventory_balances where tenant_id=p_tenant_id and branch_id=p_branch_id and item_id=p_item_id for update;
   if balance.valuation_status<>'pending' or balance.quantity<=0 then raise exception 'Only pending nonzero legacy stock may receive an initial valuation' using errcode='55000'; end if;
   total_value:=pg_catalog.round(balance.quantity*p_unit_cost,8);
   update public.inventory_balances set valuation_status='valued',stock_value=total_value,average_unit_cost=pg_catalog.round(p_unit_cost,8),valuation_updated_at=pg_catalog.clock_timestamp(),updated_at=pg_catalog.clock_timestamp() where tenant_id=p_tenant_id and branch_id=p_branch_id and item_id=p_item_id;
-  insert into public.inventory_valuation_events(tenant_id,branch_id,item_id,event_type,quantity_at_valuation,unit_cost,stock_value,reason,request_id,created_by_user_id) values(p_tenant_id,p_branch_id,p_item_id,'initial_valuation',balance.quantity,pg_catalog.round(p_unit_cost,8),total_value,pg_catalog.btrim(p_reason),p_request_id,actor) returning id into event_id;
+  insert into public.inventory_valuation_events(tenant_id,branch_id,item_id,event_type,quantity_at_valuation,unit_cost,stock_value,reason,request_id,created_by_user_id) values(p_tenant_id,p_branch_id,p_item_id,'initial_valuation',balance.quantity,p_unit_cost,total_value,normalized_reason,p_request_id,actor) returning id into event_id;
   perform app_private.write_operational_audit('inventory.initial_valuation.recorded',p_tenant_id,p_branch_id,event_id,actor,pg_catalog.jsonb_build_object('item_id',p_item_id,'quantity',balance.quantity,'unit_cost',p_unit_cost,'stock_value',total_value));
   return event_id;
 end;

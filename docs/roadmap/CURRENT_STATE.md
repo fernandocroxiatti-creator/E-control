@@ -6,9 +6,9 @@ Atualizado em 2026-11-17.
 - Worktree de integração: `/private/tmp/econtroll-phase-01-integration`.
 - Branch de integração: `codex/phase-01-integration`, criada de `origin/main`
   após fetch em `68b8e9005e94e2e5907c824d50bc17f5a580dbcb`.
-- Commits locais de integração: `b176a7e` (lógica e migration), `a397e6c`
-  (interface) e `def071c` (testes). A documentação desta atualização será
-  versionada separadamente.
+- Commits locais de integração preservados: `b176a7e` (lógica e migration),
+  `a397e6c` (interface), `def071c` (testes), `a9e3ec5` (histórico) e
+  `0073dd0` (rollout). O hardening de idempotência atual ainda não possui commit.
 - Production possui migrations confirmadas até `20261110120000`; esta tarefa não
   aplicará migration, dados, flags ou permissões remotas.
 
@@ -32,7 +32,7 @@ contas a pagar, financeiro, caixa, venda, faturamento ou dados de Production.
 - Migration local `20261116180000_purchase_receipt_inventory_valuation.sql` adiciona
   recebimentos parciais, estornos, custo médio móvel por filial e avaliação inicial
   auditada de saldo legado. SHA-256 local atual:
-  `f8838d357e68556db1c0fa36ec333b5f0ccde7de449c1b968ca0ea3fb67318d2`.
+  `f7a8e4648e82cbffadcbb6d23d192912d02ba93aa4ef449dffe62502ccdbcda3`.
 - `ZGR01` e `ZIV01` permanecem em aprovação pendente; a migration não cria grants
   de papel nem disponibilidade empresarial.
 - A interface usa RPCs novas apenas quando a transação é autorizada; a ausência da
@@ -40,9 +40,11 @@ contas a pagar, financeiro, caixa, venda, faturamento ou dados de Production.
 - Compras agora prevê envio explícito do pedido, recebimento parcial/total e
   solicitação de estorno com confirmação. Estoque prevê consulta de valuation e
   avaliação inicial; ambos continuam protegidos até aprovação de ZGR01/ZIV01.
-- PostgreSQL 17.11 isolado passou em container descartável e sem rede, inclusive
-  duas execuções independentes das concorrências cruzadas. A migration e a suíte
-  continuam somente locais; nenhum comando remoto foi emitido e Production
+- PostgreSQL 17.11 isolado passou nos cenários já cobertos, em container
+  descartável e sem rede, inclusive concorrências cruzadas. Porém a auditoria
+  independente encontrou um replay idêntico de entrada com custo derivado que
+  falha indevidamente com `23505`; a Fase 1 permanece bloqueada localmente até
+  a correção e nova regressão. Nenhum comando remoto foi emitido e Production
   permanece inalterada.
 
 ## Concorrência validada
@@ -76,22 +78,74 @@ Fase 1 permanece local, foi **integrada e versionada em branch dedicada** e
 possui plano de rollout local revisado. Não está publicada ou aplicada em
 Production.
 
-## Evidência da auditoria independente definitiva
+## Hardening final de idempotência — corrigido localmente, aguarda auditoria
+
+- O retorno idempotente agora exige payload normalizado igual. Movimento avaliado
+  compara filial, produto, tipo, quantidade, custo de entrada, referência,
+  documento de origem e responsável. Transferência compara origem, destino,
+  produto, quantidade, referência e responsável. ZIV01 compara filial, produto,
+  custo, justificativa, tipo e responsável; a quantidade é snapshot imutável do
+  servidor e não entrada do cliente.
+- Referência é `btrim` com vazio convertido para `NULL`; justificativa é somente
+  `btrim`. Quantidade com mais de quatro ou custo com mais de oito casas decimais
+  é rejeitado, para que precisão descartada nunca pareça um replay igual.
+- Locks advisory por `(empresa, request_id)` precedem locks de posição. Assim,
+  payload divergente concorrente chega à comparação explícita e falha em `23505`,
+  em vez de competir silenciosamente pela restrição única.
+- A cobertura de replay inclui custo, referência, filial, produto, quantidade
+  e justificativa divergentes. A barreira foi corrigida para rótulos de no
+  máximo 63 bytes e duas execuções completas terminaram com exit code `0`, sem
+  timeout, deadlock ou duplicidade aceitos.
+- A rota pública sem custo informado persiste `unit_cost_input_mode='derived'`;
+  a rota valorada persiste `explicit`. A comparação exige o mesmo modo, compara
+  custo apenas quando ele foi informado e não reaplica valuation no replay.
+- Referência `NULL`, vazia e somente espaços equivalem a `NULL`; referência com
+  conteúdo usa `btrim` e divergência semântica falha com `23505`. `request_id`
+  é namespace por operação e empresa, testado sem mistura de fatos.
+
+## Evidência da auditoria independente anterior
 
 - SHA-256 recalculado diretamente: `f8838d357e68556db1c0fa36ec333b5f0ccde7de449c1b968ca0ea3fb67318d2`.
-- Duas execuções novas da suíte PostgreSQL 17.11 descartável passaram, cada uma
-  com 11 disputas cross-session reais. Locks, timeout e as invariantes de
-  quantidade, valor, custo e auditoria foram verificados pelo runner.
+- Registros anteriores reportaram duas execuções da suíte PostgreSQL 17.11
+  descartável. A auditoria atual não as reutiliza como evidência conclusiva:
+  a execução independente interrompeu-se na barreira de replay derivado por
+  truncamento de `application_name`, antes de concluir todos os cenários.
 - `node --test tests/*.test.mjs` (148/148), lint, TypeScript, build,
   `git diff --check` e varredura de segredos passaram. Os avisos ESM do Node são
   pré-existentes, sem falha de teste.
-- A revisão não encontrou acesso direto às tabelas novas, `EXECUTE` para anon ou
+- A revisão anterior não encontrou acesso direto às tabelas novas, `EXECUTE` para anon ou
   service_role, concessão automática de ZGR01/ZIV01, nem efeito financeiro.
 - Riscos residuais não bloqueantes da integração local: transferência em lote
   continua fora do contrato; a tipagem de leitura de histórico ainda não nomeia
   os tipos novos de recebimento/estorno para apresentação especializada. Ambos
   devem ser tratados antes de prometer essas capacidades adicionais, mas não
   alteram a autorização, o ledger ou a consistência já testados.
+
+## Auditoria final de custo derivado — barreira corrigida localmente
+
+- O truncamento de `application_name` foi eliminado com identificadores curtos,
+  únicos e validados em bytes. A ausência de sessão é verificada sem falso PASS
+  e toda sessão de contenção observada usa o mesmo identificador configurado no
+  cliente `psql`.
+- Duas execuções normais da suíte PostgreSQL 17.11 descartável passaram com
+  exit code `0`. Cada uma exerceu 30 disputas reais, inclusive replays
+  derivados e as duas ordens de movimento × transferência com o mesmo
+  `request_id` em namespaces distintos. Nenhuma mudança foi feita em
+  Production; a aprovação ainda depende de nova auditoria independente.
+
+## Auditoria final pré-commit aprovada (2026-11-17)
+
+- Auditoria independente repetiu a suíte PostgreSQL 17.11 descartável com exit
+  code `0`: 30 cenários concorrentes reais, inclusive replay explícito e
+  derivado, conflitos `23505`, D05, inventário, O.S. e namespaces distintos de
+  `request_id`.
+- `node --test tests/*.test.mjs` passou 148/148; lint, TypeScript, build,
+  `bash -n`, `git diff --check` e a varredura de segredos também passaram.
+- A revisão não encontrou concessão automática, efeito financeiro, ACL ampla,
+  acesso por `anon`/`service_role`, quebra de RLS/FORCE RLS nem alteração
+  remota. A Fase 2 não foi iniciada.
+- Estado: **GO somente para o sexto commit local**. Push, deploy, migration e
+  qualquer ativação em Production continuam fora do escopo.
 
 ## Plano de ativação de estoque legado (não executado)
 
