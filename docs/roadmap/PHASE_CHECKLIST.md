@@ -51,6 +51,20 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
 - [ ] Aprovação, disponibilidade e grant ZIV01 apenas para piloto.
 - [ ] Aprovação, disponibilidade e grant ZGR01 apenas após valuations aceitas.
 - [ ] Aceite do piloto, expansão gradual e relatório de auditoria.
+- [x] Correção local de governança: grant aditivo por empresa/filial e
+  justificativa auditável; Node 151/151, TypeScript, lint, build e PostgreSQL
+  isolado PASS em 2026-11-19. A suíte final confirmou revogação auditada e
+  32 barreiras de concorrência reais, com exit code `0`.
+- [ ] Revisão/autorização de publicação da migration
+  `20261118190000_company_scoped_permission_governance.sql`; esta correção não
+  autoriza aprovação nem concessão remota.
+- [x] Compatibilidade verificada: somente Server Actions Master consomem as
+  assinaturas substituídas; teste isolado prova que as assinaturas sem
+  justificativa não permanecem executáveis após a migration. O rollout exige
+  janela administrativa coordenada, sem fallback inseguro.
+- [x] Revisão final local: grants de piloto fechados a `company_owner` + ZGR01,
+  PostgreSQL isolado com 32 barreiras (exit `0`), Node 151/151, lint,
+  TypeScript, build, `bash -n`, diff e segredos: PASS.
 
 ## Fases 2–9
 
@@ -62,4 +76,5 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
 | Migration | Estado |
 |---|---|
 | Até `20261110120000` | Aplicada/confirmada anteriormente; não reaplicar |
-| `20261116180000_purchase_receipt_inventory_valuation.sql` | Hardening de idempotência local auditado e pronto para sexto commit; SHA-256 `f7a8e4648e82cbffadcbb6d23d192912d02ba93aa4ef449dffe62502ccdbcda3`; não aplicada em Production |
+| `20261116180000_purchase_receipt_inventory_valuation.sql` | Aplicada em Production no rollout anterior informado; SHA-256 `f7a8e4648e82cbffadcbb6d23d192912d02ba93aa4ef449dffe62502ccdbcda3`. Nesta execução não houve nova consulta ou mutação remota. |
+| `20261118190000_company_scoped_permission_governance.sql` | Local, pendente de revisão/publicação/aplicação; SHA-256 `fef0ad3bd9001bba1c3731718ad91ed04cd650adce132106e254ff2e9cb93ef6`; sem grants, disponibilidade ou aprovações automáticas |

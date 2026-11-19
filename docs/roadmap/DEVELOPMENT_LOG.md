@@ -249,3 +249,45 @@ permanecem **NÃO VERIFICADOS** aqui.
 
 Após cada implementação, anexar data, arquivos, migration, RPCs, testes reais,
 commit quando existir, ambiente e autorizações usadas.
+
+### Governança empresarial limitada da Fase 1 (2026-11-19)
+
+- Causa confirmada: `role_permission_grants` é global por papel. Um grant de
+  recebimento para `company_owner` liberaria todas as empresas com o mesmo
+  papel, mesmo quando a disponibilidade da transação fosse empresarial.
+- Correção local: `20261118190000_company_scoped_permission_governance.sql`
+  cria um grant aditivo por `(tenant_id, branch_id, role_key, permission_key)`.
+  Ele só é considerado com filial explícita, vínculo ativo, papel/permissão
+  aprovados e acesso autorizado à filial. Nesta entrega, a RPC aceita somente
+  `company_owner` com `transaction.purchasing.receipt.manage` (ZGR01), evitando
+  que a infraestrutura do piloto habilite outras transações.
+- As decisões Master de catálogo, grant e disponibilidade passam a exigir
+  justificativa de 10–1000 caracteres, persistida na auditoria. Não há grant,
+  disponibilidade ou aprovação automática.
+- Verificações locais: Node 151/151, TypeScript, lint, build, `bash -n`,
+  `git diff --check` e PostgreSQL 17.11 isolado com concorrência real: PASS.
+  Sem commit, push, deploy, migration ou alteração remota.
+- Reexecução final: a fixture confirmou também a revogação persistida e sua
+  justificativa na auditoria. A suíte PostgreSQL descartável terminou com
+  exit code `0` e observou 32 barreiras reais de concorrência; os bloqueios de
+  inventário obsoleto e D05 foram os resultados de negócio esperados.
+- SHA-256 local: `fef0ad3bd9001bba1c3731718ad91ed04cd650adce132106e254ff2e9cb93ef6`.
+
+### Revisão final e preparação de release da governança (2026-11-19)
+
+- Auditoria local confirmou que a nova RPC é limitada no banco a
+  `company_owner` + `transaction.purchasing.receipt.manage` (ZGR01). Papel,
+  permissão, empresa, filial, vínculo, aprovação e disponibilidade continuam
+  sendo verificados separadamente; ZIV01 e qualquer permissão fora do escopo
+  falham fechadas.
+- A compatibilidade foi examinada por busca de consumidores: somente as Server
+  Actions Master usam as três assinaturas administrativas substituídas. A suite
+  aplica e exercita o contrato antigo antes da migration e prova que, depois,
+  as assinaturas antigas deixam de existir, sem caminho de escrita sem razão.
+- A estratégia aprovada localmente é code-first/fail-closed: publicar a
+  interface já validada, mantê-la indisponível para mutações até a migration e
+  então aplicar a migration em janela administrativa. Não existe fallback
+  compatível que aceite mutação sem justificativa.
+- Regressão final: PostgreSQL 17.11 descartável (32 barreiras reais; exit `0`),
+  Node 151/151, lint, TypeScript, build, `bash -n`, `git diff --check` e
+  varredura de segredos: PASS. Nenhuma operação remota foi executada.

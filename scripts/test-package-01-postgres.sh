@@ -162,6 +162,8 @@ end $$;
 SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261116180000_purchase_receipt_inventory_valuation.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/purchase-receipt-inventory-valuation-behavior.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261118190000_company_scoped_permission_governance.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/company-scoped-permission-governance-behavior.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/purchase-receipt-inventory-valuation-concurrency-setup.sql" >/dev/null
 
 # These are distinct PostgreSQL client sessions.  The test-only trigger pauses

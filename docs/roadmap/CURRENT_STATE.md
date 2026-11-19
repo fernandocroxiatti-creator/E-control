@@ -226,3 +226,36 @@ Production.
 - A integração local ocorreu no worktree dedicado acima; a `main` local e o
   worktree principal sujo permanecem inalterados. A próxima etapa exige revisão
   pré-publicação, não push automático.
+
+## Atualização local — governança de ZGR01 (2026-11-19)
+
+- Contexto informado e preservado: empresa/filial piloto ativas; ZGR01 e ZIV01
+  pendentes, sem disponibilidade nem grant de recebimento. Esta execução não
+  consultou nem modificou dados empresariais remotos.
+- A nova migration é local e não aprova ZGR01, não aprova ZIV01, não cria
+  disponibilidade nem cria grants. Ela somente cria o mecanismo auditável de
+  grant por empresa e filial.
+- Próximo marco: revisão independente e autorização explícita para versionar e
+  publicar o código e a migration; aplicação remota exige autorização distinta.
+
+## Compatibilidade de rollout da governança (2026-11-19)
+
+- Os únicos consumidores de produção das três RPCs administrativas são as
+  Server Actions em `app/actions/master-access-governance.ts`. A fixture antiga
+  usa assinaturas de três argumentos apenas antes da migration no PostgreSQL
+  descartável; nenhuma rota operacional, recepção, estoque ou O.S. depende delas.
+- Não há expand/contract seguro para manter as assinaturas antigas mutáveis:
+  elas não recebem justificativa e preservá-las permitiria mudança administrativa
+  sem auditoria obrigatória. As assinaturas antigas são removidas; a suite prova
+  que ficam indisponíveis após a migration.
+- O rollout requer janela administrativa coordenada: deploy da interface e
+  migration devem ocorrer sem operar a tela Master de governança entre as duas
+  etapas. Operações empresariais e ZGR01/ZIV01 permanecem bloqueadas durante a
+  janela. Não há fallback com `service_role`, justificativa implícita ou grant
+  global.
+- Ordem recomendada: publicar código validado primeiro e confirmar READY;
+  enquanto a migration estiver ausente, as mutações Master falham fechadas.
+  Só então aplicar a migration autorizada, executar verificações de segurança e
+  liberar a tela administrativa. Se o deploy falhar, a migration não é aplicada;
+  se a migration já tiver sido confirmada, a contenção é corrigir/publicar uma
+  versão compatível — não restaurar funções antigas sem justificativa.

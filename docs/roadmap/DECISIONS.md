@@ -161,3 +161,15 @@ posição de valuation e é auditável; nunca será eliminado silenciosamente.
 
 Aplicar migrations em Production; habilitar ZGR01; conceder grants; avaliar saldos
 reais legados; gerar AP/financeiro; publicar, fazer push ou deploy.
+
+## D09 — Grant operacional empresarial e justificativa obrigatória (2026-11-19)
+
+- Aprovar ZGR01 e sua permissão continua sendo decisão global de catálogo; não
+  concede uso a uma empresa. A disponibilidade continua empresarial.
+- O grant operacional adicional da Fase 1 é limitado à tupla `(empresa, filial,
+  company_owner, transaction.purchasing.receipt.manage)` e só é avaliado em
+  chamadas com filial explícita. Ele não pode substituir vínculo ativo, acesso
+  de filial, papel/permissão aprovados ou disponibilidade empresarial.
+- A alteração proposta exige justificativa textual de 10–1000 caracteres para
+  aprovação, grant e disponibilidade, persistida na auditoria. É decisão de
+  implementação local; não autoriza aplicação remota nem liberação do piloto.

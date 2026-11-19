@@ -10,10 +10,19 @@ import type { MasterAccessActionState } from "@/lib/master/action-state";
 const itemTypes = new Set(["role", "permission", "transaction"]);
 const states = new Set(["pending_approval", "approved", "retired"]);
 const operations = new Set(["grant", "revoke"]);
+const minimumReasonLength = 10;
 
 function text(formData: FormData, field: string, max = 120) {
   const value = formData.get(field);
   return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function reason(formData: FormData) {
+  return text(formData, "reason", 1000);
+}
+
+function hasRequiredReason(value: string) {
+  return value.length >= minimumReasonLength;
 }
 
 async function governanceClient() {
@@ -85,8 +94,9 @@ export async function setAccessCatalogApprovalAction(
   const itemType = text(formData, "item_type", 16);
   const itemKey = text(formData, "item_key", 120);
   const approvalState = text(formData, "approval_state", 24);
-  if (!itemTypes.has(itemType) || !itemKey || !states.has(approvalState)) {
-    return { status: "error", message: "Solicitação de aprovação inválida." };
+  const justification = reason(formData);
+  if (!itemTypes.has(itemType) || !itemKey || !states.has(approvalState) || !hasRequiredReason(justification)) {
+    return { status: "error", message: "Informe uma justificativa com pelo menos 10 caracteres." };
   }
   try {
     const client = await governanceClient();
@@ -95,6 +105,7 @@ export async function setAccessCatalogApprovalAction(
       p_item_type: itemType,
       p_item_key: itemKey,
       p_approval_state: approvalState,
+      p_reason: justification,
     });
     if (error || data !== approvalState) {
       console.error("[master-governance] catalog_approval_rpc_not_confirmed");
@@ -119,8 +130,9 @@ export async function setRolePermissionGrantAction(
   const roleKey = text(formData, "role_key", 80);
   const permissionKey = text(formData, "permission_key", 120);
   const operation = text(formData, "operation", 16);
-  if (!roleKey || !permissionKey || !operations.has(operation)) {
-    return { status: "error", message: "Solicitação de concessão inválida." };
+  const justification = reason(formData);
+  if (!roleKey || !permissionKey || !operations.has(operation) || !hasRequiredReason(justification)) {
+    return { status: "error", message: "Informe uma justificativa com pelo menos 10 caracteres." };
   }
   try {
     const client = await governanceClient();
@@ -129,6 +141,7 @@ export async function setRolePermissionGrantAction(
       p_role_key: roleKey,
       p_permission_key: permissionKey,
       p_operation: operation,
+      p_reason: justification,
     });
     if (error || ![operation, "unchanged"].includes(String(data))) {
       console.error("[master-governance] role_permission_rpc_not_confirmed");
@@ -151,8 +164,9 @@ export async function grantRolePermissionsBatchAction(
   if (formData.get("confirmed") !== "on") return { status: "error", message: "Confirmação explícita obrigatória." };
   const roleKey = text(formData, "role_key", 80);
   const permissionKeys = requestedPermissionKeys(formData);
-  if (!roleKey || !permissionKeys.length || permissionKeys.length > 32) {
-    return { status: "error", message: "Seleção de concessões inválida." };
+  const justification = reason(formData);
+  if (!roleKey || !permissionKeys.length || permissionKeys.length > 32 || !hasRequiredReason(justification)) {
+    return { status: "error", message: "Selecione permissões e informe uma justificativa com pelo menos 10 caracteres." };
   }
   try {
     const client = await governanceClient();
@@ -163,6 +177,7 @@ export async function grantRolePermissionsBatchAction(
         p_role_key: roleKey,
         p_permission_key: permissionKey,
         p_operation: "grant",
+        p_reason: justification,
       });
       if (error || !["grant", "unchanged"].includes(String(data))) {
         const canonical = await client.rpc("master_list_access_control_matrix");
@@ -190,9 +205,11 @@ export async function setCompanyTransactionAvailabilityAction(_state: MasterAcce
   if (formData.get("confirmed") !== "on") return { status: "error", message: "Confirmação explícita obrigatória." };
   const tenantId = text(formData, "tenant_id", 64);
   const codes = [...new Set(formData.getAll("transaction_code").filter((value): value is string => typeof value === "string" && /^[A-Z][A-Z0-9]{1,19}$/.test(value)))].sort();
+  const justification = reason(formData);
   if (!/^[0-9a-f-]{36}$/i.test(tenantId)) return { status: "error", message: "Empresa inválida." };
+  if (!hasRequiredReason(justification)) return { status: "error", message: "Informe uma justificativa com pelo menos 10 caracteres." };
   try { const client = await governanceClient(); if (!client) return { status: "error", message: "A configuração de acessos por empresa ainda não está ativada." };
-    const { data, error } = await client.rpc("master_set_company_transaction_availability", { p_tenant_id: tenantId, p_enabled_transaction_codes: codes });
+    const { data, error } = await client.rpc("master_set_company_transaction_availability", { p_tenant_id: tenantId, p_enabled_transaction_codes: codes, p_reason: justification });
     if (error || data !== "updated") {
       console.error(`[master-governance] company_access_rpc_not_confirmed:${error?.code ?? "unexpected_result"}`);
       return { status: "error", message: companyAccessErrorMessage(error?.code) };
@@ -213,5 +230,67 @@ export async function setCompanyTransactionAvailabilityAction(_state: MasterAcce
   } catch {
     console.error("[master-governance] company_access_action_failed");
     return { status: "error", message: "Não foi possível concluir a atualização. Nenhum sucesso foi confirmado; atualize a página e consulte a auditoria antes de tentar novamente." };
+  }
+}
+
+type ScopedGrantRow = {
+  branch_id?: unknown;
+  role_key?: unknown;
+  permission_key?: unknown;
+};
+
+function hasScopedGrant(value: unknown, branchId: string, roleKey: string, permissionKey: string) {
+  return Array.isArray(value) && value.some((row): row is ScopedGrantRow => typeof row === "object" && row !== null
+    && row.branch_id === branchId && row.role_key === roleKey && row.permission_key === permissionKey);
+}
+
+export async function setCompanyScopedRolePermissionGrantAction(
+  _state: MasterAccessActionState,
+  formData: FormData,
+): Promise<MasterAccessActionState> {
+  if (formData.get("confirmed") !== "on") return { status: "error", message: "Confirmação explícita obrigatória." };
+  const tenantId = text(formData, "tenant_id", 64);
+  const branchId = text(formData, "branch_id", 64);
+  const roleKey = text(formData, "role_key", 80);
+  const permissionKey = text(formData, "permission_key", 120);
+  const operation = text(formData, "operation", 16);
+  const justification = reason(formData);
+  if (!/^[0-9a-f-]{36}$/i.test(tenantId) || !/^[0-9a-f-]{36}$/i.test(branchId)
+    || roleKey !== "company_owner" || permissionKey !== "transaction.purchasing.receipt.manage"
+    || !operations.has(operation) || !hasRequiredReason(justification)) {
+    return { status: "error", message: "Revise empresa, filial, papel, permissão e a justificativa de pelo menos 10 caracteres." };
+  }
+  try {
+    const client = await governanceClient();
+    if (!client) return { status: "error", message: "Concessões empresariais estão desativadas neste ambiente." };
+    const { data, error } = await client.rpc("master_set_company_role_permission_grant", {
+      p_tenant_id: tenantId,
+      p_branch_id: branchId,
+      p_role_key: roleKey,
+      p_permission_key: permissionKey,
+      p_operation: operation,
+      p_reason: justification,
+    });
+    if (error || ![operation, "unchanged"].includes(String(data))) {
+      console.error(`[master-governance] scoped_role_permission_rpc_not_confirmed:${error?.code ?? "unexpected_result"}`);
+      return { status: "error", message: "Não foi possível confirmar a concessão empresarial. Atualize a página e consulte a auditoria antes de tentar novamente." };
+    }
+    const confirmation = await client.rpc("master_list_company_scoped_permission_grants", { p_tenant_id: tenantId });
+    const present = hasScopedGrant(confirmation.data, branchId, roleKey, permissionKey);
+    if (confirmation.error || (operation === "grant" ? !present : present)) {
+      console.error(`[master-governance] scoped_role_permission_postcondition_not_confirmed:${confirmation.error?.code ?? "mismatch"}`);
+      return { status: "error", message: "A resposta foi recebida, mas o estado persistido não pôde ser confirmado. Não repita a operação; atualize a página e consulte a auditoria." };
+    }
+    try {
+      revalidatePath("/master/acessos-por-empresa");
+      revalidatePath("/master/auditoria");
+      return { status: "success", message: operation === "grant" ? "Permissão limitada à empresa e filial, com auditoria." : "Permissão empresarial revogada e auditada." };
+    } catch {
+      console.error("[master-governance] scoped_role_permission_revalidation_failed");
+      return { status: "success", message: "A alteração foi auditada, mas a tela não pôde ser atualizada. Atualize a página para conferir." };
+    }
+  } catch {
+    console.error("[master-governance] scoped_role_permission_action_failed");
+    return { status: "error", message: "Não foi possível concluir a alteração. Nenhum sucesso foi presumido; atualize a página e consulte a auditoria." };
   }
 }

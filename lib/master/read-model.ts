@@ -306,6 +306,15 @@ export type MasterCompanyAccessItem = {
   permission_approval_state: string | null;
   enabled: boolean;
 };
+export type MasterCompanyScopedPermissionGrant = {
+  branch_id: string;
+  branch_code: string;
+  branch_name: string;
+  role_key: string;
+  permission_key: string;
+  reason: string;
+  created_at: string;
+};
 export async function getMasterCompanyAccess(tenantId: string): Promise<ReadResult<MasterCompanyAccessItem[]>> {
   const [result, matrix] = await Promise.all([
     invokeMasterRead<unknown>("master_list_company_access", { p_tenant_id: tenantId }),
@@ -322,4 +331,12 @@ export async function getMasterCompanyAccess(tenantId: string): Promise<ReadResu
     status: "ready",
     data: result.data.map((item) => ({ ...item, permission_approval_state: permissionStates.get(item.permission_key) ?? null })),
   };
+}
+
+export async function getMasterCompanyScopedPermissionGrants(tenantId: string): Promise<ReadResult<MasterCompanyScopedPermissionGrant[]>> {
+  const result = await invokeMasterRead<unknown>("master_list_company_scoped_permission_grants", { p_tenant_id: tenantId });
+  return result.status === "ready" && isArrayOfRecords<MasterCompanyScopedPermissionGrant>(result.data,
+    ["branch_id", "branch_code", "branch_name", "role_key", "permission_key", "reason", "created_at"])
+    ? { status: "ready", data: result.data }
+    : { status: "unavailable" };
 }

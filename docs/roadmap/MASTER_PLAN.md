@@ -18,7 +18,7 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
 
 | Ordem | Fase | Estado |
 |---:|---|---|
-| 1 | Recebimento de compras, estoque e custo médio | Hardening local de idempotência e concorrência aprovado em auditoria independente; pronto somente para o sexto commit local. Publicação, migration e ativação gradual permanecem pendentes de autorização. |
+| 1 | Recebimento de compras, estoque e custo médio | A migration de valuation foi publicada anteriormente conforme o histórico operacional informado; ZGR01/ZIV01 continuam bloqueadas. A correção local de governança por empresa/filial aguarda revisão, publicação e migration incremental separadas. |
 | 2 | Compra direta para O.S. | Não iniciada |
 | 3 | Orçamentos e conversão | Não iniciada |
 | 4 | O.S. completa | Não iniciada |
@@ -52,6 +52,10 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
 - O rollout da Fase 1 é progressivo: backup recuperável, código compatível,
   migration, verificação de schema, avaliação de saldos legados por ZIV01 e,
   somente então, ZGR01 para uma empresa/filial piloto explicitamente autorizada.
+- Para o piloto da Fase 1, a concessão operacional empresarial é limitada à
+  tupla `(empresa, filial, company_owner, transaction.purchasing.receipt.manage)`
+  quando não houver grant global. A camada é aditiva e nunca substitui vínculo,
+  acesso à filial, aprovação da permissão ou disponibilidade da transação.
 
 ## Referências existentes
 
