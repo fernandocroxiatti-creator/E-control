@@ -77,4 +77,4 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
 |---|---|
 | Até `20261110120000` | Aplicada/confirmada anteriormente; não reaplicar |
 | `20261116180000_purchase_receipt_inventory_valuation.sql` | Aplicada em Production no rollout anterior informado; SHA-256 `f7a8e4648e82cbffadcbb6d23d192912d02ba93aa4ef449dffe62502ccdbcda3`. Nesta execução não houve nova consulta ou mutação remota. |
-| `20261118190000_company_scoped_permission_governance.sql` | Local, pendente de revisão/publicação/aplicação; SHA-256 `fef0ad3bd9001bba1c3731718ad91ed04cd650adce132106e254ff2e9cb93ef6`; sem grants, disponibilidade ou aprovações automáticas |
+| `20261118190000_company_scoped_permission_governance.sql` | Local, pendente de revisão/publicação/aplicação; SHA-256 `6a8ad42e233ee6742f6ae19690caab4e8b3cf041e157dd58862d804fd8b2660e`; sem grants, disponibilidade ou aprovações automáticas |

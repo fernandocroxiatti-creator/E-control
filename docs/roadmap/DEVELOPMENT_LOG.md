@@ -271,7 +271,7 @@ commit quando existir, ambiente e autorizações usadas.
   justificativa na auditoria. A suíte PostgreSQL descartável terminou com
   exit code `0` e observou 32 barreiras reais de concorrência; os bloqueios de
   inventário obsoleto e D05 foram os resultados de negócio esperados.
-- SHA-256 local: `fef0ad3bd9001bba1c3731718ad91ed04cd650adce132106e254ff2e9cb93ef6`.
+- SHA-256 final local: `6a8ad42e233ee6742f6ae19690caab4e8b3cf041e157dd58862d804fd8b2660e`.
 
 ### Revisão final e preparação de release da governança (2026-11-19)
 
@@ -291,3 +291,6 @@ commit quando existir, ambiente e autorizações usadas.
 - Regressão final: PostgreSQL 17.11 descartável (32 barreiras reais; exit `0`),
   Node 151/151, lint, TypeScript, build, `bash -n`, `git diff --check` e
   varredura de segredos: PASS. Nenhuma operação remota foi executada.
+- O pacote foi versionado localmente como `7b741d5` e a branch de release
+  isolada `codex/phase-01-governance-release` foi criada dele. Não houve push,
+  merge em `main`, deploy ou migration remota.
