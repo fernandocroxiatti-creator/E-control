@@ -174,18 +174,39 @@ reais legados; gerar AP/financeiro; publicar, fazer push ou deploy.
   aprovação, grant e disponibilidade, persistida na auditoria. É decisão de
   implementação local; não autoriza aplicação remota nem liberação do piloto.
 
-## Proposta de implementação pendente — 2026-11-24
+## D10 — Transferência entre filiais e valorização do estoque (2026-11-23)
 
-- Sem criar nova decisão comercial, a extensão local proposta preserva D09 e
-  permite, somente por empresa+filial e para `company_owner`, os grants mínimos
-  de BP01, MM01–MM03, SV01, ME21N, ME23N e ZGR01. Cada grant continua exigindo
-  aprovação global, disponibilidade empresarial, vínculo ativo, filial ativa e
-  justificativa auditável.
-- ZIV01, inventário, transferência, O.S., financeiro e papéis diferentes de
-  `company_owner` permanecem fora da lista permitida. A proposta não autoriza
-  publicação ou aplicação em Production.
+**Status:** APROVADA
+**Responsável pela aprovação:** proprietário do projeto.
 
-### D12 — Escopo de grants operacionais por empresa e filial (2026-11-24)
+- A saída de uma transferência entre filiais usa o custo médio ponderado efetivo
+  da filial de origem.
+- A filial de destino incorpora o valor transferido e recalcula seu custo médio
+  ponderado móvel considerando o saldo e o valor de estoque anteriores.
+- A operação deve ser atômica, idempotente quando aplicável, auditável e isolada
+  por empresa e filial; não pode duplicar movimentos nem valores.
+
+## D11 — Cancelamento integral de compra direta vinculada à O.S. (2026-11-23)
+
+**Status:** APROVADA, com pré-condição técnica ainda indisponível.
+**Responsável pela aprovação:** proprietário do projeto.
+
+- Só pode haver estorno integral quando a O.S. estiver `open` e um contrato de
+  faturamento confiável, por empresa, comprovar que ela ainda não foi faturada.
+- A compra direta original é imutável. O estorno é um novo fato compensatório,
+  idempotente, auditável e rastreável ao fato de origem; a razão é opcional.
+- A compensação usa exatamente a quantidade e o custo total da compra direta;
+  não movimenta estoque, não altera custo médio e não cria lançamento financeiro
+  artificial.
+- Vínculo ativo, autorização ZOS02, filial da O.S., empresa, locks e `request_id`
+  continuam obrigatórios. Replays idênticos retornam o fato original; payload ou
+  ator divergente falham com `23505` quando a operação estiver habilitada.
+- O schema atual não possui fonte confiável de faturamento para O.S. Portanto a
+  RPC local falha fechada com `55000` antes de qualquer mutação. A operação só
+  poderá ser habilitada por migration posterior de faturamento, com testes de
+  compatibilidade e autorização específica.
+
+## D12 — Escopo de grants operacionais por empresa e filial (2026-11-24)
 
 - Achado confirmado: permissões de cadastros BP01/MM01/SV01 são verificadas
   sem filial, enquanto o grant scoped publicado exige filial. Logo, um grant de
@@ -194,6 +215,5 @@ reais legados; gerar AP/financeiro; publicar, fazer push ou deploy.
   permissões que movimentam saldo ou documento de filial usam escopo filial.
   O detalhe da migração, das pós-condições e da recuperação está em
   `GOVERNANCE_LEGACY_GRANT_TRANSITION.md`.
-- A implementação local correspondente é a migration
-  `20261124120000_transition_legacy_operational_grants.sql`. Ela ainda não foi
-  publicada nem aplicada remotamente. A decisão não altera D01–D09.
+- A migration `20261124120000_transition_legacy_operational_grants.sql` foi
+  aplicada em Production em 2026-11-25. Ela não altera D01–D11.

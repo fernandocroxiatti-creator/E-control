@@ -255,6 +255,58 @@ permanecem **NÃO VERIFICADOS** aqui.
 Após cada implementação, anexar data, arquivos, migration, RPCs, testes reais,
 commit quando existir, ambiente e autorizações usadas.
 
+### Fase 2 — compra direta vinculada à O.S. (2026-11-23, local)
+
+- Worktree isolado: `codex/phase2-direct-purchase-work-order`, criado de
+  `a8d890c`. A implementação adiciona a migration local
+  `20261123190000_direct_purchase_work_order.sql` (SHA-256
+  `677b981c2ed2615572e1c43ce4e2e76452fce39c7e3ff7398c75a0cfcf8f4af6`).
+- A compra direta é um fato imutável de custo da O.S. e soma
+  `work_orders.direct_purchase_total`. Não cria recebimento, movimento,
+  saldo, reserva, consumo, custo médio ou lançamento financeiro.
+- As RPCs novas usam `SECURITY DEFINER`, `search_path=''`, RLS/FORCE RLS,
+  ACL fechada, autorização operacional de atualização/leitura da O.S.,
+  filial da própria O.S., lock de linha, lock de idempotência e auditoria.
+  Repetição idêntica retorna o mesmo fato; payload ou ator divergente retorna
+  `23505`.
+- A suíte PostgreSQL 17.11 descartável passou com exit `0`; além das barreiras
+  existentes da Fase 1, duas sessões independentes disputaram o lock real da
+  O.S. para replay idêntico e payload divergente. Node 154/154, lint,
+  TypeScript, build, `bash -n` e `git diff --check`: PASS.
+- Não houve commit, push, deploy, migration remota, grant, flag nem alteração
+  de Production. O cancelamento/estorno é tratado no registro seguinte.
+
+### Fase 2 — contrato local de cancelamento/estorno (2026-11-23, local)
+
+- D11 foi registrada sem alterar D01–D10. A regra exige O.S. aberta e estado de
+  faturamento comprovadamente não faturado, cria somente evento compensatório
+  integral, preserva o fato original e não produz estoque, custo médio, AP/AR
+  ou caixa artificial.
+- A inspeção direta do schema confirmou que não há tabela, coluna ou RPC de
+  faturamento de O.S. apta a provar essa condição. A migration incremental
+  `20261123200000_direct_purchase_work_order_reversal.sql` introduz modelo,
+  RLS/FORCE RLS, ACL fechada, locks, idempotência, leitura protegida e auditoria,
+  porém `assert_work_order_not_billed` retorna `55000` antes de qualquer escrita.
+  SHA-256 local: `15a5ecab36c35751f0cfa28cdcb95db5c2209ad0c2f78e164ee8a8c47b5c8266`.
+- A suíte SQL exercita o bloqueio com O.S. aberta, fechada, tenant distinto,
+  membro ativo limitado a outra filial e identidade sem vínculo. O runner também
+  força duas sessões PostgreSQL a disputar o lock da O.S.; ambos os caminhos
+  precisam falhar pelo guard, sem aceitar timeout/deadlock como sucesso.
+- Estado local: sem commit, push, deploy, migration remota, grant, flag ou dado
+  de Production alterado. Os testes de estorno bem-sucedido, replay bem-sucedido
+  e auditoria de sucesso ficam explicitamente BLOQUEADOS até o contrato de
+  faturamento futuro; não foram simulados por mock.
+- Verificações desta execução: testes Node 157/157, lint, TypeScript e build
+  passaram. O teste SQL T18 foi aplicado e passou em PostgreSQL 17.11 Docker
+  descartável.
+- Regressão integral posterior (2026-11-23): o runner original foi executado em
+  sessão local persistente `screen`, sem reduzir pausas, barreiras ou cobertura.
+  Terminou com exit code `0` em 108 segundos (18:41:01Z–18:42:49Z), observando
+  36 barreiras reais, inclusive replay idêntico/divergente de compra direta e
+  dois pedidos de estorno T18 concorrentes. Os três `ERROR` do log são bloqueios
+  de negócio esperados — inventário obsoleto e D05 de rastreabilidade — e não há
+  marcador de falha, deadlock ou timeout. O container descartável foi removido.
+
 ### Governança empresarial limitada da Fase 1 (2026-11-19)
 
 - Causa confirmada: `role_permission_grants` é global por papel. Um grant de

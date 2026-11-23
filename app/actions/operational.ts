@@ -93,6 +93,14 @@ function workOrderLines(form: FormData) {
     return lines.every(Boolean) ? lines : null;
   } catch { return null; }
 }
+function directPurchase(form: FormData) {
+  const itemId = value(form, "item_id", 36); const supplierId = value(form, "supplier_id", 36);
+  const quantity = decimal(value(form, "quantity", 32)); const unitCost = decimal(value(form, "unit_cost", 32));
+  const description = value(form, "item_description", 500); const source = value(form, "acquisition_source", 80);
+  return quantity !== null && quantity > 0 && unitCost !== null && description && source
+    ? { itemId: UUID.test(itemId) ? itemId : null, supplierId: UUID.test(supplierId) ? supplierId : null, quantity, unitCost, description, source }
+    : null;
+}
 
 export async function createBusinessPartyAction(_: ActionState, form: FormData): Promise<ActionState> {
   const diagnosticId = businessPartyDiagnosticCode();
@@ -294,6 +302,26 @@ export async function updateWorkOrderAction(_: ActionState, form: FormData): Pro
     if (error) return { status: "error", message: "Não foi possível atualizar a O.S. Reservas ativas, permissões e itens são conferidos pelo banco." };
     revalidatePath("/operacional/ordens-servico"); return { status: "success", message: "O.S. atualizada e auditada." };
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function recordWorkOrderDirectPurchaseAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const workOrderId = value(form, "work_order_id", 36); const id = requestId(form); const purchase = directPurchase(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(workOrderId) || !id || !purchase) return { status: "error", message: "Informe descrição, quantidade, custo e origem válidos. A compra direta não movimenta estoque." };
+    const { error } = await client.rpc("operational_record_work_order_direct_purchase", { p_tenant_id: tenantId, p_work_order_id: workOrderId, p_supplier_id: purchase.supplierId, p_item_id: purchase.itemId, p_item_description: purchase.description, p_quantity: purchase.quantity, p_unit_cost: purchase.unitCost, p_acquisition_source: purchase.source, p_document_reference: value(form, "document_reference", 120) || null, p_notes: value(form, "notes", 1000) || null, p_request_id: id });
+    if (error) return { status: "error", message: "Não foi possível registrar a compra direta. O banco valida empresa, filial, O.S. aberta, fornecedor, item e autorização." };
+    revalidatePath("/operacional/ordens-servico"); return { status: "success", message: "Compra direta registrada e auditada; nenhum saldo de estoque foi movimentado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function reverseWorkOrderDirectPurchaseAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const workOrderId = value(form, "work_order_id", 36); const directPurchaseId = value(form, "direct_purchase_id", 36); const id = requestId(form); const reason = value(form, "reason", 1000) || null;
+    if (!client || !UUID.test(tenantId) || !UUID.test(workOrderId) || !UUID.test(directPurchaseId) || !id) return { status: "error", message: "Dados de estorno inválidos." };
+    const { error } = await client.rpc("operational_reverse_work_order_direct_purchase", { p_tenant_id: tenantId, p_work_order_id: workOrderId, p_direct_purchase_id: directPurchaseId, p_reason: reason, p_request_id: id });
+    if (error) return { status: "error", message: "Não foi possível estornar a compra direta. A O.S. precisa estar aberta, não faturada e autorizada." };
+    revalidatePath("/operacional/ordens-servico"); return { status: "success", message: "Compra direta estornada por evento compensatório auditável." };
+  } catch { return { status: "error", message: "Não foi possível estornar a compra direta." }; }
 }
 
 export async function reserveWorkOrderPartsAction(_: ActionState, form: FormData): Promise<ActionState> {

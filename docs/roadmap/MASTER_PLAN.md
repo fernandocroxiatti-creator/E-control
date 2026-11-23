@@ -18,8 +18,8 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
 
 | Ordem | Fase | Estado |
 |---:|---|---|
-| 1 | Recebimento de compras, estoque e custo médio | A migration de valuation e a governança incremental foram publicadas conforme o histórico operacional confirmado; ZGR01 permanece estritamente scoped no piloto e ZIV01 continua bloqueada. A transição dos grants globais legados para escopos empresa/filial é um pacote futuro separado. |
-| 2 | Compra direta para O.S. | Não iniciada |
+| 1 | Recebimento de compras, estoque e custo médio | A migration de valuation e a transição de governança foram publicadas; ZGR01 permanece estritamente scoped no piloto e ZIV01 continua bloqueada. |
+| 2 | Compra direta para O.S. | Implementação local em validação: custo direto imutável da O.S., sem entrada/baixa artificial de estoque e sem efeito financeiro. Não publicada nem aplicada em Production. |
 | 3 | Orçamentos e conversão | Não iniciada |
 | 4 | O.S. completa | Não iniciada |
 | 5 | Vendas e faturamento gerencial | Não iniciada |
@@ -77,6 +77,13 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
   tupla `(empresa, filial, company_owner, transaction.purchasing.receipt.manage)`
   quando não houver grant global. A camada é aditiva e nunca substitui vínculo,
   acesso à filial, aprovação da permissão ou disponibilidade da transação.
+- A Fase 2 registra compra direta como fato de custo da O.S. sob a autorização
+  existente de atualização de O.S. (ZOS02). Ela não cria recebimento, movimento,
+  reserva, consumo, conta financeira ou mudança de custo médio. O cancelamento
+  integral foi definido por D11, porém permanece **indisponível por falha
+  fechada** até a Fase 5 disponibilizar um contrato confiável e tenant-scoped de
+  faturamento da O.S.; ausência de tabela ou coluna nunca é tratada como
+  evidência de que a O.S. não foi faturada.
 
 ## Referências existentes
 

@@ -294,3 +294,29 @@ Production.
   liberar a tela administrativa. Se o deploy falhar, a migration não é aplicada;
   se a migration já tiver sido confirmada, a contenção é corrigir/publicar uma
   versão compatível — não restaurar funções antigas sem justificativa.
+
+## Fase 2 — estado local atual (2026-11-23)
+
+- Branch/worktree isolado: `codex/phase2-direct-purchase-work-order`.
+- Migration local pendente de revisão e de autorização remota:
+  `20261123190000_direct_purchase_work_order.sql`, SHA-256
+  `677b981c2ed2615572e1c43ce4e2e76452fce39c7e3ff7398c75a0cfcf8f4af6`.
+- A interface e as Server Actions falham fechadas enquanto os read/write RPCs
+  não existirem. A autorização operacional continua dependente de ZOS02/ZOS03,
+  vínculo, papel, filial e disponibilidade já existentes; esta fase não cria
+  catálogo, grant ou disponibilidade novos.
+- A operação segura nesta entrega é somente registrar custo direto em O.S.
+  aberta/em andamento. A migration incremental local
+  `20261123200000_direct_purchase_work_order_reversal.sql` registra o contrato
+  de estorno imutável, mas o deixa bloqueado com `55000`: não existe fonte
+  confiável de faturamento da O.S. para provar a pré-condição D11. Não há
+  reflexo em estoque, compra formal ou financeiro. SHA-256 local:
+  `15a5ecab36c35751f0cfa28cdcb95db5c2209ad0c2f78e164ee8a8c47b5c8266`.
+- Próximo marco: revisão local do diff e, somente após a Fase 5 oferecer o
+  contrato de faturamento, decisão específica para substituir o bloqueio por
+  verificação confiável e testar o caminho de sucesso.
+- A regressão PostgreSQL completa da Fase 1/Fase 2 foi encerrada localmente em
+  2026-11-23: PostgreSQL 17.11 descartável, exit `0`, 108 segundos e 36
+  barreiras reais observadas. O log local não contém deadlock, timeout ou falha
+  inesperada; containers temporários foram limpos. Isto não habilita o estorno
+  D11 nem autoriza publicação ou alterações remotas.

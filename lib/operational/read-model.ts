@@ -11,6 +11,9 @@ export type OperationalPurchaseReceivingOrder = { purchase_order_id: string; ord
 export type OperationalPurchaseReceipt = { purchase_receipt_id: string; receipt_number: number; purchase_order_id: string; status: "posted" | "partially_reversed" | "reversed"; document_number: string | null; notes: string | null; items: Array<{ purchase_receipt_item_id: string; item_id: string; received_quantity: number; effective_unit_cost: number; received_value: number; reversed_quantity: number; variance_reason: string | null }>; created_at: string };
 export type OperationalInventoryValuation = { item_id: string; item_code: string; item_name: string; quantity: number; valuation_status: "pending" | "valued"; stock_value: number | null; average_unit_cost: number | null; valuation_updated_at: string | null };
 export type OperationalWorkOrder = { work_order_id: string; order_number: number; customer_name: string; status: "open" | "in_progress" | "closed" | "cancelled" | "reversed"; total_amount: number; created_at: string; updated_at: string };
+export type OperationalWorkOrderDirectPurchase = { direct_purchase_id: string; work_order_id: string; item_id: string | null; item_description: string; quantity: number; unit_cost: number; total_cost: number; supplier_name: string | null; acquisition_source: string; document_reference: string | null; notes: string | null; created_at: string };
+export type OperationalWorkOrderDirectPurchaseTotal = { work_order_id: string; total_direct_cost: number };
+export type OperationalWorkOrderDirectPurchaseReversal = { direct_purchase_reversal_id: string; direct_purchase_id: string; work_order_id: string; reversed_quantity: number; reversed_total_cost: number; reason: string | null; created_at: string };
 export type OperationalInventoryCountSession = { count_session_id: string; status: "open" | "posted"; notes: string | null; created_at: string; posted_at: string | null; line_count: number };
 export type OperationalRead<T> = { status: "ready"; data: T } | { status: "unavailable" };
 export type OperationalPage<T> = OperationalRead<{ rows: T[]; hasMore: boolean; page: number }>;
@@ -108,6 +111,25 @@ export async function listOperationalWorkOrders(tenantId: string, branchId: stri
   const result = await read<unknown>("operational_list_work_orders", { p_tenant_id: tenantId, p_branch_id: branchId, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
   return result.status === "ready" && records<OperationalWorkOrder>(result.data, ["work_order_id", "order_number", "customer_name", "status", "total_amount", "created_at", "updated_at"])
     ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
+}
+
+/** Phase 02 read API fails closed until its migration is available. */
+export async function listOperationalWorkOrderDirectPurchases(tenantId: string, branchId: string): Promise<OperationalRead<OperationalWorkOrderDirectPurchase[]>> {
+  const result = await read<unknown>("operational_list_work_order_direct_purchases", { p_tenant_id: tenantId, p_branch_id: branchId, p_work_order_id: null, p_limit: 100, p_offset: 0 });
+  return result.status === "ready" && records<OperationalWorkOrderDirectPurchase>(result.data, ["direct_purchase_id", "work_order_id", "item_description", "quantity", "unit_cost", "total_cost", "acquisition_source", "created_at"])
+    ? { status: "ready", data: result.data } : { status: "unavailable" };
+}
+
+export async function listOperationalWorkOrderDirectPurchaseTotals(tenantId: string, branchId: string): Promise<OperationalRead<OperationalWorkOrderDirectPurchaseTotal[]>> {
+  const result = await read<unknown>("operational_list_work_order_direct_purchase_totals", { p_tenant_id: tenantId, p_branch_id: branchId });
+  return result.status === "ready" && records<OperationalWorkOrderDirectPurchaseTotal>(result.data, ["work_order_id", "total_direct_cost"])
+    ? { status: "ready", data: result.data } : { status: "unavailable" };
+}
+
+export async function listOperationalWorkOrderDirectPurchaseReversals(tenantId: string, branchId: string): Promise<OperationalRead<OperationalWorkOrderDirectPurchaseReversal[]>> {
+  const result = await read<unknown>("operational_list_work_order_direct_purchase_reversals", { p_tenant_id: tenantId, p_branch_id: branchId, p_work_order_id: null, p_limit: 100, p_offset: 0 });
+  return result.status === "ready" && records<OperationalWorkOrderDirectPurchaseReversal>(result.data, ["direct_purchase_reversal_id", "direct_purchase_id", "work_order_id", "reversed_quantity", "reversed_total_cost", "created_at"])
+    ? { status: "ready", data: result.data } : { status: "unavailable" };
 }
 
 /** Package 05 read API. A missing RPC is intentionally reported as unavailable

@@ -163,6 +163,8 @@ SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261116180000_purchase_receipt_inventory_valuation.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/purchase-receipt-inventory-valuation-behavior.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261118190000_company_scoped_permission_governance.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261123190000_direct_purchase_work_order.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261123200000_direct_purchase_work_order_reversal.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/company-scoped-permission-governance-behavior.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261124110000_company_scoped_pilot_operational_entitlements.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/company-scoped-pilot-operational-entitlements-behavior.sql" >/dev/null
@@ -679,5 +681,121 @@ end $$;
 SQL
 
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/purchase-receipt-inventory-valuation-concurrency-assertions.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-02-direct-purchase-work-order.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-02-direct-purchase-work-order-reversal.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-02-direct-purchase-work-order-concurrency-setup.sql" >/dev/null
+
+# T09. The first session holds the exact work-order row lock acquired by the
+# production direct-purchase RPC. The second session is a separate PostgreSQL
+# client and must wait on that lock. This verifies serialization and replay
+# behavior without adding test hooks to Production SQL.
+phase02_wait_activity() {
+  local label="$1" predicate="$2" observed
+  for _ in $(seq 1 80); do
+    observed=$("$docker_bin" exec "$container" psql -X -qAt -v ON_ERROR_STOP=1 -U postgres -d postgres -c "select count(*) from pg_catalog.pg_stat_activity where application_name='${label}' and ${predicate};") || return 1
+    if [ "$observed" = '1' ]; then
+      echo "BARRIER: observed ${label}"
+      return 0
+    fi
+    if [ "$observed" != '0' ]; then
+      echo "ERROR: Phase 02 concurrency probe ${label} matched ${observed} sessions" >&2
+      return 1
+    fi
+    sleep 0.05
+  done
+  echo "ERROR: Phase 02 concurrency probe did not observe ${label}" >&2
+  return 1
+}
+run_phase02_direct_purchase() {
+  local mode="$1" first="$2" label="$3" request cost statement
+  request='d2700000-0000-4000-8000-000000000002'
+  cost=12.5
+  if [ "$mode" = divergent ]; then
+    request='d2700000-0000-4000-8000-000000000003'
+    [ "$first" = yes ] || cost=13
+  fi
+  statement="select public.operational_record_work_order_direct_purchase('d2000000-0000-4000-8000-000000000001',(select id from public.work_orders where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000001'),'d2400000-0000-4000-8000-000000000002',null,'Concurrent direct material',2,${cost},'supplier receipt','P02C',null,'${request}');"
+  if [ "$mode" = divergent ] && [ "$first" != yes ]; then
+    statement="do \$idempotency\$ begin ${statement} raise exception 'divergent direct-purchase replay was accepted'; exception when unique_violation then null; end \$idempotency\$;"
+  fi
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','d2200000-0000-4000-8000-000000000001',true);
+set local application_name='${label}';
+$(if [ "$first" = yes ]; then printf "%s\n%s\n" "select 1 from public.work_orders where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000001' for update;" "select pg_sleep(0.7);"; fi)
+${statement}
+commit;
+SQL
+}
+run_phase02_direct_pair() {
+  local mode="$1"
+  local first_label="p02-${mode}-first"
+  local second_label="p02-${mode}-second"
+  echo "CONCURRENCY: direct purchase ${mode} replay waits on the real work-order lock"
+  run_phase02_direct_purchase "$mode" yes "$first_label" & local first_pid=$!
+  phase02_wait_activity "$first_label" "wait_event='PgSleep'"
+  run_phase02_direct_purchase "$mode" no "$second_label" & local second_pid=$!
+  phase02_wait_activity "$second_label" "wait_event_type='Lock'"
+  wait "$first_pid"
+  wait "$second_pid"
+}
+run_phase02_direct_pair same
+run_phase02_direct_pair divergent
+# T18.14/T18.15: distinct concurrent reversal requests contend on the real
+# work-order lock and both fail closed without a billing-status contract.
+run_phase02_direct_reversal() {
+  local first="$1" label="$2" request
+  request='d2700000-0000-4000-8000-000000000004'
+  [ "$first" = yes ] || request='d2700000-0000-4000-8000-000000000005'
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+begin;
+set local lock_timeout='3s'; set local statement_timeout='8s';
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claim.sub','d2200000-0000-4000-8000-000000000001',true);
+set local application_name='${label}';
+$(if [ "$first" = yes ]; then printf "%s\n%s\n" "select 1 from public.work_orders where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000001' for update;" "select pg_sleep(0.7);"; fi)
+do \$reversal\$ begin
+  perform public.operational_reverse_work_order_direct_purchase('d2000000-0000-4000-8000-000000000001',(select id from public.work_orders where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000001'),(select id from public.work_order_direct_purchases where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000002'),null,'${request}');
+  raise exception 'billing-unknown reversal was accepted';
+exception when object_not_in_prerequisite_state then
+  if sqlerrm not like '%billing status contract%' then raise; end if;
+end \$reversal\$;
+commit;
+SQL
+}
+echo 'CONCURRENCY: direct-purchase reversals wait on the real work-order lock and fail closed without billing status'
+run_phase02_direct_reversal yes p02-reversal-first & phase02_reversal_first_pid=$!
+phase02_wait_activity p02-reversal-first "wait_event='PgSleep'"
+run_phase02_direct_reversal no p02-reversal-second & phase02_reversal_second_pid=$!
+phase02_wait_activity p02-reversal-second "wait_event_type='Lock'"
+wait "$phase02_reversal_first_pid"
+wait "$phase02_reversal_second_pid"
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
+do $$
+declare purchases integer; total numeric; movements integer; audits integer; reversals integer;
+begin
+  select count(*),coalesce(sum(total_cost),0) into purchases,total
+    from public.work_order_direct_purchases
+   where tenant_id='d2000000-0000-4000-8000-000000000001';
+  select direct_purchase_total into total from public.work_orders
+   where tenant_id='d2000000-0000-4000-8000-000000000001'
+     and request_id='d2700000-0000-4000-8000-000000000001';
+  if purchases<>2 or total<>50 then
+    raise exception 'Phase 02 concurrent idempotency produced duplicate or lost direct cost (% / %)', purchases,total;
+  end if;
+  select count(*) into movements from public.inventory_movements where tenant_id='d2000000-0000-4000-8000-000000000001';
+  select count(*) into audits from app_private.operational_audit_events where tenant_id='d2000000-0000-4000-8000-000000000001' and event_key='work_order.direct_purchase.recorded';
+  select count(*) into reversals from public.work_order_direct_purchase_reversals where tenant_id='d2000000-0000-4000-8000-000000000001';
+  -- T15: direct purchases have no financial ledger in the current schema; the
+  -- only persisted operational side effect is the direct-purchase audit event.
+  if movements<>0 or audits<>2 or reversals<>0 then
+    raise exception 'Phase 02 direct purchases changed stock, audit or reversal state (% / % / %)', movements,audits,reversals;
+  end if;
+end $$;
+SQL
+# T17 is the full Package 01/03/04/05 and Phase 01 regression above. T18 uses
+# an explicit fail-closed billing guard because the current schema has none.
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'
-echo 'PASS: Packages 01, 03, 04, 05, Phase 01 purchase valuation, real cross-session concurrency and authenticated onboarding pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'
+echo 'PASS: Packages 01, 03, 04, 05, Phase 01 valuation and Phase 02 direct work-order purchase contracts pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'
