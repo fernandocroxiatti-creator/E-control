@@ -11,6 +11,7 @@ const behavior = read("tests/sql/company-scoped-permission-governance-behavior.s
 const runner = read("scripts/test-package-01-postgres.sh");
 const actions = read("app/actions/master-access-governance.ts");
 const companyAccess = read("app/master/acessos-por-empresa/company-access-console.tsx");
+const companyAccessPage = read("app/master/acessos-por-empresa/page.tsx");
 
 test("scoped governance is additive, branch-bound, audited and installs with default denial", () => {
   assert.match(migration, /create table public\.company_role_permission_grants/);
@@ -39,6 +40,13 @@ test("Master RPCs require a textual reason and expose only a Master-scoped read 
   assert.match(actions, /p_reason: justification/);
   assert.match(companyAccess, /Permissões por empresa e filial/);
   assert.match(companyAccess, /Justificativa auditável/);
+});
+
+test("company access readiness distinguishes no selection from an unavailable selected company", () => {
+  assert.match(companyAccessPage, /!selected\?"Selecione uma empresa"/);
+  assert.match(companyAccessPage, /"Configuração disponível"/);
+  assert.match(companyAccessPage, /"Configuração indisponível"/);
+  assert.doesNotMatch(companyAccessPage, /Aguardando ativação/);
 });
 
 test("isolated PostgreSQL behavior covers reason rejection, Master-only writes and tenant/branch denial", () => {
