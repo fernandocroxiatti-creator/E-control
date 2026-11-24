@@ -173,3 +173,14 @@ reais legados; gerar AP/financeiro; publicar, fazer push ou deploy.
 - A alteração proposta exige justificativa textual de 10–1000 caracteres para
   aprovação, grant e disponibilidade, persistida na auditoria. É decisão de
   implementação local; não autoriza aplicação remota nem liberação do piloto.
+
+## Proposta de implementação pendente — 2026-11-24
+
+- Sem criar nova decisão comercial, a extensão local proposta preserva D09 e
+  permite, somente por empresa+filial e para `company_owner`, os grants mínimos
+  de BP01, MM01–MM03, SV01, ME21N, ME23N e ZGR01. Cada grant continua exigindo
+  aprovação global, disponibilidade empresarial, vínculo ativo, filial ativa e
+  justificativa auditável.
+- ZIV01, inventário, transferência, O.S., financeiro e papéis diferentes de
+  `company_owner` permanecem fora da lista permitida. A proposta não autoriza
+  publicação ou aplicação em Production.

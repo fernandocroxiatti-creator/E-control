@@ -294,3 +294,24 @@ commit quando existir, ambiente e autorizações usadas.
 - O pacote foi versionado localmente como `7b741d5` e a branch de release
   isolada `codex/phase-01-governance-release` foi criada dele. Não houve push,
   merge em `main`, deploy ou migration remota.
+
+### Continuidade do piloto e grants empresariais (2026-11-24)
+
+- A leitura pelo painel oficial Admin Master confirmou que a empresa piloto e
+  a filial TESTE001 estão selecionáveis e que BP01, MM01–MM03, SV01, ME21N,
+  ME23N e ZGR01 já estão disponíveis somente para a empresa piloto. ZIV01
+  continua pendente e não habilitada.
+- O painel confirmou um único grant empresarial ativo: `company_owner` +
+  `transaction.purchasing.receipt.manage` na TESTE001. Nenhuma alteração foi
+  enviada pelo painel nesta sessão.
+- Lacuna confirmada: a governança publicada aceita grants empresariais somente
+  para ZGR01. Conceder os demais grants pelo mecanismo global afetaria outras
+  empresas, portanto não foi usado.
+- Worktree isolado `codex/pilot-company-owner-entitlements` recebeu a migration
+  local `20261124110000_company_scoped_pilot_operational_entitlements.sql`,
+  interface e testes para grants mínimos de cadastros/compras, mantendo ZIV01,
+  inventário, transferências e O.S. bloqueados. Ainda não há commit, push,
+  deploy ou migration remota.
+- Verificações locais: lint, TypeScript, build, Node 156/156 e PostgreSQL 17.11
+  descartável com as barreiras reais existentes: PASS. A correção inicial da
+  fixture SQL foi uma ambiguidade de variável no teste, sem mudança de regra.

@@ -28,6 +28,16 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
 | 8 | DRE e relatórios | Não iniciada |
 | 9 | Comercial SaaS | Não iniciada |
 
+## Atualização factual — 2026-11-24
+
+- A Production está no commit `7330582`; a Fase 1 e a governança empresarial
+  anterior estão publicadas conforme os registros de rollout anteriores.
+- A continuidade do piloto identificou que a disponibilidade empresarial não
+  substitui grants. A extensão local de grants por empresa/filial para os
+  cadastros e compras do piloto está em desenvolvimento isolado; ela ainda não
+  foi publicada nem aplicada remotamente.
+- Fase 2 possui trabalho local separado e não está liberada para Production.
+
 ## Portões
 
 - Fase 1 precisa de recebimento idempotente, valuation por filial e testes de

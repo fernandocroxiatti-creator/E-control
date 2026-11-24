@@ -39,21 +39,29 @@ function CompanyScopedGrantManager({ tenantId, branches, items, grants, ready }:
 }) {
   const [state, action, pending] = useActionState(setCompanyScopedRolePermissionGrantAction, masterAccessIdle);
   const activeBranches = branches.filter((branch) => branch.status === "active");
-  const receiptPermission = items.find((item) => item.transaction_code === "ZGR01"
-    && item.permission_key === "transaction.purchasing.receipt.manage"
+  const pilotPermissions = items.filter((item) => ["BP01", "MM01", "MM02", "MM03", "SV01", "ME21N", "ME23N", "ZGR01"].includes(item.transaction_code)
     && item.approval_state === "approved" && item.permission_approval_state === "approved");
+  const extraCatalogRead = pilotPermissions.some((item) => item.transaction_code === "MM01" || item.transaction_code === "SV01")
+    ? { transaction_code: "MDM", permission_key: "transaction.masterdata.catalog.read", label: "Leitura do catálogo necessária para os cadastros" }
+    : null;
+  const grantOptions = [
+    ...pilotPermissions.map((item) => ({ transaction_code: item.transaction_code, permission_key: item.permission_key, label: names[item.transaction_code] ?? item.transaction_code })),
+    ...(extraCatalogRead ? [extraCatalogRead] : []),
+  ];
   const [branchId, setBranchId] = useState(activeBranches[0]?.branch_id ?? "");
+  const [permissionKey, setPermissionKey] = useState(grantOptions[0]?.permission_key ?? "");
   const [confirmed, setConfirmed] = useState(false);
-  const selectedGrant = grants.find((grant) => grant.branch_id === branchId && grant.role_key === "company_owner" && grant.permission_key === "transaction.purchasing.receipt.manage");
+  const selectedGrant = grants.find((grant) => grant.branch_id === branchId && grant.role_key === "company_owner" && grant.permission_key === permissionKey);
   return <section className="master-company-scoped-grants">
     <header><h3>Permissões por empresa e filial</h3><p>Esta camada é aditiva, limitada à filial escolhida e não cria vínculos nem grants globais. O papel fixo para este piloto é <code>company_owner</code>.</p></header>
-    {!ready ? <p className="master-panel-empty">A leitura canônica dos grants empresariais não está disponível. Nenhuma alteração pode ser enviada.</p> : !activeBranches.length || !receiptPermission ? <p className="master-panel-empty">Aprove ZGR01 e sua permissão globalmente e mantenha ao menos uma filial ativa antes de conceder o grant empresarial do piloto.</p> : <form action={action} className="master-company-scoped-grant-form">
+    {!ready ? <p className="master-panel-empty">A leitura canônica dos grants empresariais não está disponível. Nenhuma alteração pode ser enviada.</p> : !activeBranches.length || !grantOptions.length ? <p className="master-panel-empty">Mantenha uma filial ativa e aprove a transação e a permissão correspondente antes de conceder um grant empresarial do piloto.</p> : <form action={action} className="master-company-scoped-grant-form">
       <input type="hidden" name="tenant_id" value={tenantId} />
       <input type="hidden" name="role_key" value="company_owner" />
-      <input type="hidden" name="permission_key" value="transaction.purchasing.receipt.manage" />
+      <input type="hidden" name="permission_key" value={permissionKey} />
       <input type="hidden" name="operation" value={selectedGrant ? "revoke" : "grant"} />
       <label>Filial<select name="branch_id" value={branchId} onChange={(event) => { setBranchId(event.target.value); setConfirmed(false); }} disabled={pending}>{activeBranches.map((branch) => <option key={branch.branch_id} value={branch.branch_id}>{branch.code} · {branch.name}</option>)}</select></label>
-      <p className="master-form-help">Permissão fixa do piloto: <code>ZGR01 · transaction.purchasing.receipt.manage</code>.</p>
+      <label>Permissão do piloto<select value={permissionKey} onChange={(event) => { setPermissionKey(event.target.value); setConfirmed(false); }} disabled={pending}>{grantOptions.map((option) => <option key={option.permission_key} value={option.permission_key}>{option.transaction_code} · {option.label}</option>)}</select></label>
+      <p className="master-form-help">Somente permissões aprovadas de cadastros, compras e recebimento podem ser concedidas neste escopo. Inventário, transferências, O.S. e ZIV01 permanecem excluídos.</p>
       <label>Justificativa auditável<textarea name="reason" minLength={10} maxLength={1000} required disabled={pending} /></label>
       <label className="master-checkbox-label"><input name="confirmed" type="checkbox" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} disabled={pending} /> Confirmo o escopo exato de empresa, filial, papel e permissão.</label>
       <button className="master-action" type="submit" disabled={!confirmed || pending}>{pending ? "Registrando…" : selectedGrant ? "Revogar grant empresarial" : "Conceder grant empresarial"}</button>

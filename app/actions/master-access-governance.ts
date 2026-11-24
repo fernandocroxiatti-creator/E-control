@@ -11,6 +11,17 @@ const itemTypes = new Set(["role", "permission", "transaction"]);
 const states = new Set(["pending_approval", "approved", "retired"]);
 const operations = new Set(["grant", "revoke"]);
 const minimumReasonLength = 10;
+const scopedPilotPermissionKeys = new Set([
+  "transaction.masterdata.party.manage",
+  "transaction.masterdata.catalog.read",
+  "transaction.masterdata.catalog.product.manage",
+  "transaction.masterdata.catalog.product.update",
+  "transaction.masterdata.catalog.product.read",
+  "transaction.masterdata.catalog.service.manage",
+  "transaction.purchasing.purchase_order.create",
+  "transaction.purchasing.purchase_order.read",
+  "transaction.purchasing.receipt.manage",
+]);
 
 function text(formData: FormData, field: string, max = 120) {
   const value = formData.get(field);
@@ -256,7 +267,7 @@ export async function setCompanyScopedRolePermissionGrantAction(
   const operation = text(formData, "operation", 16);
   const justification = reason(formData);
   if (!/^[0-9a-f-]{36}$/i.test(tenantId) || !/^[0-9a-f-]{36}$/i.test(branchId)
-    || roleKey !== "company_owner" || permissionKey !== "transaction.purchasing.receipt.manage"
+    || roleKey !== "company_owner" || !scopedPilotPermissionKeys.has(permissionKey)
     || !operations.has(operation) || !hasRequiredReason(justification)) {
     return { status: "error", message: "Revise empresa, filial, papel, permissão e a justificativa de pelo menos 10 caracteres." };
   }

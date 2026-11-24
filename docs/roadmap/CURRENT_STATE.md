@@ -2,6 +2,16 @@
 
 Atualizado em 2026-11-17.
 
+## Atualização factual — 2026-11-24
+
+- `origin/main` e Production estão no commit `7330582b62b96a220e438cb8e9e0597a0beccede`.
+- A tela Master de acessos por empresa foi corrigida para distinguir empresa não
+  selecionada de indisponibilidade real; a correção não alterou autorização.
+- A empresa piloto tem disponibilidade para os cadastros e compras autorizados,
+  mas os grants empresariais publicados permanecem restritos a ZGR01. A extensão
+  local para grants mínimos por empresa/filial está pendente de revisão,
+  publicação e migration remota separadas.
+
 - Worktree de origem preservado: `/private/tmp/econtroll-phase-01-receiving`.
 - Worktree de integração: `/private/tmp/econtroll-phase-01-integration`.
 - Branch de integração: `codex/phase-01-integration`, criada de `origin/main`

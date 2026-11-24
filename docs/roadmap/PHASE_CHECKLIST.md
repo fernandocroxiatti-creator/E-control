@@ -65,6 +65,13 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
 - [x] Revisão final local: grants de piloto fechados a `company_owner` + ZGR01,
   PostgreSQL isolado com 32 barreiras (exit `0`), Node 151/151, lint,
   TypeScript, build, `bash -n`, diff e segredos: PASS.
+- [x] Diagnóstico do piloto: disponibilidade empresarial de BP01, MM01–MM03,
+  SV01, ME21N, ME23N e ZGR01 confirmada pelo painel oficial; ZIV01 permanece
+  não habilitada.
+- [~] Extensão local de grants empresariais mínimos para cadastros e compras:
+  migration `20261124110000_company_scoped_pilot_operational_entitlements.sql`,
+  Node 156/156, lint, TypeScript, build e PostgreSQL isolado PASS; pendente de
+  revisão, commit, publicação e autorização remota específica.
 
 ## Fases 2–9
 
@@ -78,3 +85,4 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
 | Até `20261110120000` | Aplicada/confirmada anteriormente; não reaplicar |
 | `20261116180000_purchase_receipt_inventory_valuation.sql` | Aplicada em Production no rollout anterior informado; SHA-256 `f7a8e4648e82cbffadcbb6d23d192912d02ba93aa4ef449dffe62502ccdbcda3`. Nesta execução não houve nova consulta ou mutação remota. |
 | `20261118190000_company_scoped_permission_governance.sql` | Local, pendente de revisão/publicação/aplicação; SHA-256 `6a8ad42e233ee6742f6ae19690caab4e8b3cf041e157dd58862d804fd8b2660e`; sem grants, disponibilidade ou aprovações automáticas |
+| `20261124110000_company_scoped_pilot_operational_entitlements.sql` | Local, não aplicada; amplia apenas a lista permitida de grants empresariais já existente, sem criar grants, disponibilidade, aprovações ou vínculos; SHA-256 `876793f2d8028569d583cc79b54a06d84d34bd6b16d5456ee77fad808cce0d13` |

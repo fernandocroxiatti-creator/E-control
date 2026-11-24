@@ -7,7 +7,9 @@ import test from "node:test";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const read = (file) => readFileSync(resolve(root, file), "utf8");
 const migration = read("supabase/migrations/20261118190000_company_scoped_permission_governance.sql");
+const pilotEntitlementsMigration = read("supabase/migrations/20261124110000_company_scoped_pilot_operational_entitlements.sql");
 const behavior = read("tests/sql/company-scoped-permission-governance-behavior.sql");
+const pilotEntitlementsBehavior = read("tests/sql/company-scoped-pilot-operational-entitlements-behavior.sql");
 const runner = read("scripts/test-package-01-postgres.sh");
 const actions = read("app/actions/master-access-governance.ts");
 const companyAccess = read("app/master/acessos-por-empresa/company-access-console.tsx");
@@ -47,6 +49,26 @@ test("company access readiness distinguishes no selection from an unavailable se
   assert.match(companyAccessPage, /"Configuração disponível"/);
   assert.match(companyAccessPage, /"Configuração indisponível"/);
   assert.doesNotMatch(companyAccessPage, /Aguardando ativação/);
+});
+
+test("pilot operational entitlements remain company- and branch-scoped", () => {
+  for (const permission of [
+    "transaction.masterdata.party.manage",
+    "transaction.masterdata.catalog.product.manage",
+    "transaction.masterdata.catalog.product.update",
+    "transaction.masterdata.catalog.product.read",
+    "transaction.masterdata.catalog.service.manage",
+    "transaction.purchasing.purchase_order.create",
+    "transaction.purchasing.purchase_order.read",
+    "transaction.purchasing.receipt.manage",
+  ]) assert.match(pilotEntitlementsMigration, new RegExp(`'${permission}'`));
+  assert.match(pilotEntitlementsMigration, /p_role_key <> 'company_owner'/);
+  assert.doesNotMatch(pilotEntitlementsMigration, /transaction\.inventory\.valuation\.initial/);
+  assert.match(actions, /scopedPilotPermissionKeys/);
+  assert.match(companyAccess, /Inventário, transferências, O\.S\. e ZIV01 permanecem excluídos/);
+  assert.match(pilotEntitlementsBehavior, /ZIV01 permission was accepted/);
+  assert.match(pilotEntitlementsBehavior, /crossed a branch, tenant or ZIV01 boundary/);
+  assert.match(runner, /20261124110000_company_scoped_pilot_operational_entitlements\.sql/);
 });
 
 test("isolated PostgreSQL behavior covers reason rejection, Master-only writes and tenant/branch denial", () => {
