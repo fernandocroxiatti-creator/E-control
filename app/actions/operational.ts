@@ -6,6 +6,8 @@ import { getSiteUrl, getSupabaseEnv } from "@/lib/supabase/env";
 import { isAuthorizedSupabaseTarget } from "@/lib/supabase/homologation-env";
 import { createClient } from "@/lib/supabase/server";
 import { authInvitationsEnabled, createAuthAdminClient } from "@/lib/supabase/auth-admin";
+import { businessPartyDiagnosticCode, businessPartyRpcMessage, prepareBusinessParty } from "@/lib/operational/business-party-input";
+import { reportBusinessPartyFailure } from "@/lib/operational/diagnostics";
 
 type ActionState = { status: "idle" | "success" | "error"; message?: string };
 export const operationalIdle: ActionState = { status: "idle" };
@@ -93,14 +95,19 @@ function workOrderLines(form: FormData) {
 }
 
 export async function createBusinessPartyAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const diagnosticId = businessPartyDiagnosticCode();
   try {
     const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const id = requestId(form);
-    const partyType = value(form, "party_type", 10); const legalName = value(form, "legal_name", 200);
-    if (!client || !UUID.test(tenantId) || !id || !["customer", "supplier", "both"].includes(partyType) || !legalName) return { status: "error", message: "Ação indisponível ou dados inválidos." };
-    const { error } = await client.rpc("operational_create_business_party", { p_tenant_id: tenantId, p_party_type: partyType, p_legal_name: legalName, p_document_number: value(form, "document_number", 18) || null, p_contact_email: value(form, "contact_email", 254) || null, p_contact_phone: value(form, "contact_phone", 40) || null, p_address: {}, p_request_id: id });
-    if (error) return { status: "error", message: "Não foi possível cadastrar. A autorização continua negada até que o banco aceite a operação." };
+    const prepared = prepareBusinessParty({ partyType: value(form, "party_type", 10), legalName: value(form, "legal_name", 200), documentNumber: value(form, "document_number", 18), contactEmail: value(form, "contact_email", 254), contactPhone: value(form, "contact_phone", 40) });
+    if (!client || !UUID.test(tenantId) || !id) return { status: "error", message: "Ação indisponível ou dados inválidos." };
+    if ("error" in prepared) return { status: "error", message: prepared.error };
+    const { error } = await client.rpc("operational_create_business_party", { p_tenant_id: tenantId, p_party_type: prepared.value.partyType, p_legal_name: prepared.value.legalName, p_document_number: prepared.value.documentNumber, p_contact_email: prepared.value.contactEmail, p_contact_phone: prepared.value.contactPhone, p_address: {}, p_request_id: id });
+    if (error) return { status: "error", message: businessPartyRpcMessage(error, diagnosticId) };
     revalidatePath("/operacional/cadastros"); return { status: "success", message: "Cadastro registrado e auditado." };
-  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+  } catch (error) {
+    reportBusinessPartyFailure(diagnosticId, error);
+    return { status: "error", message: `Não foi possível concluir o cadastro. Tente novamente. Código de diagnóstico: ${diagnosticId}.` };
+  }
 }
 
 export async function createCatalogItemAction(_: ActionState, form: FormData): Promise<ActionState> {

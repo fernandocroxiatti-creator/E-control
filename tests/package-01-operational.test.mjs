@@ -14,6 +14,8 @@ const team = read("app/operacional/equipe/page.tsx");
 const catalogPage = read("app/operacional/cadastros/page.tsx");
 const stockPage = read("app/operacional/estoque/page.tsx");
 const operationalReadModel = read("lib/operational/read-model.ts");
+const businessPartyInput = read("lib/operational/business-party-input.ts");
+const operationalDiagnostics = read("lib/operational/diagnostics.ts");
 const dashboard = read("app/components/erp-dashboard.tsx");
 const dashboardPage = read("app/dashboard/page.tsx");
 
@@ -74,7 +76,11 @@ test("browser-facing operational actions remain server-session and explicit-flag
   assert.match(actions, /env\.operationalEnabled/);
   assert.match(actions, /client\.auth\.getUser\(\)/);
   assert.match(actions, /isAuthorizedSupabaseTarget\(env\)/);
-  assert.doesNotMatch(actions, /service_role|SUPABASE_SERVICE_ROLE_KEY|console\.(?:log|error)/i);
+  assert.doesNotMatch(actions, /service_role|SUPABASE_SERVICE_ROLE_KEY/i);
+  assert.match(actions, /reportBusinessPartyFailure/);
+  assert.match(operationalDiagnostics, /business_party\.create\.failed/);
+  assert.match(operationalDiagnostics, /diagnostic_id/);
+  assert.match(businessPartyInput, /businessPartyRpcMessage/);
   assert.match(catalog, /Operações/);
   assert.match(catalog, /Aguardando ativação|Bloqueadas/);
   assert.match(catalog, /InventoryMovementForm/);
@@ -111,5 +117,5 @@ test("operational catalog uses the approved update RPCs and bounded server-side 
   assert.match(operationalReadModel, /p_offset: \(currentPage - 1\) \* PAGE_SIZE/);
   assert.match(stockPage, /Paginação de saldo/);
   assert.match(stockPage, /Paginação de movimentações/);
-  assert.doesNotMatch(actions, /service_role|SUPABASE_SERVICE_ROLE_KEY|console\.(?:log|error)/i);
+  assert.doesNotMatch(actions, /service_role|SUPABASE_SERVICE_ROLE_KEY/i);
 });
