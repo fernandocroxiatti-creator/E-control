@@ -96,7 +96,9 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
 - [x] Documentar arquitetura de transição e pós-condições fail-closed.
 - [x] Aprovar a política de escopo empresa versus filial (D12).
 - [x] Implementar migration incremental e testes isolados.
-- [x] Verificar SHA-256 da migration local:
-  `af597c479c4076ed26ba9131bb805966ed7f2b8894116d66e2e70e47a23f9ed9`.
+- [x] Reproduzir e corrigir a normalização de grants piloto pré-existentes;
+  rollback remoto anterior confirmado sem alteração parcial.
+- [x] Verificar SHA-256 da migration local corrigida:
+  `a7e0d89de8e24228ea254cc3ef14b63be752f40e263bcbf97294aa153cbc8f24`.
 - [ ] Concluir revisão final, commit local e publicação coordenada com backup
   atual antes da migration remota.

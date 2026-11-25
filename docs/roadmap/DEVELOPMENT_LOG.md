@@ -32,6 +32,7 @@
 | 2026-11-24 | Diagnóstico de grants legados | Leitura de schema publicado e contagens agregadas: grants globais de `company_owner` alcançam empresas e vínculos ativos; cadastros BP01/MM01/SV01 chamam autorização sem filial | Transição necessária; sem mutação remota |
 | 2026-11-24 | Preparação de transição | Worktree local `codex/governance-legacy-transition` criado de `71d13a1`; arquitetura de escopo empresa/filial e pós-condições fail-closed documentadas | Política aprovada como D12; sem mutação remota |
 | 2026-11-25 | Implementação local da transição legada | Migration `20261124120000`, UI/Admin Master, leitura canônica e testes de equivalência | PostgreSQL isolado PASS; Node 160/160, TypeScript, lint e build PASS; pendente revisão final, commit e publicação autorizada separadamente |
+| 2026-11-25 | Aplicação controlada da transição | A migration detectou grants piloto de cadastro ainda no formato filial e interrompeu antes do commit | Rollback transacional confirmado; correção local converte somente quando há equivalência de empresa, com auditoria; regressão isolada PASS |
 
 ### Evidência da concorrência cruzada e do hardening
 

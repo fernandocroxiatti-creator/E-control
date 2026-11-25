@@ -22,6 +22,13 @@ begin
   ) then
     raise exception 'legacy company-scope grant was not materialized';
   end if;
+  if exists (
+    select 1 from public.company_role_permission_grants
+    where tenant_id = tenant_a and branch_id = branch_a and grant_scope = 'branch'
+      and role_key = 'company_owner' and permission_key = 'transaction.masterdata.party.manage'
+  ) then
+    raise exception 'legacy pilot branch grant was not normalized to company scope';
+  end if;
   if not exists (
     select 1 from public.company_role_permission_grants
     where tenant_id = tenant_a and branch_id = branch_a and grant_scope = 'branch'
@@ -34,6 +41,12 @@ begin
     where event_key = 'master_legacy_global_grant.materialized' and tenant_id = tenant_a
   ) then
     raise exception 'legacy grant materialization is missing audit evidence';
+  end if;
+  if not exists (
+    select 1 from app_private.provisioning_audit_events
+    where event_key = 'master_legacy_scoped_grant.normalized' and tenant_id = tenant_a
+  ) then
+    raise exception 'legacy pilot grant normalization is missing audit evidence';
   end if;
 
   perform set_config('request.jwt.claim.role', 'authenticated', true);

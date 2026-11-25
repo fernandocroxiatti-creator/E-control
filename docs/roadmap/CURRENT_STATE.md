@@ -23,7 +23,13 @@ o estado no momento em que foram escritos, não o estado publicado atual.
 - A migration local `20261124120000_transition_legacy_operational_grants.sql`
   materializa somente a cobertura já efetiva, registra auditoria e falha antes
   de remover um fallback global se a equivalência não puder ser provada.
-- SHA-256 local verificado: `af597c479c4076ed26ba9131bb805966ed7f2b8894116d66e2e70e47a23f9ed9`.
+- A primeira tentativa remota falhou fechada e foi revertida integralmente pelo
+  `BEGIN`/`COMMIT`: grants piloto preexistentes de cadastros ainda estavam no
+  formato filial. A correção local normaliza apenas linhas que já possuem a
+  cobertura equivalente de empresa, registra auditoria e mantém a falha
+  fechada quando a equivalência não existe.
+- SHA-256 local verificado após a correção:
+  `a7e0d89de8e24228ea254cc3ef14b63be752f40e263bcbf97294aa153cbc8f24`.
 - Evidências locais: PostgreSQL descartável PASS; Node 160/160 PASS;
   TypeScript, lint e build PASS. A migration **não** foi publicada, aplicada ou
   testada com dados de Production nesta etapa.

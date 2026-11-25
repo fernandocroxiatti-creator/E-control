@@ -21,6 +21,7 @@ test("legacy operational grants transition atomically to company and branch scop
   assert.match(migration, /Legacy branch-scoped operational grant coverage is incomplete/);
   assert.match(migration, /delete from public\.role_permission_grants where permission_key like 'transaction\.%'/);
   assert.match(migration, /master_legacy_global_grant\.materialized/);
+  assert.match(migration, /master_legacy_scoped_grant\.normalized/);
 });
 
 test("authorization removes the global operational fallback and respects permission scope", () => {
@@ -41,6 +42,7 @@ test("database runner and behavior suite exercise materialization, denial and Ma
     "legacy global operational grants remained after transition",
     "legacy company-scope grant was not materialized",
     "legacy branch-scope grant was not materialized",
+    "legacy pilot branch grant was not normalized to company scope",
     "transition changed the effective company or branch boundaries",
     "global operational grant was accepted after transition",
   ]) assert.match(behavior, new RegExp(probe));

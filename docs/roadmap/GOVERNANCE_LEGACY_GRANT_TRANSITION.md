@@ -41,7 +41,14 @@ migration e qualquer grant remoto continuam sujeitos ao rollout coordenado.
 ## Implementação incremental local
 
 - Migration: `20261124120000_transition_legacy_operational_grants.sql`.
-- SHA-256 local: `af597c479c4076ed26ba9131bb805966ed7f2b8894116d66e2e70e47a23f9ed9`.
+- SHA-256 local: `a7e0d89de8e24228ea254cc3ef14b63be752f40e263bcbf97294aa153cbc8f24`.
+
+Durante a primeira aplicação controlada, a verificação final detectou grants
+piloto existentes de cadastros ainda persistidos por filial. A transação foi
+integralmente revertida, sem registrar a migration. A correção normaliza uma
+linha dessas somente depois de existir a mesma tupla em escopo empresa; cada
+normalização recebe o evento auditável
+`master_legacy_scoped_grant.normalized`.
 
 1. Acrescentar à definição de permissão um escopo canônico (`company` ou
    `branch`) e classificar explicitamente cada permissão operacional existente.
