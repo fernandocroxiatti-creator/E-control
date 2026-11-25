@@ -184,3 +184,16 @@ reais legados; gerar AP/financeiro; publicar, fazer push ou deploy.
 - ZIV01, inventário, transferência, O.S., financeiro e papéis diferentes de
   `company_owner` permanecem fora da lista permitida. A proposta não autoriza
   publicação ou aplicação em Production.
+
+### D12 — Escopo de grants operacionais por empresa e filial (2026-11-24)
+
+- Achado confirmado: permissões de cadastros BP01/MM01/SV01 são verificadas
+  sem filial, enquanto o grant scoped publicado exige filial. Logo, um grant de
+  filial não pode substituir o grant global legado desses cadastros.
+- Decisão aprovada: permissões de cadastro compartilhado usam escopo empresa;
+  permissões que movimentam saldo ou documento de filial usam escopo filial.
+  O detalhe da migração, das pós-condições e da recuperação está em
+  `GOVERNANCE_LEGACY_GRANT_TRANSITION.md`.
+- A implementação local correspondente é a migration
+  `20261124120000_transition_legacy_operational_grants.sql`. Ela ainda não foi
+  publicada nem aplicada remotamente. A decisão não altera D01–D09.

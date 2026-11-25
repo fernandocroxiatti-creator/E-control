@@ -64,8 +64,8 @@ test("pilot operational entitlements remain company- and branch-scoped", () => {
   ]) assert.match(pilotEntitlementsMigration, new RegExp(`'${permission}'`));
   assert.match(pilotEntitlementsMigration, /p_role_key <> 'company_owner'/);
   assert.doesNotMatch(pilotEntitlementsMigration, /transaction\.inventory\.valuation\.initial/);
-  assert.match(actions, /scopedPilotPermissionKeys/);
-  assert.match(companyAccess, /Inventário, transferências, O\.S\. e ZIV01 permanecem excluídos/);
+  assert.match(actions, /transaction\\\.\[a-z0-9_\.\]\{1,127\}/);
+  assert.match(companyAccess, /Inventário, transferências, O\.S\. e ZIV01 não são habilitados automaticamente/);
   assert.match(pilotEntitlementsBehavior, /ZIV01 permission was accepted/);
   assert.match(pilotEntitlementsBehavior, /crossed a branch, tenant or ZIV01 boundary/);
   assert.match(runner, /20261124110000_company_scoped_pilot_operational_entitlements\.sql/);

@@ -11,17 +11,6 @@ const itemTypes = new Set(["role", "permission", "transaction"]);
 const states = new Set(["pending_approval", "approved", "retired"]);
 const operations = new Set(["grant", "revoke"]);
 const minimumReasonLength = 10;
-const scopedPilotPermissionKeys = new Set([
-  "transaction.masterdata.party.manage",
-  "transaction.masterdata.catalog.read",
-  "transaction.masterdata.catalog.product.manage",
-  "transaction.masterdata.catalog.product.update",
-  "transaction.masterdata.catalog.product.read",
-  "transaction.masterdata.catalog.service.manage",
-  "transaction.purchasing.purchase_order.create",
-  "transaction.purchasing.purchase_order.read",
-  "transaction.purchasing.receipt.manage",
-]);
 
 function text(formData: FormData, field: string, max = 120) {
   const value = formData.get(field);
@@ -250,9 +239,10 @@ type ScopedGrantRow = {
   permission_key?: unknown;
 };
 
-function hasScopedGrant(value: unknown, branchId: string, roleKey: string, permissionKey: string) {
+function hasScopedGrant(value: unknown, branchId: string | null, roleKey: string, permissionKey: string) {
   return Array.isArray(value) && value.some((row): row is ScopedGrantRow => typeof row === "object" && row !== null
-    && row.branch_id === branchId && row.role_key === roleKey && row.permission_key === permissionKey);
+    && (branchId === null ? row.branch_id === null : row.branch_id === branchId)
+    && row.role_key === roleKey && row.permission_key === permissionKey);
 }
 
 export async function setCompanyScopedRolePermissionGrantAction(
@@ -266,8 +256,8 @@ export async function setCompanyScopedRolePermissionGrantAction(
   const permissionKey = text(formData, "permission_key", 120);
   const operation = text(formData, "operation", 16);
   const justification = reason(formData);
-  if (!/^[0-9a-f-]{36}$/i.test(tenantId) || !/^[0-9a-f-]{36}$/i.test(branchId)
-    || roleKey !== "company_owner" || !scopedPilotPermissionKeys.has(permissionKey)
+  if (!/^[0-9a-f-]{36}$/i.test(tenantId) || (branchId !== "" && !/^[0-9a-f-]{36}$/i.test(branchId))
+    || !/^[a-z][a-z0-9_]{1,63}$/.test(roleKey) || !/^transaction\.[a-z0-9_.]{1,127}$/.test(permissionKey)
     || !operations.has(operation) || !hasRequiredReason(justification)) {
     return { status: "error", message: "Revise empresa, filial, papel, permissão e a justificativa de pelo menos 10 caracteres." };
   }
@@ -276,7 +266,7 @@ export async function setCompanyScopedRolePermissionGrantAction(
     if (!client) return { status: "error", message: "Concessões empresariais estão desativadas neste ambiente." };
     const { data, error } = await client.rpc("master_set_company_role_permission_grant", {
       p_tenant_id: tenantId,
-      p_branch_id: branchId,
+      p_branch_id: branchId || null,
       p_role_key: roleKey,
       p_permission_key: permissionKey,
       p_operation: operation,
@@ -287,7 +277,7 @@ export async function setCompanyScopedRolePermissionGrantAction(
       return { status: "error", message: "Não foi possível confirmar a concessão empresarial. Atualize a página e consulte a auditoria antes de tentar novamente." };
     }
     const confirmation = await client.rpc("master_list_company_scoped_permission_grants", { p_tenant_id: tenantId });
-    const present = hasScopedGrant(confirmation.data, branchId, roleKey, permissionKey);
+    const present = hasScopedGrant(confirmation.data, branchId || null, roleKey, permissionKey);
     if (confirmation.error || (operation === "grant" ? !present : present)) {
       console.error(`[master-governance] scoped_role_permission_postcondition_not_confirmed:${confirmation.error?.code ?? "mismatch"}`);
       return { status: "error", message: "A resposta foi recebida, mas o estado persistido não pôde ser confirmado. Não repita a operação; atualize a página e consulte a auditoria." };

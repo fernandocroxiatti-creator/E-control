@@ -84,5 +84,19 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
 |---|---|
 | Até `20261110120000` | Aplicada/confirmada anteriormente; não reaplicar |
 | `20261116180000_purchase_receipt_inventory_valuation.sql` | Aplicada em Production no rollout anterior informado; SHA-256 `f7a8e4648e82cbffadcbb6d23d192912d02ba93aa4ef449dffe62502ccdbcda3`. Nesta execução não houve nova consulta ou mutação remota. |
-| `20261118190000_company_scoped_permission_governance.sql` | Local, pendente de revisão/publicação/aplicação; SHA-256 `6a8ad42e233ee6742f6ae19690caab4e8b3cf041e157dd58862d804fd8b2660e`; sem grants, disponibilidade ou aprovações automáticas |
-| `20261124110000_company_scoped_pilot_operational_entitlements.sql` | Local, não aplicada; amplia apenas a lista permitida de grants empresariais já existente, sem criar grants, disponibilidade, aprovações ou vínculos; SHA-256 `876793f2d8028569d583cc79b54a06d84d34bd6b16d5456ee77fad808cce0d13` |
+| `20261118190000_company_scoped_permission_governance.sql` | Aplicada em Production no rollout de governança registrado; SHA-256 `6a8ad42e233ee6742f6ae19690caab4e8b3cf041e157dd58862d804fd8b2660e`. Não cria grants, disponibilidade ou aprovações automaticamente. |
+| `20261124110000_company_scoped_pilot_operational_entitlements.sql` | Aplicada em Production no rollout confirmado de 2026-11-24; SHA-256 `876793f2d8028569d583cc79b54a06d84d34bd6b16d5456ee77fad808cce0d13`. Não cria grants, disponibilidade, aprovações ou vínculos automaticamente. |
+
+## Governança legada — preparação local 2026-11-24
+
+- [x] Mapear grants globais operacionais legados sem expor dados pessoais.
+- [x] Confirmar que a remoção direta causaria regressão para vínculos ativos.
+- [x] Confirmar incompatibilidade entre cadastros sem filial e grants estritos
+  por filial.
+- [x] Documentar arquitetura de transição e pós-condições fail-closed.
+- [x] Aprovar a política de escopo empresa versus filial (D12).
+- [x] Implementar migration incremental e testes isolados.
+- [x] Verificar SHA-256 da migration local:
+  `af597c479c4076ed26ba9131bb805966ed7f2b8894116d66e2e70e47a23f9ed9`.
+- [ ] Concluir revisão final, commit local e publicação coordenada com backup
+  atual antes da migration remota.

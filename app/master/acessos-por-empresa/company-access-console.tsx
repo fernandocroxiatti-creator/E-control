@@ -4,7 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { setCompanyScopedRolePermissionGrantAction, setCompanyTransactionAvailabilityAction } from "@/app/actions/master-access-governance";
 import { masterAccessIdle } from "@/lib/master/action-state";
-import type { MasterBranch, MasterCompany, MasterCompanyAccessItem, MasterCompanyScopedPermissionGrant } from "@/lib/master/read-model";
+import type { MasterAccessControlEntry, MasterBranch, MasterCompany, MasterCompanyAccessItem, MasterCompanyScopedPermissionGrant } from "@/lib/master/read-model";
 
 const names: Record<string, string> = {
   BP01: "Clientes e fornecedores", MM01: "Cadastro de produtos", SV01: "Cadastro de serviços",
@@ -18,6 +18,15 @@ const modules: Record<string, string> = {
   MDM: "Cadastros", INV: "Estoque", PUR: "Compras", SAL: "Vendas", FIN: "Financeiro",
   SVC: "Serviços", SRV: "Serviços", REP: "Relatórios", ADM: "Administração",
 };
+const companyScopedPermissionKeys = new Set([
+  "transaction.masterdata.party.read",
+  "transaction.masterdata.party.manage",
+  "transaction.masterdata.catalog.read",
+  "transaction.masterdata.catalog.product.manage",
+  "transaction.masterdata.catalog.product.update",
+  "transaction.masterdata.catalog.product.read",
+  "transaction.masterdata.catalog.service.manage",
+]);
 
 function stateLabel(value: string | null) {
   if (value === "approved") return "Aprovada";
@@ -34,46 +43,52 @@ function unavailableReason(item: MasterCompanyAccessItem) {
   return "Pronta para disponibilização empresarial.";
 }
 
-function CompanyScopedGrantManager({ tenantId, branches, items, grants, ready }: {
-  tenantId: string; branches: MasterBranch[]; items: MasterCompanyAccessItem[]; grants: MasterCompanyScopedPermissionGrant[]; ready: boolean;
+function CompanyScopedGrantManager({ tenantId, branches, items, grants, roles, ready }: {
+  tenantId: string; branches: MasterBranch[]; items: MasterCompanyAccessItem[]; grants: MasterCompanyScopedPermissionGrant[]; roles: MasterAccessControlEntry[]; ready: boolean;
 }) {
   const [state, action, pending] = useActionState(setCompanyScopedRolePermissionGrantAction, masterAccessIdle);
   const activeBranches = branches.filter((branch) => branch.status === "active");
-  const pilotPermissions = items.filter((item) => ["BP01", "MM01", "MM02", "MM03", "SV01", "ME21N", "ME23N", "ZGR01"].includes(item.transaction_code)
+  const pilotPermissions = items.filter((item) => item.permission_key.startsWith("transaction.")
     && item.approval_state === "approved" && item.permission_approval_state === "approved");
   const extraCatalogRead = pilotPermissions.some((item) => item.transaction_code === "MM01" || item.transaction_code === "SV01")
     ? { transaction_code: "MDM", permission_key: "transaction.masterdata.catalog.read", label: "Leitura do catálogo necessária para os cadastros" }
     : null;
-  const grantOptions = [
+  const grantOptions = [...new Map([
     ...pilotPermissions.map((item) => ({ transaction_code: item.transaction_code, permission_key: item.permission_key, label: names[item.transaction_code] ?? item.transaction_code })),
     ...(extraCatalogRead ? [extraCatalogRead] : []),
-  ];
+  ].map((option) => [option.permission_key, option])).values()];
+  const approvedRoles = roles.filter((role) => role.entry_type === "role" && role.approval_state === "approved" && role.role_key)
+    .map((role) => ({ role_key: role.role_key!, label: role.display_name }));
   const [branchId, setBranchId] = useState(activeBranches[0]?.branch_id ?? "");
   const [permissionKey, setPermissionKey] = useState(grantOptions[0]?.permission_key ?? "");
+  const [roleKey, setRoleKey] = useState(approvedRoles[0]?.role_key ?? "");
   const [confirmed, setConfirmed] = useState(false);
-  const selectedGrant = grants.find((grant) => grant.branch_id === branchId && grant.role_key === "company_owner" && grant.permission_key === permissionKey);
+  const grantScope = companyScopedPermissionKeys.has(permissionKey) ? "company" : "branch";
+  const selectedGrant = grants.find((grant) => grant.branch_id === (grantScope === "company" ? null : branchId) && grant.role_key === roleKey && grant.permission_key === permissionKey);
   return <section className="master-company-scoped-grants">
-    <header><h3>Permissões por empresa e filial</h3><p>Esta camada é aditiva, limitada à filial escolhida e não cria vínculos nem grants globais. O papel fixo para este piloto é <code>company_owner</code>.</p></header>
-    {!ready ? <p className="master-panel-empty">A leitura canônica dos grants empresariais não está disponível. Nenhuma alteração pode ser enviada.</p> : !activeBranches.length || !grantOptions.length ? <p className="master-panel-empty">Mantenha uma filial ativa e aprove a transação e a permissão correspondente antes de conceder um grant empresarial do piloto.</p> : <form action={action} className="master-company-scoped-grant-form">
+    <header><h3>Permissões por empresa e filial</h3><p>Cadastros compartilhados são concedidos por empresa. Operações com contexto operacional exigem empresa e filial. Esta camada não cria vínculos nem grants globais.</p></header>
+    {!ready ? <p className="master-panel-empty">A leitura canônica dos grants empresariais não está disponível. Nenhuma alteração pode ser enviada.</p> : !grantOptions.length || !approvedRoles.length || (grantScope === "branch" && !activeBranches.length) ? <p className="master-panel-empty">Aprove papel, permissão e transação; mantenha uma filial ativa quando a permissão exigir contexto de filial.</p> : <form action={action} className="master-company-scoped-grant-form">
       <input type="hidden" name="tenant_id" value={tenantId} />
-      <input type="hidden" name="role_key" value="company_owner" />
+      <input type="hidden" name="branch_id" value={grantScope === "branch" ? branchId : ""} />
+      <input type="hidden" name="role_key" value={roleKey} />
       <input type="hidden" name="permission_key" value={permissionKey} />
       <input type="hidden" name="operation" value={selectedGrant ? "revoke" : "grant"} />
-      <label>Filial<select name="branch_id" value={branchId} onChange={(event) => { setBranchId(event.target.value); setConfirmed(false); }} disabled={pending}>{activeBranches.map((branch) => <option key={branch.branch_id} value={branch.branch_id}>{branch.code} · {branch.name}</option>)}</select></label>
-      <label>Permissão do piloto<select value={permissionKey} onChange={(event) => { setPermissionKey(event.target.value); setConfirmed(false); }} disabled={pending}>{grantOptions.map((option) => <option key={option.permission_key} value={option.permission_key}>{option.transaction_code} · {option.label}</option>)}</select></label>
-      <p className="master-form-help">Somente permissões aprovadas de cadastros, compras e recebimento podem ser concedidas neste escopo. Inventário, transferências, O.S. e ZIV01 permanecem excluídos.</p>
+      <label>Papel<select value={roleKey} onChange={(event) => { setRoleKey(event.target.value); setConfirmed(false); }} disabled={pending}>{approvedRoles.map((role) => <option key={role.role_key} value={role.role_key}>{role.label} · {role.role_key}</option>)}</select></label>
+      <label>Permissão operacional<select value={permissionKey} onChange={(event) => { setPermissionKey(event.target.value); setConfirmed(false); }} disabled={pending}>{grantOptions.map((option) => <option key={option.permission_key} value={option.permission_key}>{option.transaction_code} · {option.label}</option>)}</select></label>
+      {grantScope === "branch" ? <label>Filial<select value={branchId} onChange={(event) => { setBranchId(event.target.value); setConfirmed(false); }} disabled={pending}>{activeBranches.map((branch) => <option key={branch.branch_id} value={branch.branch_id}>{branch.code} · {branch.name}</option>)}</select></label> : <p className="master-form-help">Escopo: empresa. O cadastro é compartilhado entre as filiais autorizadas da empresa.</p>}
+      <p className="master-form-help">Aprovação global, disponibilidade empresarial, vínculo ativo e acesso à filial continuam obrigatórios. Inventário, transferências, O.S. e ZIV01 não são habilitados automaticamente.</p>
       <label>Justificativa auditável<textarea name="reason" minLength={10} maxLength={1000} required disabled={pending} /></label>
-      <label className="master-checkbox-label"><input name="confirmed" type="checkbox" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} disabled={pending} /> Confirmo o escopo exato de empresa, filial, papel e permissão.</label>
+      <label className="master-checkbox-label"><input name="confirmed" type="checkbox" required checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} disabled={pending} /> Confirmo o escopo exato de empresa, papel, permissão e, quando aplicável, filial.</label>
       <button className="master-action" type="submit" disabled={!confirmed || pending}>{pending ? "Registrando…" : selectedGrant ? "Revogar grant empresarial" : "Conceder grant empresarial"}</button>
       {selectedGrant && <p className="master-form-help">Grant ativo desde {new Date(selectedGrant.created_at).toLocaleString("pt-BR")}. Justificativa registrada: {selectedGrant.reason}</p>}
       {state.message && <p className={`master-company-feedback ${state.status === "success" ? "is-success" : "is-error"}`} role={state.status === "success" ? "status" : "alert"}>{state.message}</p>}
     </form>}
-    {grants.length > 0 && <ul className="master-company-scoped-grant-list">{grants.map((grant) => <li key={`${grant.branch_id}:${grant.role_key}:${grant.permission_key}`}><strong>{grant.branch_code} · {grant.role_key}</strong><span>{grant.permission_key}</span><small>{grant.reason}</small></li>)}</ul>}
+    {grants.length > 0 && <ul className="master-company-scoped-grant-list">{grants.map((grant) => <li key={`${grant.grant_scope}:${grant.branch_id ?? "company"}:${grant.role_key}:${grant.permission_key}`}><strong>{grant.grant_scope === "company" ? `Empresa · ${grant.role_key}` : `${grant.branch_code} · ${grant.role_key}`}</strong><span>{grant.permission_key}</span><small>{grant.reason}</small></li>)}</ul>}
   </section>;
 }
 
-function CompanyAccessWorkspace({ companies, selected, items, branches, scopedGrants, ready }: {
-  companies: MasterCompany[]; selected: string; items: MasterCompanyAccessItem[]; branches: MasterBranch[]; scopedGrants: MasterCompanyScopedPermissionGrant[]; ready: boolean;
+function CompanyAccessWorkspace({ companies, selected, items, branches, scopedGrants, roles, ready }: {
+  companies: MasterCompany[]; selected: string; items: MasterCompanyAccessItem[]; branches: MasterBranch[]; scopedGrants: MasterCompanyScopedPermissionGrant[]; roles: MasterAccessControlEntry[]; ready: boolean;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -133,12 +148,12 @@ function CompanyAccessWorkspace({ companies, selected, items, branches, scopedGr
         <button className="master-action" type="submit" disabled={!hasChanges || !confirming || pending}>{pending ? "Salvando…" : "Salvar permissões da empresa"}</button>
         {state.message && <p className={`master-company-feedback ${state.status === "success" ? "is-success" : "is-error"}`} role={state.status === "success" ? "status" : "alert"}>{state.message}</p>}
       </form> : <section className="master-notice"><div><strong>Configuração aguardando ativação</strong><p>A estrutura de disponibilidade por empresa não está acessível neste ambiente. Nada pode ser salvo antes dela.</p></div></section>}
-      <CompanyScopedGrantManager tenantId={selected} branches={branches} items={items} grants={scopedGrants} ready={ready} />
+      <CompanyScopedGrantManager tenantId={selected} branches={branches} items={items} grants={scopedGrants} roles={roles} ready={ready} />
     </>}
   </div>;
 }
 
-export function CompanyAccessConsole(props: { companies: MasterCompany[]; selected: string; items: MasterCompanyAccessItem[]; branches: MasterBranch[]; scopedGrants: MasterCompanyScopedPermissionGrant[]; ready: boolean }) {
-  const savedState = `${props.items.map((item) => `${item.transaction_code}:${item.enabled ? "1" : "0"}`).join("|")}:${props.scopedGrants.map((grant) => `${grant.branch_id}:${grant.role_key}:${grant.permission_key}`).join("|")}`;
+export function CompanyAccessConsole(props: { companies: MasterCompany[]; selected: string; items: MasterCompanyAccessItem[]; branches: MasterBranch[]; scopedGrants: MasterCompanyScopedPermissionGrant[]; roles: MasterAccessControlEntry[]; ready: boolean }) {
+  const savedState = `${props.items.map((item) => `${item.transaction_code}:${item.enabled ? "1" : "0"}`).join("|")}:${props.scopedGrants.map((grant) => `${grant.grant_scope}:${grant.branch_id ?? "company"}:${grant.role_key}:${grant.permission_key}`).join("|")}`;
   return <CompanyAccessWorkspace key={`${props.selected}:${savedState}`} {...props} />;
 }

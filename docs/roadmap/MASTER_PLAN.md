@@ -18,7 +18,7 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
 
 | Ordem | Fase | Estado |
 |---:|---|---|
-| 1 | Recebimento de compras, estoque e custo médio | A migration de valuation foi publicada anteriormente conforme o histórico operacional informado; ZGR01/ZIV01 continuam bloqueadas. A correção local de governança por empresa/filial aguarda revisão, publicação e migration incremental separadas. |
+| 1 | Recebimento de compras, estoque e custo médio | A migration de valuation e a governança incremental foram publicadas conforme o histórico operacional confirmado; ZGR01 permanece estritamente scoped no piloto e ZIV01 continua bloqueada. A transição dos grants globais legados para escopos empresa/filial é um pacote futuro separado. |
 | 2 | Compra direta para O.S. | Não iniciada |
 | 3 | Orçamentos e conversão | Não iniciada |
 | 4 | O.S. completa | Não iniciada |
@@ -37,6 +37,17 @@ auditável. Nunca usar `service_role` para contornar a autorização operacional
   cadastros e compras do piloto está em desenvolvimento isolado; ela ainda não
   foi publicada nem aplicada remotamente.
 - Fase 2 possui trabalho local separado e não está liberada para Production.
+
+## Transição de grants legados — 2026-11-24
+
+- Grants globais de `company_owner` para BP01, MM01, SV01, ME21N e ME23N ainda
+  coexistem com a governança scoped. Eles não podem ser removidos diretamente:
+  a leitura agregada demonstrou cobertura de empresas e vínculos ativos.
+- A correção definitiva deve diferenciar permissões de escopo empresa de
+  permissões de escopo filial; ver
+  `GOVERNANCE_LEGACY_GRANT_TRANSITION.md`. D12 aprovou a política e a
+  implementação local está pronta para revisão final; nenhuma migration ou
+  alteração remota foi realizada nesta preparação.
 
 ## Portões
 

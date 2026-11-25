@@ -29,6 +29,9 @@
 | 2026-11-17 | Auditoria independente do hardening de idempotência | Reprodução em PostgreSQL 17.11 de replay idêntico de entrada pública com custo derivado | **NO-GO:** `23505` indevido; nenhum commit/remoto |
 | 2026-11-17 | Correção do replay com custo derivado | Persistência de modo de entrada de custo e cobertura comportamental/concorrente ampliada | PASS local; aguarda nova auditoria, sem commit/remoto |
 | 2026-11-17 | Auditoria final pré-commit | Reexecução independente da suíte PostgreSQL 17.11, 30 cenários concorrentes reais, Node 148/148, lint, TypeScript, build, `bash -n`, diff e segredos | **GO para sexto commit local**; sem mutação remota |
+| 2026-11-24 | Diagnóstico de grants legados | Leitura de schema publicado e contagens agregadas: grants globais de `company_owner` alcançam empresas e vínculos ativos; cadastros BP01/MM01/SV01 chamam autorização sem filial | Transição necessária; sem mutação remota |
+| 2026-11-24 | Preparação de transição | Worktree local `codex/governance-legacy-transition` criado de `71d13a1`; arquitetura de escopo empresa/filial e pós-condições fail-closed documentadas | Política aprovada como D12; sem mutação remota |
+| 2026-11-25 | Implementação local da transição legada | Migration `20261124120000`, UI/Admin Master, leitura canônica e testes de equivalência | PostgreSQL isolado PASS; Node 160/160, TypeScript, lint e build PASS; pendente revisão final, commit e publicação autorizada separadamente |
 
 ### Evidência da concorrência cruzada e do hardening
 

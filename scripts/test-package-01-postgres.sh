@@ -166,6 +166,13 @@ SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/company-scoped-permission-governance-behavior.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261124110000_company_scoped_pilot_operational_entitlements.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/company-scoped-pilot-operational-entitlements-behavior.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
+insert into public.role_permission_grants(role_key, permission_key) values
+  ('company_owner', 'transaction.masterdata.party.manage'),
+  ('company_owner', 'transaction.inventory.stock.read');
+SQL
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261124120000_transition_legacy_operational_grants.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/legacy-operational-grant-transition-behavior.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/purchase-receipt-inventory-valuation-concurrency-setup.sql" >/dev/null
 
 # These are distinct PostgreSQL client sessions.  The test-only trigger pauses

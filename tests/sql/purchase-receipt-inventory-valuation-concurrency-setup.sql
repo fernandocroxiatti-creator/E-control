@@ -26,15 +26,22 @@ update public.permission_definitions set approval_state='approved' where permiss
   'transaction.purchasing.purchase_order.create','transaction.purchasing.purchase_order.read',
   'transaction.purchasing.receipt.manage'
 );
-insert into public.role_permission_grants(role_key,permission_key)
-  select 'phase01_concurrency_role',permission_key from public.permission_definitions where permission_key in (
+insert into public.company_role_permission_grants(tenant_id,branch_id,grant_scope,role_key,permission_key,reason,created_by_user_id)
+  select 'ca100000-0000-4000-8000-000000000001', branch_id, 'branch', 'phase01_concurrency_role', permission_key,
+    'Isolated explicit branch grant for Phase 01 concurrency test', 'ca300000-0000-4000-8000-000000000001'
+  from (values
+    ('ca200000-0000-4000-8000-000000000001'::uuid),
+    ('ca200000-0000-4000-8000-000000000002'::uuid),
+    ('ca200000-0000-4000-8000-000000000003'::uuid)
+  ) as fixture_branch(branch_id)
+  cross join (select permission_key from public.permission_definitions where permission_key in (
     'transaction.inventory.stock.move','transaction.inventory.transfer',
     'transaction.inventory.physical.create','transaction.inventory.physical.count','transaction.inventory.physical.adjust',
     'transaction.inventory.valuation.initial',
     'transaction.service_order.create','transaction.service_order.update','transaction.service_order.close',
     'transaction.purchasing.purchase_order.create','transaction.purchasing.purchase_order.read',
     'transaction.purchasing.receipt.manage'
-  ) on conflict do nothing;
+  )) as permission_definition on conflict do nothing;
 update public.erp_transaction_authorization_catalog set approval_state='approved' where transaction_code in
   ('MIGO','ZTR01','MI01','MI04','MI07','ZIV01','ZOS01','ZOS02','ZOS04','ME21N','ME23N','ZGR01');
 insert into public.company_module_availability(tenant_id,module_code,enabled,changed_by_user_id) values

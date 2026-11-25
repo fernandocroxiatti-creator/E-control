@@ -4,13 +4,29 @@ Atualizado em 2026-11-17.
 
 ## Atualização factual — 2026-11-24
 
-- `origin/main` e Production estão no commit `7330582b62b96a220e438cb8e9e0597a0beccede`.
+- `origin/main` e Production estão no commit `71d13a1e0398e3bc85cde50de3c3d14d1d2fac4d`.
 - A tela Master de acessos por empresa foi corrigida para distinguir empresa não
   selecionada de indisponibilidade real; a correção não alterou autorização.
-- A empresa piloto tem disponibilidade para os cadastros e compras autorizados,
-  mas os grants empresariais publicados permanecem restritos a ZGR01. A extensão
-  local para grants mínimos por empresa/filial está pendente de revisão,
-  publicação e migration remota separadas.
+- A migration `20261124110000_company_scoped_pilot_operational_entitlements.sql`
+  está aplicada. O piloto recebeu somente os grants scoped mínimos aprovados;
+  ZIV01 continua bloqueada. A autorização efetiva dos cadastros ainda depende
+  de grants globais legados porque as RPCs de cadastro não recebem filial.
+
+Esta atualização factual prevalece sobre registros históricos locais de
+planejamento que descrevem migrations anteriores como pendentes. Eles registram
+o estado no momento em que foram escritos, não o estado publicado atual.
+
+## Transição de grants globais legados — implementação local 2026-11-25
+
+- D12 aprovou grants de empresa para cadastros compartilhados e grants de filial
+  para operações com contexto operacional.
+- A migration local `20261124120000_transition_legacy_operational_grants.sql`
+  materializa somente a cobertura já efetiva, registra auditoria e falha antes
+  de remover um fallback global se a equivalência não puder ser provada.
+- SHA-256 local verificado: `af597c479c4076ed26ba9131bb805966ed7f2b8894116d66e2e70e47a23f9ed9`.
+- Evidências locais: PostgreSQL descartável PASS; Node 160/160 PASS;
+  TypeScript, lint e build PASS. A migration **não** foi publicada, aplicada ou
+  testada com dados de Production nesta etapa.
 
 - Worktree de origem preservado: `/private/tmp/econtroll-phase-01-receiving`.
 - Worktree de integração: `/private/tmp/econtroll-phase-01-integration`.
@@ -19,8 +35,9 @@ Atualizado em 2026-11-17.
 - Commits locais de integração preservados: `b176a7e` (lógica e migration),
   `a397e6c` (interface), `def071c` (testes), `a9e3ec5` (histórico) e
   `0073dd0` (rollout). O hardening de idempotência atual ainda não possui commit.
-- Production possui migrations confirmadas até `20261110120000`; esta tarefa não
-  aplicará migration, dados, flags ou permissões remotas.
+- Production possui as migrations de Fase 1 e a extensão de grants de piloto
+  registradas até `20261124110000`; esta preparação não aplicará migration,
+  dados, flags ou permissões remotas.
 
 ## Fundação reutilizada
 
