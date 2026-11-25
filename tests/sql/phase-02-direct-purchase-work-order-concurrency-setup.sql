@@ -15,10 +15,12 @@ insert into public.membership_role_assignments(tenant_id,membership_id,role_key,
 values ('d2000000-0000-4000-8000-000000000001','d2300000-0000-4000-8000-000000000001','phase02_concurrency_owner',null,'d2200000-0000-4000-8000-000000000001');
 update public.permission_definitions set approval_state='approved'
 where permission_key in ('transaction.service_order.create','transaction.service_order.update','transaction.service_order.read');
-insert into public.role_permission_grants(role_key,permission_key) values
-  ('phase02_concurrency_owner','transaction.service_order.create'),
-  ('phase02_concurrency_owner','transaction.service_order.update'),
-  ('phase02_concurrency_owner','transaction.service_order.read');
+insert into public.company_role_permission_grants(
+  tenant_id,branch_id,grant_scope,role_key,permission_key,reason,created_by_user_id
+) values
+  ('d2000000-0000-4000-8000-000000000001','d2100000-0000-4000-8000-000000000001','branch','phase02_concurrency_owner','transaction.service_order.create','Isolated Phase 02 branch grant for concurrency test','d2200000-0000-4000-8000-000000000001'),
+  ('d2000000-0000-4000-8000-000000000001','d2100000-0000-4000-8000-000000000001','branch','phase02_concurrency_owner','transaction.service_order.update','Isolated Phase 02 branch grant for concurrency test','d2200000-0000-4000-8000-000000000001'),
+  ('d2000000-0000-4000-8000-000000000001','d2100000-0000-4000-8000-000000000001','branch','phase02_concurrency_owner','transaction.service_order.read','Isolated Phase 02 branch grant for concurrency test','d2200000-0000-4000-8000-000000000001');
 update public.erp_transaction_authorization_catalog set approval_state='approved'
 where transaction_code in ('ZOS01','ZOS02','ZOS03');
 insert into public.company_module_availability(tenant_id,module_code,enabled,changed_by_user_id)
