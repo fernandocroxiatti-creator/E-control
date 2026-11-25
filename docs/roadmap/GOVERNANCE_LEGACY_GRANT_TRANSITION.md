@@ -41,14 +41,16 @@ migration e qualquer grant remoto continuam sujeitos ao rollout coordenado.
 ## Implementação incremental local
 
 - Migration: `20261124120000_transition_legacy_operational_grants.sql`.
-- SHA-256 local: `a7e0d89de8e24228ea254cc3ef14b63be752f40e263bcbf97294aa153cbc8f24`.
+- SHA-256 local: `6dfb45d15278694af727bafc06ffd5a97ea9ecc9cc316aa119222938144b8a59`.
 
-Durante a primeira aplicação controlada, a verificação final detectou grants
-piloto existentes de cadastros ainda persistidos por filial. A transação foi
-integralmente revertida, sem registrar a migration. A correção normaliza uma
-linha dessas somente depois de existir a mesma tupla em escopo empresa; cada
-normalização recebe o evento auditável
-`master_legacy_scoped_grant.normalized`.
+Durante as duas primeiras aplicações controladas, a verificação final detectou
+grants piloto de cadastros ainda persistidos por filial. As transações foram
+integralmente revertidas, sem registrar a migration. Alguns grants de catálogo
+não tinham fallback global, mas eram grants scoped pré-existentes. Sob D12, a
+correção cria a mesma tupla em escopo empresa somente para esse registro
+prévio, remove a tupla filial e registra cada normalização no evento auditável
+`master_legacy_scoped_grant.normalized`. Não há criação de grant para empresa,
+papel ou permissão sem cobertura anterior.
 
 1. Acrescentar à definição de permissão um escopo canônico (`company` ou
    `branch`) e classificar explicitamente cada permissão operacional existente.

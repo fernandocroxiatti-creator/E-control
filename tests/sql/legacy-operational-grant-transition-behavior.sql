@@ -31,6 +31,17 @@ begin
   end if;
   if not exists (
     select 1 from public.company_role_permission_grants
+    where tenant_id = tenant_a and branch_id is null and grant_scope = 'company'
+      and role_key = 'company_owner' and permission_key = 'transaction.masterdata.catalog.read'
+  ) or exists (
+    select 1 from public.company_role_permission_grants
+    where tenant_id = tenant_a and branch_id = branch_a and grant_scope = 'branch'
+      and role_key = 'company_owner' and permission_key = 'transaction.masterdata.catalog.read'
+  ) then
+    raise exception 'legacy pilot catalog grant was not normalized to company scope';
+  end if;
+  if not exists (
+    select 1 from public.company_role_permission_grants
     where tenant_id = tenant_a and branch_id = branch_a and grant_scope = 'branch'
       and role_key = 'company_owner' and permission_key = 'transaction.inventory.stock.read'
   ) then

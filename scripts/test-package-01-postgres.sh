@@ -179,6 +179,13 @@ insert into public.company_role_permission_grants(
   'transaction.masterdata.party.manage',
   'Legacy pilot branch grant requiring company-scope normalization',
   'e1000000-0000-4000-8000-000000000001'
+), (
+  'e2000000-0000-4000-8000-000000000001',
+  'e3000000-0000-4000-8000-000000000001',
+  'company_owner',
+  'transaction.masterdata.catalog.read',
+  'Legacy pilot catalog grant requiring company-scope normalization',
+  'e1000000-0000-4000-8000-000000000001'
 );
 SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261124120000_transition_legacy_operational_grants.sql" >/dev/null

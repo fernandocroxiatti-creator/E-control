@@ -33,6 +33,7 @@
 | 2026-11-24 | Preparação de transição | Worktree local `codex/governance-legacy-transition` criado de `71d13a1`; arquitetura de escopo empresa/filial e pós-condições fail-closed documentadas | Política aprovada como D12; sem mutação remota |
 | 2026-11-25 | Implementação local da transição legada | Migration `20261124120000`, UI/Admin Master, leitura canônica e testes de equivalência | PostgreSQL isolado PASS; Node 160/160, TypeScript, lint e build PASS; pendente revisão final, commit e publicação autorizada separadamente |
 | 2026-11-25 | Aplicação controlada da transição | A migration detectou grants piloto de cadastro ainda no formato filial e interrompeu antes do commit | Rollback transacional confirmado; correção local converte somente quando há equivalência de empresa, com auditoria; regressão isolada PASS |
+| 2026-11-25 | Revalidação de grants piloto | Diagnóstico agregado identificou três grants de catálogo em filial sem fallback global; a segunda aplicação também foi revertida integralmente | D12 normaliza somente grants scoped pré-existentes para empresa, com trilha de auditoria; PostgreSQL isolado e regressão completa PASS |
 
 ### Evidência da concorrência cruzada e do hardening
 

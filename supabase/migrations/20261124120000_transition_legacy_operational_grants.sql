@@ -403,9 +403,31 @@ end;
 $transition$;
 
 -- The pilot migration predates grant_scope and stored all of its grants with a
--- branch.  A master-data permission now has company semantics.  Remove an old
--- branch row only after the same tenant/role/permission has a company grant;
--- otherwise the verification below fails closed rather than broadening it.
+-- branch. A shared master-data permission now has company semantics under D12.
+-- First materialize a company tuple for every such legacy branch tuple. This
+-- is the explicit, audited contract change; it is not a fallback or automatic
+-- grant for a company without an existing scoped grant.
+insert into public.company_role_permission_grants(
+  tenant_id, branch_id, grant_scope, role_key, permission_key, reason, created_by_user_id
+)
+select distinct on (legacy_scoped.tenant_id, legacy_scoped.role_key, legacy_scoped.permission_key)
+  legacy_scoped.tenant_id,
+  null::uuid,
+  'company',
+  legacy_scoped.role_key,
+  legacy_scoped.permission_key,
+  'Normalização auditada de grant legado de cadastro compartilhado',
+  legacy_scoped.created_by_user_id
+from public.company_role_permission_grants legacy_scoped
+join public.permission_definitions permission
+  on permission.permission_key = legacy_scoped.permission_key
+where permission.grant_scope = 'company'
+  and legacy_scoped.grant_scope = 'branch'
+  and legacy_scoped.branch_id is not null
+order by legacy_scoped.tenant_id, legacy_scoped.role_key, legacy_scoped.permission_key,
+  legacy_scoped.created_at, legacy_scoped.branch_id
+on conflict (tenant_id, branch_id, role_key, permission_key) do nothing;
+
 with replaced as (
   delete from public.company_role_permission_grants legacy_scoped
   using public.permission_definitions permission
@@ -413,15 +435,6 @@ with replaced as (
     and permission.grant_scope = 'company'
     and legacy_scoped.grant_scope = 'branch'
     and legacy_scoped.branch_id is not null
-    and exists (
-      select 1
-      from public.company_role_permission_grants company_scoped
-      where company_scoped.tenant_id = legacy_scoped.tenant_id
-        and company_scoped.branch_id is null
-        and company_scoped.grant_scope = 'company'
-        and company_scoped.role_key = legacy_scoped.role_key
-        and company_scoped.permission_key = legacy_scoped.permission_key
-    )
   returning legacy_scoped.tenant_id, legacy_scoped.branch_id, legacy_scoped.role_key,
     legacy_scoped.permission_key, legacy_scoped.created_by_user_id
 )
@@ -433,7 +446,8 @@ select
   session_user::text, null,
   pg_catalog.jsonb_build_object('from_scope', 'branch', 'to_scope', 'company',
     'branch_id', branch_id, 'role_key', role_key, 'permission_key', permission_key,
-    'source', 'pre_grant_scope_pilot')
+    'source', 'pre_grant_scope_pilot',
+    'policy', 'D12_shared_master_data_company_scope')
 from replaced;
 
 alter function app_private.has_tenant_permission(uuid, text, uuid) owner to postgres;

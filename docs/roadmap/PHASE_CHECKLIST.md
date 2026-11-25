@@ -98,7 +98,9 @@ Legenda: `[ ]` pendente, `[~]` em andamento, `[x]` concluído com evidência.
 - [x] Implementar migration incremental e testes isolados.
 - [x] Reproduzir e corrigir a normalização de grants piloto pré-existentes;
   rollback remoto anterior confirmado sem alteração parcial.
+- [x] Reproduzir grants de catálogo scoped sem fallback global e normalizá-los
+  somente sob a política D12, com auditoria.
 - [x] Verificar SHA-256 da migration local corrigida:
-  `a7e0d89de8e24228ea254cc3ef14b63be752f40e263bcbf97294aa153cbc8f24`.
+  `6dfb45d15278694af727bafc06ffd5a97ea9ecc9cc316aa119222938144b8a59`.
 - [ ] Concluir revisão final, commit local e publicação coordenada com backup
   atual antes da migration remota.

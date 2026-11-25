@@ -43,6 +43,7 @@ test("database runner and behavior suite exercise materialization, denial and Ma
     "legacy company-scope grant was not materialized",
     "legacy branch-scope grant was not materialized",
     "legacy pilot branch grant was not normalized to company scope",
+    "legacy pilot catalog grant was not normalized to company scope",
     "transition changed the effective company or branch boundaries",
     "global operational grant was accepted after transition",
   ]) assert.match(behavior, new RegExp(probe));
