@@ -1,6 +1,6 @@
 export type ErpTransactionDefinition = {
   code: string;
-  moduleCode: "MDM" | "INV" | "PUR" | "SVC";
+  moduleCode: "MDM" | "INV" | "PUR" | "SVC" | "BUD";
   moduleName: string;
   name: string;
   description: string;
@@ -65,6 +65,10 @@ export const erpTransactionCatalog = {
   ZOS02: { code: "ZOS02", moduleCode: "SVC", moduleName: "Ordem de serviço", name: "Alterar ordem de serviço", description: "Diagnóstico, serviços e peças de uma O.S.", permissionKey: "transaction.service_order.update", route: "/operacional/ordens-servico?tx=ZOS02" },
   ZOS03: { code: "ZOS03", moduleCode: "SVC", moduleName: "Ordem de serviço", name: "Consultar ordem de serviço", description: "Consulta de O.S. autorizada por filial.", permissionKey: "transaction.service_order.read", route: "/operacional/ordens-servico?tx=ZOS03" },
   ZOS04: { code: "ZOS04", moduleCode: "SVC", moduleName: "Ordem de serviço", name: "Encerrar ordem de serviço", description: "Consumo, encerramento e estorno auditáveis.", permissionKey: "transaction.service_order.close", route: "/operacional/ordens-servico?tx=ZOS04" },
+  ZQT01: { code: "ZQT01", moduleCode: "BUD", moduleName: "Orçamentos", name: "Criar orçamento", description: "Criação de rascunho comercial por empresa e filial.", permissionKey: "transaction.quotation.create", route: "/operacional/orcamentos?tx=ZQT01" },
+  ZQT02: { code: "ZQT02", moduleCode: "BUD", moduleName: "Orçamentos", name: "Alterar orçamento", description: "Alteração de rascunho comercial com nova fotografia de itens.", permissionKey: "transaction.quotation.manage", route: "/operacional/orcamentos?tx=ZQT02" },
+  ZQT03: { code: "ZQT03", moduleCode: "BUD", moduleName: "Orçamentos", name: "Consultar orçamentos", description: "Consulta empresarial e por filial de orçamentos.", permissionKey: "transaction.quotation.read", route: "/operacional/orcamentos?tx=ZQT03" },
+  ZQT04: { code: "ZQT04", moduleCode: "BUD", moduleName: "Orçamentos", name: "Aprovar orçamento", description: "Aprovação ou reprovação com justificativa auditável.", permissionKey: "transaction.quotation.approve", route: "/operacional/orcamentos?tx=ZQT04" },
 } as const satisfies Record<string, ErpTransactionDefinition>;
 
 export type ErpTransactionCode = keyof typeof erpTransactionCatalog;

@@ -15,6 +15,7 @@ export type OperationalWorkOrderDirectPurchase = { direct_purchase_id: string; w
 export type OperationalWorkOrderDirectPurchaseTotal = { work_order_id: string; total_direct_cost: number };
 export type OperationalWorkOrderDirectPurchaseReversal = { direct_purchase_reversal_id: string; direct_purchase_id: string; work_order_id: string; reversed_quantity: number; reversed_total_cost: number; reason: string | null; created_at: string };
 export type OperationalInventoryCountSession = { count_session_id: string; status: "open" | "posted"; notes: string | null; created_at: string; posted_at: string | null; line_count: number };
+export type OperationalQuotation = { quotation_id: string; quotation_number: number; customer_name: string; status: "draft" | "approved" | "rejected" | "cancelled"; valid_until: string | null; subtotal: number; discount_total: number; total_amount: number; created_at: string; updated_at: string };
 export type OperationalRead<T> = { status: "ready"; data: T } | { status: "unavailable" };
 export type OperationalPage<T> = OperationalRead<{ rows: T[]; hasMore: boolean; page: number }>;
 
@@ -110,6 +111,14 @@ export async function listOperationalWorkOrders(tenantId: string, branchId: stri
   const currentPage = requestedPage(options.page);
   const result = await read<unknown>("operational_list_work_orders", { p_tenant_id: tenantId, p_branch_id: branchId, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
   return result.status === "ready" && records<OperationalWorkOrder>(result.data, ["work_order_id", "order_number", "customer_name", "status", "total_amount", "created_at", "updated_at"])
+    ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
+}
+
+/** Phase 03 reads deliberately fail closed until the quotation migration is installed and ZQT03 is authorized. */
+export async function listOperationalQuotations(tenantId: string, branchId: string, options: { status?: string | null; page?: number }): Promise<OperationalPage<OperationalQuotation>> {
+  const currentPage = requestedPage(options.page);
+  const result = await read<unknown>("operational_list_quotations", { p_tenant_id: tenantId, p_branch_id: branchId, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
+  return result.status === "ready" && records<OperationalQuotation>(result.data, ["quotation_id", "quotation_number", "customer_name", "status", "subtotal", "discount_total", "total_amount", "created_at", "updated_at"])
     ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
 }
 

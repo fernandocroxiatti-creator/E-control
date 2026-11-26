@@ -101,6 +101,22 @@ function directPurchase(form: FormData) {
     ? { itemId: UUID.test(itemId) ? itemId : null, supplierId: UUID.test(supplierId) ? supplierId : null, quantity, unitCost, description, source }
     : null;
 }
+function quotationLines(form: FormData) {
+  const raw = value(form, "lines", 30000);
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 100) return null;
+    const lines = parsed.map((line) => {
+      if (!line || typeof line !== "object" || Array.isArray(line)) return null;
+      const row = line as Record<string, unknown>;
+      const itemId = typeof row.item_id === "string" ? row.item_id : "";
+      const quantity = Number(row.quantity); const unitPrice = Number(row.unit_price); const discountPercent = Number(row.discount_percent ?? 0);
+      return UUID.test(itemId) && Number.isFinite(quantity) && quantity > 0 && Number.isFinite(unitPrice) && unitPrice >= 0 && Number.isFinite(discountPercent) && discountPercent >= 0 && discountPercent <= 100
+        ? { item_id: itemId, quantity, unit_price: unitPrice, discount_percent: discountPercent } : null;
+    });
+    return lines.every(Boolean) ? lines : null;
+  } catch { return null; }
+}
 
 export async function createBusinessPartyAction(_: ActionState, form: FormData): Promise<ActionState> {
   const diagnosticId = businessPartyDiagnosticCode();
@@ -352,6 +368,48 @@ export async function reverseWorkOrderConsumptionAction(_: ActionState, form: Fo
     if (error || data !== "reversed") return { status: "error", message: "Não foi possível estornar a O.S. Apenas consumo já encerrado pode ser revertido." };
     revalidatePath("/operacional/ordens-servico"); revalidatePath("/operacional/estoque"); return { status: "success", message: "Consumo estornado e auditado." };
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function createQuotationAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const branchId = value(form, "branch_id", 36); const customerId = value(form, "customer_id", 36); const id = requestId(form); const lines = quotationLines(form);
+    const validUntil = value(form, "valid_until", 10) || null;
+    if (!client || !UUID.test(tenantId) || !UUID.test(branchId) || !UUID.test(customerId) || !id || !lines || (validUntil !== null && !/^\d{4}-\d{2}-\d{2}$/.test(validUntil))) return { status: "error", message: "Informe cliente, validade e linhas válidas para o orçamento." };
+    const { data, error } = await client.rpc("operational_create_quotation", { p_tenant_id: tenantId, p_branch_id: branchId, p_customer_id: customerId, p_valid_until: validUntil, p_notes: value(form, "notes", 4000) || null, p_lines: lines, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Não foi possível criar o orçamento. Cliente, itens, escopo e permissão são validados pelo banco." };
+    revalidatePath("/operacional/orcamentos"); return { status: "success", message: "Orçamento criado com preços, descontos e custos de referência auditáveis." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function updateQuotationAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const quotationId = value(form, "quotation_id", 36); const customerId = value(form, "customer_id", 36); const id = requestId(form); const lines = quotationLines(form);
+    const validUntil = value(form, "valid_until", 10) || null;
+    if (!client || !UUID.test(tenantId) || !UUID.test(quotationId) || !UUID.test(customerId) || !id || !lines || (validUntil !== null && !/^\d{4}-\d{2}-\d{2}$/.test(validUntil))) return { status: "error", message: "Dados do orçamento inválidos." };
+    const { error } = await client.rpc("operational_update_quotation", { p_tenant_id: tenantId, p_quotation_id: quotationId, p_customer_id: customerId, p_valid_until: validUntil, p_notes: value(form, "notes", 4000) || null, p_lines: lines, p_request_id: id });
+    if (error) return { status: "error", message: "Não foi possível alterar o orçamento. Somente rascunhos autorizados podem ser modificados." };
+    revalidatePath("/operacional/orcamentos"); return { status: "success", message: "Rascunho atualizado e auditado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function decideQuotationAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const quotationId = value(form, "quotation_id", 36); const decision = value(form, "decision", 10); const reason = value(form, "reason", 1000); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(quotationId) || !id || !["approved", "rejected"].includes(decision) || reason.length < 3) return { status: "error", message: "Informe uma decisão e uma justificativa de ao menos três caracteres." };
+    const { data, error } = await client.rpc("operational_decide_quotation", { p_tenant_id: tenantId, p_quotation_id: quotationId, p_decision: decision, p_reason: reason, p_request_id: id });
+    if (error || data !== decision) return { status: "error", message: "Não foi possível registrar a decisão. A aprovação exige ZQT04 e justificativa auditável." };
+    revalidatePath("/operacional/orcamentos"); return { status: "success", message: decision === "approved" ? "Orçamento aprovado e congelado para conversão futura autorizada." : "Orçamento reprovado e auditado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function convertQuotationToWorkOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const quotationId = value(form, "quotation_id", 36); const id = requestId(form); const problem = value(form, "problem_description", 4000);
+    if (!client || !UUID.test(tenantId) || !UUID.test(quotationId) || !id || !problem) return { status: "error", message: "Informe a descrição do atendimento para converter o orçamento." };
+    const { data, error } = await client.rpc("operational_convert_quotation_to_work_order", { p_tenant_id: tenantId, p_quotation_id: quotationId, p_equipment_description: value(form, "equipment_description", 500) || null, p_problem_description: problem, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Conversão recusada. O orçamento precisa estar aprovado e vigente, e ZQT03, ZOS01 e ZOS02 devem estar autorizadas." };
+    revalidatePath("/operacional/orcamentos"); revalidatePath("/operacional/ordens-servico"); return { status: "success", message: "Orçamento convertido uma única vez em O.S.; nenhum estoque, financeiro ou faturamento foi gerado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a conversão." }; }
 }
 
 export async function setOperationalMembershipStatusAction(_: ActionState, form: FormData): Promise<ActionState> {

@@ -684,6 +684,8 @@ SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-02-direct-purchase-work-order.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-02-direct-purchase-work-order-reversal.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-02-direct-purchase-work-order-concurrency-setup.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126120000_quotation_foundation.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-03-quotation-foundation.sql" >/dev/null
 
 # T09. The first session holds the exact work-order row lock acquired by the
 # production direct-purchase RPC. The second session is a separate PostgreSQL
@@ -798,4 +800,4 @@ SQL
 # T17 is the full Package 01/03/04/05 and Phase 01 regression above. T18 uses
 # an explicit fail-closed billing guard because the current schema has none.
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'
-echo 'PASS: Packages 01, 03, 04, 05, Phase 01 valuation and Phase 02 direct work-order purchase contracts pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'
+echo 'PASS: Packages 01, 03, 04, 05, Phase 01 valuation, Phase 02 direct work-order purchase, and Phase 03 quotation contracts pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'

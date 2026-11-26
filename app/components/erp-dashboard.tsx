@@ -27,7 +27,7 @@ const modules: ModuleItem[] = [
   { id: "finance", label: "Financeiro", icon: "wallet", status: "development" },
   { id: "accounting", label: "Contabilidade", icon: "book", status: "development" },
   { id: "reports", label: "Relatórios", icon: "chart", status: "development" },
-  { id: "budgets", label: "Orçamentos", icon: "clipboard", status: "development" },
+  { id: "budgets", label: "Orçamentos", icon: "clipboard", status: "route", href: "/operacional/orcamentos" },
   { id: "users", label: "Usuários e permissões", icon: "users", status: "route", href: "/operacional/equipe" },
   { id: "settings", label: "Configurações", icon: "settings", status: "development" },
 ];
@@ -44,6 +44,7 @@ const tiles: DashboardTile[] = [
   { title: "Filiais", icon: "building", href: "/empresas/filiais", status: "available" },
   { title: "Estoque", icon: "box", href: "/operacional/estoque?tx=MIGO", status: "authorized" },
   { title: "Compras", icon: "cart", href: "/operacional/compras", status: "authorized" },
+  { title: "Orçamentos", icon: "clipboard", href: "/operacional/orcamentos", status: "authorized" },
   { title: "Vendas", icon: "receipt", status: "development" },
   { title: "Financeiro", icon: "wallet", status: "development" },
   { title: "Relatórios", icon: "chart", status: "development" },
@@ -109,6 +110,7 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
   const activeModule = pathname?.startsWith("/operacional/cadastros") ? "catalog"
     : pathname?.startsWith("/operacional/estoque") ? "inventory"
       : pathname?.startsWith("/operacional/compras") ? "purchases"
+          : pathname?.startsWith("/operacional/orcamentos") ? "budgets"
         : pathname?.startsWith("/operacional/ordens-servico") ? "services"
           : pathname?.startsWith("/operacional/equipe") ? "users"
             : activeSection;
