@@ -76,6 +76,10 @@ export const erpTransactionCatalog = {
   ZFB01: { code: "ZFB01", moduleCode: "FIN", moduleName: "Faturamento", name: "Emitir faturamento comercial", description: "Emissão interna auditável de faturamento, sem documento fiscal ou recebível automático.", permissionKey: "transaction.billing.issue", route: "/operacional/faturamento?tx=ZFB01" },
   ZFB02: { code: "ZFB02", moduleCode: "FIN", moduleName: "Faturamento", name: "Consultar faturamento comercial", description: "Consulta empresarial e por filial de faturamentos internos.", permissionKey: "transaction.billing.read", route: "/operacional/faturamento?tx=ZFB02" },
   ZFB03: { code: "ZFB03", moduleCode: "FIN", moduleName: "Faturamento", name: "Cancelar faturamento comercial", description: "Cancelamento auditável de faturamento interno sem estorno fiscal ou financeiro.", permissionKey: "transaction.billing.cancel", route: "/operacional/faturamento?tx=ZFB03" },
+  ZFI01: { code: "ZFI01", moduleCode: "FIN", moduleName: "Financeiro", name: "Criar contas a pagar", description: "Registro empresarial e parcelado de obrigações a pagar.", permissionKey: "transaction.finance.payable.manage", route: "/operacional/financeiro?tx=ZFI01" },
+  ZFI02: { code: "ZFI02", moduleCode: "FIN", moduleName: "Financeiro", name: "Criar contas a receber", description: "Registro empresarial e parcelado de direitos a receber.", permissionKey: "transaction.finance.receivable.manage", route: "/operacional/financeiro?tx=ZFI02" },
+  ZFI03: { code: "ZFI03", moduleCode: "FIN", moduleName: "Financeiro", name: "Baixas financeiras", description: "Baixas parciais, totais e estornos auditáveis por filial.", permissionKey: "transaction.finance.settlement.manage", route: "/operacional/financeiro?tx=ZFI03" },
+  ZFI04: { code: "ZFI04", moduleCode: "FIN", moduleName: "Financeiro", name: "Consultar contas", description: "Consulta empresarial de obrigações e parcelas.", permissionKey: "transaction.finance.read", route: "/operacional/financeiro?tx=ZFI04" },
 } as const satisfies Record<string, ErpTransactionDefinition>;
 
 export type ErpTransactionCode = keyof typeof erpTransactionCatalog;

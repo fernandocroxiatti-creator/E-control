@@ -18,6 +18,9 @@ export type OperationalInventoryCountSession = { count_session_id: string; statu
 export type OperationalQuotation = { quotation_id: string; quotation_number: number; customer_name: string; status: "draft" | "approved" | "rejected" | "cancelled"; valid_until: string | null; subtotal: number; discount_total: number; total_amount: number; created_at: string; updated_at: string };
 export type OperationalSalesOrder = { sales_order_id: string; sales_order_number: number; customer_name: string; status: "draft" | "confirmed" | "cancelled"; source_quotation_id: string | null; subtotal: number; discount_total: number; total_amount: number; created_at: string; updated_at: string };
 export type OperationalCommercialBilling = { billing_document_id: string; billing_number: number; source_type: "sales_order" | "work_order"; source_id: string; source_number: number; customer_name: string; status: "issued" | "cancelled"; total_amount: number; issued_at: string; cancelled_at: string | null };
+export type OperationalFinancialSettlement = { settlement_id: string; amount: number; settled_on: string; method: string; reversed: boolean };
+export type OperationalFinancialInstallment = { installment_id: string; number: number; due_date: string; amount: number; settled_amount: number; open_amount: number; status: "open" | "partially_settled" | "settled" | "cancelled"; settlements: OperationalFinancialSettlement[] };
+export type OperationalFinancialObligation = { obligation_id: string; obligation_type: "payable" | "receivable"; status: "open" | "partially_settled" | "settled" | "cancelled"; description: string; gross_amount: number; settled_amount: number; open_amount: number; installments: OperationalFinancialInstallment[]; created_at: string };
 export type OperationalRead<T> = { status: "ready"; data: T } | { status: "unavailable" };
 export type OperationalPage<T> = OperationalRead<{ rows: T[]; hasMore: boolean; page: number }>;
 
@@ -137,6 +140,14 @@ export async function listOperationalCommercialBilling(tenantId: string, branchI
   const currentPage = requestedPage(options.page);
   const result = await read<unknown>("operational_list_commercial_billing", { p_tenant_id: tenantId, p_branch_id: branchId, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
   return result.status === "ready" && records<OperationalCommercialBilling>(result.data, ["billing_document_id", "billing_number", "source_type", "source_id", "source_number", "customer_name", "status", "total_amount", "issued_at", "cancelled_at"])
+    ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
+}
+
+/** Finance reads fail closed until the finance migration and ZFI04 are both available. */
+export async function listOperationalFinancialObligations(tenantId: string, branchId: string, options: { type?: string | null; status?: string | null; page?: number }): Promise<OperationalPage<OperationalFinancialObligation>> {
+  const currentPage = requestedPage(options.page);
+  const result = await read<unknown>("operational_list_financial_obligations", { p_tenant_id: tenantId, p_branch_id: branchId, p_type: options.type ?? null, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
+  return result.status === "ready" && records<OperationalFinancialObligation>(result.data, ["obligation_id", "obligation_type", "status", "description", "gross_amount", "settled_amount", "open_amount", "installments", "created_at"])
     ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
 }
 

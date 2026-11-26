@@ -117,6 +117,19 @@ function quotationLines(form: FormData) {
     return lines.every(Boolean) ? lines : null;
   } catch { return null; }
 }
+function financialInstallments(form: FormData) {
+  const raw = value(form, "installments", 20000);
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 120) return null;
+    const installments = parsed.map((row) => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return null;
+      const data = row as Record<string, unknown>; const dueDate = typeof data.due_date === "string" ? data.due_date : ""; const amount = Number(data.amount);
+      return /^\d{4}-\d{2}-\d{2}$/.test(dueDate) && Number.isFinite(amount) && amount > 0 ? { due_date: dueDate, amount } : null;
+    });
+    return installments.every(Boolean) ? installments : null;
+  } catch { return null; }
+}
 
 export async function createBusinessPartyAction(_: ActionState, form: FormData): Promise<ActionState> {
   const diagnosticId = businessPartyDiagnosticCode();
@@ -472,6 +485,36 @@ export async function cancelCommercialBillingAction(_: ActionState, form: FormDa
     revalidatePath("/operacional/faturamento"); revalidatePath("/operacional/vendas"); revalidatePath("/operacional/ordens-servico");
     return { status: "success", message: "Faturamento comercial cancelado e auditado. Nenhum estorno fiscal ou financeiro foi gerado." };
   } catch { return { status: "error", message: "Não foi possível cancelar o faturamento comercial." }; }
+/** Finance records obligations only. Cash, bank, tax and accounting ledgers remain out of scope. */
+export async function createFinancialObligationAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const branchId = value(form, "branch_id", 36); const type = value(form, "obligation_type", 16); const counterpartyId = value(form, "counterparty_id", 36); const id = requestId(form); const installments = financialInstallments(form);
+    const issueDate = value(form, "issue_date", 10);
+    if (!client || !UUID.test(tenantId) || !UUID.test(branchId) || !id || !["payable", "receivable"].includes(type) || !/^\d{4}-\d{2}-\d{2}$/.test(issueDate) || !installments) return { status: "error", message: "Informe tipo, datas, parcelas e contexto empresarial válidos." };
+    const { data, error } = await client.rpc("operational_create_financial_obligation", { p_tenant_id: tenantId, p_branch_id: branchId, p_type: type, p_counterparty_id: UUID.test(counterpartyId) ? counterpartyId : null, p_description: value(form, "description", 1000), p_issue_date: issueDate, p_installments: installments, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Não foi possível registrar a conta. A autorização, filial e idempotência são verificadas pelo banco." };
+    revalidatePath("/operacional/financeiro"); return { status: "success", message: "Conta registrada com parcelas auditáveis. Nenhum caixa, banco, fiscal ou contábil foi movimentado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação financeira." }; }
+}
+
+export async function settleFinancialInstallmentAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const installmentId = value(form, "installment_id", 36); const id = requestId(form); const amount = decimal(value(form, "amount", 32)); const settledOn = value(form, "settled_on", 10);
+    if (!client || !UUID.test(tenantId) || !UUID.test(installmentId) || !id || amount === null || amount <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(settledOn)) return { status: "error", message: "Informe parcela, valor e data válidos." };
+    const { data, error } = await client.rpc("operational_settle_financial_installment", { p_tenant_id: tenantId, p_installment_id: installmentId, p_amount: amount, p_settled_on: settledOn, p_method: value(form, "method", 80), p_reference: value(form, "reference", 300) || null, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Baixa recusada. O saldo, escopo e permissão ZFI03 são validados pelo banco." };
+    revalidatePath("/operacional/financeiro"); return { status: "success", message: "Baixa registrada de forma idempotente e auditável; nenhum caixa ou banco foi movimentado." };
+  } catch { return { status: "error", message: "Não foi possível registrar a baixa." }; }
+}
+
+export async function reverseFinancialSettlementAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const settlementId = value(form, "settlement_id", 36); const id = requestId(form); const reason = value(form, "reason", 1000);
+    if (!client || !UUID.test(tenantId) || !UUID.test(settlementId) || !id || reason.length < 3) return { status: "error", message: "Informe uma justificativa de ao menos três caracteres." };
+    const { data, error } = await client.rpc("operational_reverse_financial_settlement", { p_tenant_id: tenantId, p_settlement_id: settlementId, p_reason: reason, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Estorno recusado. Uma baixa só pode ser estornada uma vez, com trilha auditável." };
+    revalidatePath("/operacional/financeiro"); return { status: "success", message: "Estorno registrado como evento reverso auditável. Nenhum lançamento de caixa, banco, fiscal ou contábil foi criado." };
+  } catch { return { status: "error", message: "Não foi possível estornar a baixa." }; }
 }
 
 export async function setOperationalMembershipStatusAction(_: ActionState, form: FormData): Promise<ActionState> {

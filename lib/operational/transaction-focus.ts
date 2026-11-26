@@ -5,9 +5,9 @@ import {
   type TransactionLookupResult,
 } from "@/lib/master/transaction-resolution";
 
-export type OperationalRouteTransaction = "BP01" | "MM01" | "SV01" | "MIGO" | "ME21N" | "ME23N" | "ZGR01" | "ZIV01" | "MM02" | "MM03" | "MB52" | "MB51" | "MI01" | "MI04" | "MI07" | "ZTR01" | "ZOS01" | "ZOS02" | "ZOS03" | "ZOS04" | "ZQT01" | "ZQT02" | "ZQT03" | "ZQT04" | "ZVE01" | "ZVE02" | "ZVE03" | "ZVE04" | "ZFB01" | "ZFB02" | "ZFB03";
+export type OperationalRouteTransaction = "BP01" | "MM01" | "SV01" | "MIGO" | "ME21N" | "ME23N" | "ZGR01" | "ZIV01" | "MM02" | "MM03" | "MB52" | "MB51" | "MI01" | "MI04" | "MI07" | "ZTR01" | "ZOS01" | "ZOS02" | "ZOS03" | "ZOS04" | "ZQT01" | "ZQT02" | "ZQT03" | "ZQT04" | "ZVE01" | "ZVE02" | "ZVE03" | "ZVE04" | "ZFB01" | "ZFB02" | "ZFB03" | "ZFI01" | "ZFI02" | "ZFI03" | "ZFI04";
 
-const routeTransactions = new Set<OperationalRouteTransaction>(["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N", "ZGR01", "ZIV01", "MM02", "MM03", "MB52", "MB51", "MI01", "MI04", "MI07", "ZTR01", "ZOS01", "ZOS02", "ZOS03", "ZOS04", "ZQT01", "ZQT02", "ZQT03", "ZQT04", "ZVE01", "ZVE02", "ZVE03", "ZVE04", "ZFB01", "ZFB02", "ZFB03"]);
+const routeTransactions = new Set<OperationalRouteTransaction>(["BP01", "MM01", "SV01", "MIGO", "ME21N", "ME23N", "ZGR01", "ZIV01", "MM02", "MM03", "MB52", "MB51", "MI01", "MI04", "MI07", "ZTR01", "ZOS01", "ZOS02", "ZOS03", "ZOS04", "ZQT01", "ZQT02", "ZQT03", "ZQT04", "ZVE01", "ZVE02", "ZVE03", "ZVE04", "ZFB01", "ZFB02", "ZFB03", "ZFI01", "ZFI02", "ZFI03", "ZFI04"]);
 
 /**
  * A route focus is presentation metadata only. The caller must still invoke
