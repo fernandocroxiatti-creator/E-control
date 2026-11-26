@@ -452,6 +452,28 @@ export async function convertQuotationToSalesOrderAction(_: ActionState, form: F
   } catch { return { status: "error", message: "Não foi possível concluir a conversão." }; }
 }
 
+export async function issueCommercialBillingAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const sourceId = value(form, "source_id", 36); const sourceType = value(form, "source_type", 16); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(sourceId) || !id || !["sales_order", "work_order"].includes(sourceType)) return { status: "error", message: "Origem do faturamento ou identificador inválido." };
+    const { data, error } = await client.rpc("operational_issue_commercial_billing", { p_tenant_id: tenantId, p_source_type: sourceType, p_source_id: sourceId, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "O faturamento foi recusado. A origem, seu estado e a autorização empresarial são verificados pelo banco." };
+    revalidatePath("/operacional/faturamento"); revalidatePath("/operacional/vendas"); revalidatePath("/operacional/ordens-servico");
+    return { status: "success", message: "Faturamento comercial emitido e auditado; nenhum documento fiscal, recebível ou caixa foi criado." };
+  } catch { return { status: "error", message: "Não foi possível emitir o faturamento comercial." }; }
+}
+
+export async function cancelCommercialBillingAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const billingId = value(form, "billing_document_id", 36); const reason = value(form, "reason", 1000); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(billingId) || !id || reason.length < 3) return { status: "error", message: "Informe uma justificativa de ao menos três caracteres." };
+    const { data, error } = await client.rpc("operational_cancel_commercial_billing", { p_tenant_id: tenantId, p_billing_document_id: billingId, p_reason: reason, p_request_id: id });
+    if (error || data !== "cancelled") return { status: "error", message: "O cancelamento foi recusado. Somente faturamentos comerciais emitidos e autorizados podem ser cancelados." };
+    revalidatePath("/operacional/faturamento"); revalidatePath("/operacional/vendas"); revalidatePath("/operacional/ordens-servico");
+    return { status: "success", message: "Faturamento comercial cancelado e auditado. Nenhum estorno fiscal ou financeiro foi gerado." };
+  } catch { return { status: "error", message: "Não foi possível cancelar o faturamento comercial." }; }
+}
+
 export async function setOperationalMembershipStatusAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
     const client = await operationalClient();

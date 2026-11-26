@@ -24,7 +24,7 @@ const modules: ModuleItem[] = [
   { id: "purchases", label: "Compras", icon: "cart", status: "route", href: "/operacional/compras" },
   { id: "services", label: "Ordens de serviço", icon: "clipboard", status: "route", href: "/operacional/ordens-servico" },
   { id: "sales", label: "Vendas", icon: "receipt", status: "route", href: "/operacional/vendas" },
-  { id: "finance", label: "Financeiro", icon: "wallet", status: "development" },
+  { id: "finance", label: "Faturamento", icon: "wallet", status: "route", href: "/operacional/faturamento" },
   { id: "accounting", label: "Contabilidade", icon: "book", status: "development" },
   { id: "reports", label: "Relatórios", icon: "chart", status: "development" },
   { id: "budgets", label: "Orçamentos", icon: "clipboard", status: "route", href: "/operacional/orcamentos" },
@@ -46,7 +46,7 @@ const tiles: DashboardTile[] = [
   { title: "Compras", icon: "cart", href: "/operacional/compras", status: "authorized" },
   { title: "Orçamentos", icon: "clipboard", href: "/operacional/orcamentos", status: "authorized" },
   { title: "Vendas", icon: "receipt", href: "/operacional/vendas", status: "authorized" },
-  { title: "Financeiro", icon: "wallet", status: "development" },
+  { title: "Faturamento", icon: "wallet", href: "/operacional/faturamento?tx=ZFB02", status: "authorized" },
   { title: "Relatórios", icon: "chart", status: "development" },
 ];
 
@@ -112,6 +112,7 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
       : pathname?.startsWith("/operacional/compras") ? "purchases"
           : pathname?.startsWith("/operacional/orcamentos") ? "budgets"
           : pathname?.startsWith("/operacional/vendas") ? "sales"
+            : pathname?.startsWith("/operacional/faturamento") ? "finance"
         : pathname?.startsWith("/operacional/ordens-servico") ? "services"
           : pathname?.startsWith("/operacional/equipe") ? "users"
             : activeSection;

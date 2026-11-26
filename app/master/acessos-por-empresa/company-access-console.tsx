@@ -13,6 +13,7 @@ const names: Record<string, string> = {
   MI01: "Iniciar inventário", MI04: "Registrar contagem", MI07: "Aplicar inventário", ZTR01: "Transferir entre filiais",
   ZGR01: "Recebimento de compra", ZIV01: "Avaliação inicial de estoque",
   ZOS01: "Criar ordem de serviço", ZOS02: "Alterar ordem de serviço", ZOS03: "Consultar ordem de serviço", ZOS04: "Encerrar ordem de serviço",
+  ZFB01: "Emitir faturamento comercial", ZFB02: "Consultar faturamento comercial", ZFB03: "Cancelar faturamento comercial",
 };
 const modules: Record<string, string> = {
   MDM: "Cadastros", INV: "Estoque", PUR: "Compras", SAL: "Vendas", FIN: "Financeiro",

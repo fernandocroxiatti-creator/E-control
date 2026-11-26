@@ -1,6 +1,6 @@
 export type ErpTransactionDefinition = {
   code: string;
-  moduleCode: "MDM" | "INV" | "PUR" | "SVC" | "BUD" | "SAL";
+  moduleCode: "MDM" | "INV" | "PUR" | "SVC" | "BUD" | "SAL" | "FIN";
   moduleName: string;
   name: string;
   description: string;
@@ -73,6 +73,9 @@ export const erpTransactionCatalog = {
   ZVE02: { code: "ZVE02", moduleCode: "SAL", moduleName: "Vendas", name: "Alterar pedido de venda", description: "Alteração de rascunho comercial por empresa e filial.", permissionKey: "transaction.sales.order.manage", route: "/operacional/vendas?tx=ZVE02" },
   ZVE03: { code: "ZVE03", moduleCode: "SAL", moduleName: "Vendas", name: "Consultar pedidos de venda", description: "Consulta de pedidos comerciais por empresa e filial.", permissionKey: "transaction.sales.order.read", route: "/operacional/vendas?tx=ZVE03" },
   ZVE04: { code: "ZVE04", moduleCode: "SAL", moduleName: "Vendas", name: "Confirmar pedido de venda", description: "Confirmação ou cancelamento auditável de pedido comercial.", permissionKey: "transaction.sales.order.decide", route: "/operacional/vendas?tx=ZVE04" },
+  ZFB01: { code: "ZFB01", moduleCode: "FIN", moduleName: "Faturamento", name: "Emitir faturamento comercial", description: "Emissão interna auditável de faturamento, sem documento fiscal ou recebível automático.", permissionKey: "transaction.billing.issue", route: "/operacional/faturamento?tx=ZFB01" },
+  ZFB02: { code: "ZFB02", moduleCode: "FIN", moduleName: "Faturamento", name: "Consultar faturamento comercial", description: "Consulta empresarial e por filial de faturamentos internos.", permissionKey: "transaction.billing.read", route: "/operacional/faturamento?tx=ZFB02" },
+  ZFB03: { code: "ZFB03", moduleCode: "FIN", moduleName: "Faturamento", name: "Cancelar faturamento comercial", description: "Cancelamento auditável de faturamento interno sem estorno fiscal ou financeiro.", permissionKey: "transaction.billing.cancel", route: "/operacional/faturamento?tx=ZFB03" },
 } as const satisfies Record<string, ErpTransactionDefinition>;
 
 export type ErpTransactionCode = keyof typeof erpTransactionCatalog;

@@ -17,6 +17,7 @@ export type OperationalWorkOrderDirectPurchaseReversal = { direct_purchase_rever
 export type OperationalInventoryCountSession = { count_session_id: string; status: "open" | "posted"; notes: string | null; created_at: string; posted_at: string | null; line_count: number };
 export type OperationalQuotation = { quotation_id: string; quotation_number: number; customer_name: string; status: "draft" | "approved" | "rejected" | "cancelled"; valid_until: string | null; subtotal: number; discount_total: number; total_amount: number; created_at: string; updated_at: string };
 export type OperationalSalesOrder = { sales_order_id: string; sales_order_number: number; customer_name: string; status: "draft" | "confirmed" | "cancelled"; source_quotation_id: string | null; subtotal: number; discount_total: number; total_amount: number; created_at: string; updated_at: string };
+export type OperationalCommercialBilling = { billing_document_id: string; billing_number: number; source_type: "sales_order" | "work_order"; source_id: string; source_number: number; customer_name: string; status: "issued" | "cancelled"; total_amount: number; issued_at: string; cancelled_at: string | null };
 export type OperationalRead<T> = { status: "ready"; data: T } | { status: "unavailable" };
 export type OperationalPage<T> = OperationalRead<{ rows: T[]; hasMore: boolean; page: number }>;
 
@@ -128,6 +129,14 @@ export async function listOperationalSalesOrders(tenantId: string, branchId: str
   const currentPage = requestedPage(options.page);
   const result = await read<unknown>("operational_list_sales_orders", { p_tenant_id: tenantId, p_branch_id: branchId, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
   return result.status === "ready" && records<OperationalSalesOrder>(result.data, ["sales_order_id", "sales_order_number", "customer_name", "status", "subtotal", "discount_total", "total_amount", "created_at", "updated_at"])
+    ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
+}
+
+/** Commercial billing is intentionally unavailable until its protected migration is installed and ZFB02 is authorized. */
+export async function listOperationalCommercialBilling(tenantId: string, branchId: string, options: { status?: string | null; page?: number }): Promise<OperationalPage<OperationalCommercialBilling>> {
+  const currentPage = requestedPage(options.page);
+  const result = await read<unknown>("operational_list_commercial_billing", { p_tenant_id: tenantId, p_branch_id: branchId, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
+  return result.status === "ready" && records<OperationalCommercialBilling>(result.data, ["billing_document_id", "billing_number", "source_type", "source_id", "source_number", "customer_name", "status", "total_amount", "issued_at", "cancelled_at"])
     ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
 }
 
