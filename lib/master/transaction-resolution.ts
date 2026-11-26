@@ -1,6 +1,6 @@
 export type ErpTransactionDefinition = {
   code: string;
-  moduleCode: "MDM" | "INV" | "PUR" | "SVC" | "BUD";
+  moduleCode: "MDM" | "INV" | "PUR" | "SVC" | "BUD" | "SAL";
   moduleName: string;
   name: string;
   description: string;
@@ -69,6 +69,10 @@ export const erpTransactionCatalog = {
   ZQT02: { code: "ZQT02", moduleCode: "BUD", moduleName: "Orçamentos", name: "Alterar orçamento", description: "Alteração de rascunho comercial com nova fotografia de itens.", permissionKey: "transaction.quotation.manage", route: "/operacional/orcamentos?tx=ZQT02" },
   ZQT03: { code: "ZQT03", moduleCode: "BUD", moduleName: "Orçamentos", name: "Consultar orçamentos", description: "Consulta empresarial e por filial de orçamentos.", permissionKey: "transaction.quotation.read", route: "/operacional/orcamentos?tx=ZQT03" },
   ZQT04: { code: "ZQT04", moduleCode: "BUD", moduleName: "Orçamentos", name: "Aprovar orçamento", description: "Aprovação ou reprovação com justificativa auditável.", permissionKey: "transaction.quotation.approve", route: "/operacional/orcamentos?tx=ZQT04" },
+  ZVE01: { code: "ZVE01", moduleCode: "SAL", moduleName: "Vendas", name: "Criar pedido de venda", description: "Criação de pedido comercial por empresa e filial.", permissionKey: "transaction.sales.order.create", route: "/operacional/vendas?tx=ZVE01" },
+  ZVE02: { code: "ZVE02", moduleCode: "SAL", moduleName: "Vendas", name: "Alterar pedido de venda", description: "Alteração de rascunho comercial por empresa e filial.", permissionKey: "transaction.sales.order.manage", route: "/operacional/vendas?tx=ZVE02" },
+  ZVE03: { code: "ZVE03", moduleCode: "SAL", moduleName: "Vendas", name: "Consultar pedidos de venda", description: "Consulta de pedidos comerciais por empresa e filial.", permissionKey: "transaction.sales.order.read", route: "/operacional/vendas?tx=ZVE03" },
+  ZVE04: { code: "ZVE04", moduleCode: "SAL", moduleName: "Vendas", name: "Confirmar pedido de venda", description: "Confirmação ou cancelamento auditável de pedido comercial.", permissionKey: "transaction.sales.order.decide", route: "/operacional/vendas?tx=ZVE04" },
 } as const satisfies Record<string, ErpTransactionDefinition>;
 
 export type ErpTransactionCode = keyof typeof erpTransactionCatalog;

@@ -412,6 +412,46 @@ export async function convertQuotationToWorkOrderAction(_: ActionState, form: Fo
   } catch { return { status: "error", message: "Não foi possível concluir a conversão." }; }
 }
 
+export async function createSalesOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const branchId = value(form, "branch_id", 36); const customerId = value(form, "customer_id", 36); const id = requestId(form); const lines = quotationLines(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(branchId) || !UUID.test(customerId) || !id || !lines) return { status: "error", message: "Informe cliente e linhas válidas para o pedido de venda." };
+    const { data, error } = await client.rpc("operational_create_sales_order", { p_tenant_id: tenantId, p_branch_id: branchId, p_customer_id: customerId, p_notes: value(form, "notes", 4000) || null, p_lines: lines, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Não foi possível criar o pedido. Empresa, filial, itens e autorização são validados pelo banco." };
+    revalidatePath("/operacional/vendas"); return { status: "success", message: "Pedido de venda criado como rascunho auditável; não houve estoque, faturamento ou financeiro." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function updateSalesOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const salesOrderId = value(form, "sales_order_id", 36); const customerId = value(form, "customer_id", 36); const id = requestId(form); const lines = quotationLines(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(salesOrderId) || !UUID.test(customerId) || !id || !lines) return { status: "error", message: "Dados do pedido de venda inválidos." };
+    const { error } = await client.rpc("operational_update_sales_order", { p_tenant_id: tenantId, p_sales_order_id: salesOrderId, p_customer_id: customerId, p_notes: value(form, "notes", 4000) || null, p_lines: lines, p_request_id: id });
+    if (error) return { status: "error", message: "Somente rascunhos independentes autorizados podem ser alterados." };
+    revalidatePath("/operacional/vendas"); return { status: "success", message: "Rascunho atualizado e auditado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function decideSalesOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const salesOrderId = value(form, "sales_order_id", 36); const decision = value(form, "decision", 12); const reason = value(form, "reason", 1000); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(salesOrderId) || !id || !["confirmed", "cancelled"].includes(decision) || reason.length < 3) return { status: "error", message: "Informe uma decisão e justificativa de ao menos três caracteres." };
+    const { data, error } = await client.rpc("operational_decide_sales_order", { p_tenant_id: tenantId, p_sales_order_id: salesOrderId, p_decision: decision, p_reason: reason, p_request_id: id });
+    if (error || data !== decision) return { status: "error", message: "A decisão foi recusada. ZVE04 e uma justificativa auditável são obrigatórios." };
+    revalidatePath("/operacional/vendas"); return { status: "success", message: decision === "confirmed" ? "Pedido confirmado; faturamento e estoque permanecem bloqueados nesta fase." : "Pedido cancelado e auditado." };
+  } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
+}
+
+export async function convertQuotationToSalesOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const quotationId = value(form, "quotation_id", 36); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(quotationId) || !id) return { status: "error", message: "Dados da conversão inválidos." };
+    const { data, error } = await client.rpc("operational_convert_quotation_to_sales_order", { p_tenant_id: tenantId, p_quotation_id: quotationId, p_request_id: id });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Conversão recusada. O orçamento precisa estar aprovado, vigente e ZQT03/ZVE01 autorizadas." };
+    revalidatePath("/operacional/orcamentos"); revalidatePath("/operacional/vendas"); return { status: "success", message: "Orçamento convertido uma única vez em pedido de venda, sem baixa de estoque, fiscal ou financeiro." };
+  } catch { return { status: "error", message: "Não foi possível concluir a conversão." }; }
+}
+
 export async function setOperationalMembershipStatusAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
     const client = await operationalClient();

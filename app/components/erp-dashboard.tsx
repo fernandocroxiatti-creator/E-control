@@ -23,7 +23,7 @@ const modules: ModuleItem[] = [
   { id: "inventory", label: "Estoque", icon: "box", status: "route", href: "/operacional/estoque" },
   { id: "purchases", label: "Compras", icon: "cart", status: "route", href: "/operacional/compras" },
   { id: "services", label: "Ordens de serviço", icon: "clipboard", status: "route", href: "/operacional/ordens-servico" },
-  { id: "sales", label: "Vendas", icon: "receipt", status: "development" },
+  { id: "sales", label: "Vendas", icon: "receipt", status: "route", href: "/operacional/vendas" },
   { id: "finance", label: "Financeiro", icon: "wallet", status: "development" },
   { id: "accounting", label: "Contabilidade", icon: "book", status: "development" },
   { id: "reports", label: "Relatórios", icon: "chart", status: "development" },
@@ -45,7 +45,7 @@ const tiles: DashboardTile[] = [
   { title: "Estoque", icon: "box", href: "/operacional/estoque?tx=MIGO", status: "authorized" },
   { title: "Compras", icon: "cart", href: "/operacional/compras", status: "authorized" },
   { title: "Orçamentos", icon: "clipboard", href: "/operacional/orcamentos", status: "authorized" },
-  { title: "Vendas", icon: "receipt", status: "development" },
+  { title: "Vendas", icon: "receipt", href: "/operacional/vendas", status: "authorized" },
   { title: "Financeiro", icon: "wallet", status: "development" },
   { title: "Relatórios", icon: "chart", status: "development" },
 ];
@@ -111,6 +111,7 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
     : pathname?.startsWith("/operacional/estoque") ? "inventory"
       : pathname?.startsWith("/operacional/compras") ? "purchases"
           : pathname?.startsWith("/operacional/orcamentos") ? "budgets"
+          : pathname?.startsWith("/operacional/vendas") ? "sales"
         : pathname?.startsWith("/operacional/ordens-servico") ? "services"
           : pathname?.startsWith("/operacional/equipe") ? "users"
             : activeSection;
