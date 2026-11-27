@@ -1,7 +1,7 @@
 begin;
 
 do $setup$
-declare tenant_id constant uuid := '91000000-0000-4000-8000-000000000001'; branch_id constant uuid := '92000000-0000-4000-8000-000000000001'; actor_id constant uuid := '93000000-0000-4000-8000-000000000001'; membership_id constant uuid := '94000000-0000-4000-8000-000000000001';
+declare tenant_id constant uuid := 'f9100000-0000-4000-8000-000000000001'; branch_id constant uuid := 'f9200000-0000-4000-8000-000000000001'; actor_id constant uuid := 'f9300000-0000-4000-8000-000000000001'; membership_id constant uuid := 'f9400000-0000-4000-8000-000000000001';
 begin
   insert into auth.users(id,email,email_confirmed_at) values(actor_id,'phase05@example.test',clock_timestamp());
   insert into public.companies(id,legal_name,status) values(tenant_id,'Phase 05 finance','active');
@@ -17,10 +17,10 @@ begin
     (tenant_id,branch_id,'branch','phase05_owner','transaction.finance.payable.manage','Phase 05 isolated test',actor_id),(tenant_id,branch_id,'branch','phase05_owner','transaction.finance.receivable.manage','Phase 05 isolated test',actor_id),(tenant_id,branch_id,'branch','phase05_owner','transaction.finance.settlement.manage','Phase 05 isolated test',actor_id),(tenant_id,branch_id,'branch','phase05_owner','transaction.finance.read','Phase 05 isolated test',actor_id);
 end;
 $setup$;
-select set_config('request.jwt.claim.role','authenticated',false); select set_config('request.jwt.claim.sub','93000000-0000-4000-8000-000000000001',false);
+select set_config('request.jwt.claim.role','authenticated',false); select set_config('request.jwt.claim.sub','f9300000-0000-4000-8000-000000000001',false);
 
 do $test$
-declare v_tenant_id constant uuid := '91000000-0000-4000-8000-000000000001'; v_branch_id constant uuid := '92000000-0000-4000-8000-000000000001'; payable_id uuid; receivable_id uuid; installment_id uuid; settlement_id uuid; reversal_id uuid; stock_before integer;
+declare v_tenant_id constant uuid := 'f9100000-0000-4000-8000-000000000001'; v_branch_id constant uuid := 'f9200000-0000-4000-8000-000000000001'; payable_id uuid; receivable_id uuid; installment_id uuid; settlement_id uuid; reversal_id uuid; stock_before integer;
 begin
   select count(*) into stock_before from public.inventory_movements m where m.tenant_id=v_tenant_id;
   select public.operational_create_financial_obligation(v_tenant_id,v_branch_id,'payable',null,'Phase 05 payable','2026-11-26',jsonb_build_array(jsonb_build_object('due_date','2026-12-01','amount',60),jsonb_build_object('due_date','2027-01-01','amount',40)),'95000000-0000-4000-8000-000000000001') into payable_id;

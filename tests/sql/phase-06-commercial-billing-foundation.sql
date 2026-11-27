@@ -39,24 +39,27 @@ select set_config('request.jwt.claim.role','authenticated',false);
 select set_config('request.jwt.claim.sub',(select id::text from auth.users where email='phase06-commercial-billing@example.test'),false);
 
 do $test$
-declare tenant_id uuid; branch_id uuid; customer_id uuid; supplier_id uuid; item_id uuid; sales_id uuid; work_order_id uuid; direct_purchase_id uuid; sales_bill_id uuid; work_order_bill_id uuid; before_financial integer; after_financial integer;
+<<test_block>>
+declare tenant_id uuid; branch_id uuid; customer_id uuid; supplier_id uuid; item_id uuid; sales_id uuid; divergent_sales_id uuid; work_order_id uuid; direct_purchase_id uuid; sales_bill_id uuid; work_order_bill_id uuid; before_financial integer; after_financial integer;
 begin
   select id into tenant_id from public.companies where legal_name='Phase 06 commercial billing';
-  select id into branch_id from public.branches where tenant_id=tenant_id and code='P06';
-  select id into customer_id from public.business_parties where tenant_id=tenant_id and party_type='customer';
-  select id into supplier_id from public.business_parties where tenant_id=tenant_id and party_type='supplier';
-  select id into item_id from public.catalog_items where tenant_id=tenant_id and code='P06-PART';
+  select b.id into branch_id from public.branches b where b.tenant_id=test_block.tenant_id and b.code='P06';
+  select p.id into customer_id from public.business_parties p where p.tenant_id=test_block.tenant_id and p.party_type='customer';
+  select p.id into supplier_id from public.business_parties p where p.tenant_id=test_block.tenant_id and p.party_type='supplier';
+  select i.id into item_id from public.catalog_items i where i.tenant_id=test_block.tenant_id and i.code='P06-PART';
 
   select public.operational_create_sales_order(tenant_id,branch_id,customer_id,'Phase 06 sale',jsonb_build_array(jsonb_build_object('item_id',item_id,'quantity',2,'unit_price',30,'discount_percent',0)),'96000000-0000-4000-8000-000000000001') into sales_id;
   perform public.operational_decide_sales_order(tenant_id,sales_id,'confirmed','Phase 06 commercial confirmation','96000000-0000-4000-8000-000000000002');
+  select public.operational_create_sales_order(tenant_id,branch_id,customer_id,'Phase 06 divergent sale',jsonb_build_array(jsonb_build_object('item_id',item_id,'quantity',1,'unit_price',30,'discount_percent',0)),'96000000-0000-4000-8000-000000000012') into divergent_sales_id;
+  perform public.operational_decide_sales_order(tenant_id,divergent_sales_id,'confirmed','Phase 06 divergent commercial confirmation','96000000-0000-4000-8000-000000000013');
   select public.operational_issue_commercial_billing(tenant_id,'sales_order',sales_id,'96000000-0000-4000-8000-000000000003') into sales_bill_id;
   if public.operational_issue_commercial_billing(tenant_id,'sales_order',sales_id,'96000000-0000-4000-8000-000000000003') <> sales_bill_id then raise exception 'T06 identical billing replay did not return original document'; end if;
-  begin perform public.operational_issue_commercial_billing(tenant_id,'work_order',sales_id,'96000000-0000-4000-8000-000000000003'); raise exception 'T06 divergent billing replay accepted'; exception when unique_violation then null; end;
+  begin perform public.operational_issue_commercial_billing(tenant_id,'sales_order',divergent_sales_id,'96000000-0000-4000-8000-000000000003'); raise exception 'T06 divergent billing replay accepted'; exception when unique_violation then null; end;
   begin perform public.operational_issue_commercial_billing(tenant_id,'sales_order',sales_id,'96000000-0000-4000-8000-000000000004'); raise exception 'T06 source was billed twice'; exception when unique_violation then null; end;
   if public.operational_cancel_commercial_billing(tenant_id,sales_bill_id,'Commercial cancellation test','96000000-0000-4000-8000-000000000005') <> 'cancelled' then raise exception 'T06 billing cancellation failed'; end if;
   if public.operational_cancel_commercial_billing(tenant_id,sales_bill_id,'Commercial cancellation test','96000000-0000-4000-8000-000000000005') <> 'cancelled' then raise exception 'T06 cancellation replay failed'; end if;
   begin perform public.operational_cancel_commercial_billing(tenant_id,sales_bill_id,'Different reason','96000000-0000-4000-8000-000000000005'); raise exception 'T06 divergent cancellation replay accepted'; exception when unique_violation then null; end;
-  if not exists(select 1 from public.commercial_billing_documents where tenant_id=tenant_id and id=sales_bill_id and status='cancelled') or (select count(*) from public.commercial_billing_events where tenant_id=tenant_id and billing_document_id=sales_bill_id)<>2 then raise exception 'T06 immutable cancellation event history is incomplete'; end if;
+  if not exists(select 1 from public.commercial_billing_documents d where d.tenant_id=test_block.tenant_id and d.id=sales_bill_id and d.status='cancelled') or (select count(*) from public.commercial_billing_events e where e.tenant_id=test_block.tenant_id and e.billing_document_id=sales_bill_id)<>2 then raise exception 'T06 immutable cancellation event history is incomplete'; end if;
 
   select public.operational_create_work_order(tenant_id,branch_id,customer_id,null,'Phase 06 billing guard','96000000-0000-4000-8000-000000000006') into work_order_id;
   select public.operational_record_work_order_direct_purchase(tenant_id,work_order_id,supplier_id,item_id,'Phase 06 direct part',1,15,'test supplier receipt','P06-DP',null,'96000000-0000-4000-8000-000000000007') into direct_purchase_id;
@@ -65,7 +68,7 @@ begin
   begin perform public.operational_reverse_work_order_direct_purchase(tenant_id,work_order_id,direct_purchase_id,'Blocked while billed','96000000-0000-4000-8000-000000000009'); raise exception 'T06 billed work-order direct purchase reversal accepted'; exception when object_not_in_prerequisite_state then null; end;
   perform public.operational_cancel_commercial_billing(tenant_id,work_order_bill_id,'Cancel before cost correction','96000000-0000-4000-8000-000000000010');
   perform public.operational_reverse_work_order_direct_purchase(tenant_id,work_order_id,direct_purchase_id,'Cost correction after cancellation','96000000-0000-4000-8000-000000000011');
-  if (select direct_purchase_total from public.work_orders where tenant_id=tenant_id and id=work_order_id)<>0 then raise exception 'T06 direct purchase total was not reversed after billing cancellation'; end if;
+  if (select w.direct_purchase_total from public.work_orders w where w.tenant_id=test_block.tenant_id and w.id=work_order_id)<>0 then raise exception 'T06 direct purchase total was not reversed after billing cancellation'; end if;
 
   select count(*) into before_financial from pg_catalog.pg_tables where schemaname='public' and tablename in ('accounts_payable','accounts_receivable','cash_movements','fiscal_documents');
   select count(*) into after_financial from pg_catalog.pg_tables where schemaname='public' and tablename in ('accounts_payable','accounts_receivable','cash_movements','fiscal_documents');

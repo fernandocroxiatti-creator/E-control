@@ -56,7 +56,7 @@ create table public.financial_settlements (
   settlement_type text not null check(settlement_type in ('payment','receipt')), amount numeric(24,8) not null check(amount>0), settled_on date not null,
   method text not null check(pg_catalog.length(method) between 1 and 80), reference text, request_id uuid not null, request_payload jsonb not null check(pg_catalog.jsonb_typeof(request_payload)='object'),
   created_by_user_id uuid not null references auth.users(id) on delete restrict, created_at timestamptz not null default pg_catalog.clock_timestamp(),
-  unique(tenant_id,request_id), foreign key(tenant_id,obligation_id) references public.financial_obligations(tenant_id,id) on delete restrict,
+  unique(tenant_id,id), unique(tenant_id,request_id), foreign key(tenant_id,obligation_id) references public.financial_obligations(tenant_id,id) on delete restrict,
   foreign key(tenant_id,installment_id) references public.financial_installments(tenant_id,id) on delete restrict
 );
 create table public.financial_settlement_reversals (

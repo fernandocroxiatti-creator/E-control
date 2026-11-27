@@ -692,8 +692,6 @@ SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-05-financial-obligations-foundation.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126140500_sales_inventory_fulfillment.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-05-sales-inventory-fulfillment.sql" >/dev/null
-"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126141000_commercial_billing_foundation.sql" >/dev/null
-"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-06-commercial-billing-foundation.sql" >/dev/null
 
 # T09. The first session holds the exact work-order row lock acquired by the
 # production direct-purchase RPC. The second session is a separate PostgreSQL
@@ -805,6 +803,12 @@ begin
   end if;
 end $$;
 SQL
+
+# The Phase 02 T18 concurrency contract deliberately runs before commercial
+# billing exists, proving its original fail-closed behavior. The billing
+# migration is then applied and validated independently below.
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126141000_commercial_billing_foundation.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-06-commercial-billing-foundation.sql" >/dev/null
 # T17 is the full Package 01/03/04/05 and Phase 01 regression above. T18 uses
 # an explicit fail-closed billing guard because the current schema has none.
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'

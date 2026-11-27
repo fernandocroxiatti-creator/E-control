@@ -525,6 +525,8 @@ export async function cancelCommercialBillingAction(_: ActionState, form: FormDa
     revalidatePath("/operacional/faturamento"); revalidatePath("/operacional/vendas"); revalidatePath("/operacional/ordens-servico");
     return { status: "success", message: "Faturamento comercial cancelado e auditado. Nenhum estorno fiscal ou financeiro foi gerado." };
   } catch { return { status: "error", message: "Não foi possível cancelar o faturamento comercial." }; }
+}
+
 /** Finance records obligations only. Cash, bank, tax and accounting ledgers remain out of scope. */
 export async function createFinancialObligationAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
