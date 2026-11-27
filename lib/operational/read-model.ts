@@ -21,6 +21,9 @@ export type OperationalCommercialBilling = { billing_document_id: string; billin
 export type OperationalFinancialSettlement = { settlement_id: string; amount: number; settled_on: string; method: string; reversed: boolean };
 export type OperationalFinancialInstallment = { installment_id: string; number: number; due_date: string; amount: number; settled_amount: number; open_amount: number; status: "open" | "partially_settled" | "settled" | "cancelled"; settlements: OperationalFinancialSettlement[] };
 export type OperationalFinancialObligation = { obligation_id: string; obligation_type: "payable" | "receivable"; status: "open" | "partially_settled" | "settled" | "cancelled"; description: string; gross_amount: number; settled_amount: number; open_amount: number; installments: OperationalFinancialInstallment[]; created_at: string };
+export type OperationalCashRegister = { cash_register_id: string; code: string; name: string; status: "active" | "inactive"; created_at: string };
+export type OperationalCashSession = { cash_session_id: string; cash_register_id: string; cash_register_code: string; status: "open" | "closed"; opening_amount: number; expected_amount: number | null; closing_amount: number | null; difference_amount: number | null; opened_at: string; closed_at: string | null };
+export type OperationalCashMovement = { cash_movement_id: string; cash_session_id: string; movement_type: "supply" | "withdrawal" | "payment" | "receipt" | "adjustment"; direction: "in" | "out"; amount: number; reason: string; source_obligation_id: string | null; created_at: string };
 export type OperationalRead<T> = { status: "ready"; data: T } | { status: "unavailable" };
 export type OperationalPage<T> = OperationalRead<{ rows: T[]; hasMore: boolean; page: number }>;
 
@@ -148,6 +151,28 @@ export async function listOperationalFinancialObligations(tenantId: string, bran
   const currentPage = requestedPage(options.page);
   const result = await read<unknown>("operational_list_financial_obligations", { p_tenant_id: tenantId, p_branch_id: branchId, p_type: options.type ?? null, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
   return result.status === "ready" && records<OperationalFinancialObligation>(result.data, ["obligation_id", "obligation_type", "status", "description", "gross_amount", "settled_amount", "open_amount", "installments", "created_at"])
+    ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
+}
+
+/** Cash reads fail closed until ZCX04 and the cash migration are explicitly available. */
+export async function listOperationalCashRegisters(tenantId: string, branchId: string, options: { page?: number }): Promise<OperationalPage<OperationalCashRegister>> {
+  const currentPage = requestedPage(options.page);
+  const result = await read<unknown>("operational_list_cash_registers", { p_tenant_id: tenantId, p_branch_id: branchId, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
+  return result.status === "ready" && records<OperationalCashRegister>(result.data, ["cash_register_id", "code", "name", "status", "created_at"])
+    ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
+}
+
+export async function listOperationalCashSessions(tenantId: string, branchId: string, options: { status?: string | null; page?: number }): Promise<OperationalPage<OperationalCashSession>> {
+  const currentPage = requestedPage(options.page);
+  const result = await read<unknown>("operational_list_cash_sessions", { p_tenant_id: tenantId, p_branch_id: branchId, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
+  return result.status === "ready" && records<OperationalCashSession>(result.data, ["cash_session_id", "cash_register_id", "cash_register_code", "status", "opening_amount", "expected_amount", "closing_amount", "difference_amount", "opened_at", "closed_at"])
+    ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
+}
+
+export async function listOperationalCashMovements(tenantId: string, branchId: string, options: { sessionId?: string | null; page?: number }): Promise<OperationalPage<OperationalCashMovement>> {
+  const currentPage = requestedPage(options.page);
+  const result = await read<unknown>("operational_list_cash_movements", { p_tenant_id: tenantId, p_branch_id: branchId, p_session_id: options.sessionId ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
+  return result.status === "ready" && records<OperationalCashMovement>(result.data, ["cash_movement_id", "cash_session_id", "movement_type", "direction", "amount", "reason", "source_obligation_id", "created_at"])
     ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
 }
 

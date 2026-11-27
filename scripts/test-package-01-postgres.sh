@@ -692,6 +692,12 @@ SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-05-financial-obligations-foundation.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126140500_sales_inventory_fulfillment.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-05-sales-inventory-fulfillment.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126141000_commercial_billing_foundation.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-06-commercial-billing-foundation.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126142000_cash_treasury_foundation.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126142100_cash_treasury_operations.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126142200_cash_treasury_read_models.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-07-cash-treasury-foundation.sql" >/dev/null
 
 # T09. The first session holds the exact work-order row lock acquired by the
 # production direct-purchase RPC. The second session is a separate PostgreSQL

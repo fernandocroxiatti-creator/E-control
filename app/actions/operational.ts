@@ -559,6 +559,47 @@ export async function reverseFinancialSettlementAction(_: ActionState, form: For
   } catch { return { status: "error", message: "Não foi possível estornar a baixa." }; }
 }
 
+/** Cash actions only create cash audit events; they never settle financial obligations. */
+export async function createCashRegisterAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const branchId = value(form, "branch_id", 36); const request = requestId(form); const code = value(form, "code", 32); const name = value(form, "name", 160);
+    if (!client || !UUID.test(tenantId) || !UUID.test(branchId) || !request || code.length < 2 || name.length < 2) return { status: "error", message: "Informe caixa, filial e contexto empresarial válidos." };
+    const { data, error } = await client.rpc("operational_create_cash_register", { p_tenant_id: tenantId, p_branch_id: branchId, p_code: code, p_name: name, p_request_id: request });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Não foi possível criar o caixa. A autorização ZCX01 e a idempotência são verificadas pelo banco." };
+    revalidatePath("/operacional/caixa"); return { status: "success", message: "Caixa criado com trilha auditável." };
+  } catch { return { status: "error", message: "Não foi possível criar o caixa." }; }
+}
+
+export async function openCashSessionAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const branchId = value(form, "branch_id", 36); const registerId = value(form, "cash_register_id", 36); const request = requestId(form); const opening = decimal(value(form, "opening_amount", 32));
+    if (!client || !UUID.test(tenantId) || !UUID.test(branchId) || !UUID.test(registerId) || !request || opening === null) return { status: "error", message: "Informe caixa, filial, abertura e contexto válidos." };
+    const { data, error } = await client.rpc("operational_open_cash_session", { p_tenant_id: tenantId, p_branch_id: branchId, p_register_id: registerId, p_opening: opening, p_request_id: request });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "A abertura foi recusada. Só é permitida uma sessão aberta por caixa." };
+    revalidatePath("/operacional/caixa"); return { status: "success", message: "Sessão de caixa aberta e auditada." };
+  } catch { return { status: "error", message: "Não foi possível abrir a sessão de caixa." }; }
+}
+
+export async function recordCashMovementAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const sessionId = value(form, "cash_session_id", 36); const request = requestId(form); const amount = decimal(value(form, "amount", 32)); const type = value(form, "movement_type", 16); const direction = value(form, "direction", 3); const reason = value(form, "reason", 1000); const obligationId = value(form, "source_obligation_id", 36);
+    if (!client || !UUID.test(tenantId) || !UUID.test(sessionId) || !request || amount === null || amount <= 0 || !["supply", "withdrawal", "payment", "receipt", "adjustment"].includes(type) || !["in", "out"].includes(direction) || reason.length < 3 || (obligationId && !UUID.test(obligationId))) return { status: "error", message: "Informe movimento, valor, justificativa e contexto válidos." };
+    const { data, error } = await client.rpc("operational_record_cash_movement", { p_tenant_id: tenantId, p_session_id: sessionId, p_type: type, p_direction: direction, p_amount: amount, p_reason: reason, p_request_id: request, p_obligation_id: obligationId || null });
+    if (error || typeof data !== "string" || !UUID.test(data)) return { status: "error", message: "Movimento recusado. A sessão, escopo, obrigação e idempotência são verificados pelo banco." };
+    revalidatePath("/operacional/caixa"); return { status: "success", message: "Movimento de caixa registrado sem criar baixa financeira duplicada." };
+  } catch { return { status: "error", message: "Não foi possível registrar o movimento de caixa." }; }
+}
+
+export async function closeCashSessionAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const sessionId = value(form, "cash_session_id", 36); const request = requestId(form); const counted = decimal(value(form, "counted_amount", 32));
+    if (!client || !UUID.test(tenantId) || !UUID.test(sessionId) || !request || counted === null) return { status: "error", message: "Informe sessão, conferência e contexto válidos." };
+    const { data, error } = await client.rpc("operational_close_cash_session", { p_tenant_id: tenantId, p_session_id: sessionId, p_counted: counted, p_request_id: request });
+    if (error || data !== "closed") return { status: "error", message: "Fechamento recusado. Uma sessão fechada não aceita novos movimentos." };
+    revalidatePath("/operacional/caixa"); return { status: "success", message: "Caixa fechado com diferença apurada e auditoria preservada." };
+  } catch { return { status: "error", message: "Não foi possível fechar a sessão de caixa." }; }
+}
+
 export async function setOperationalMembershipStatusAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
     const client = await operationalClient();

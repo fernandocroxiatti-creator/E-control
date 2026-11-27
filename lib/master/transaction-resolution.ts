@@ -1,6 +1,6 @@
 export type ErpTransactionDefinition = {
   code: string;
-  moduleCode: "MDM" | "INV" | "PUR" | "SVC" | "BUD" | "SAL" | "FIN";
+  moduleCode: "MDM" | "INV" | "PUR" | "SVC" | "BUD" | "SAL" | "FIN" | "CSH";
   moduleName: string;
   name: string;
   description: string;
@@ -83,6 +83,10 @@ export const erpTransactionCatalog = {
   ZVE05: { code: "ZVE05", moduleCode: "SAL", moduleName: "Vendas", name: "Reservar estoque da venda", description: "Reserva auditável de saldo para pedido de venda confirmado.", permissionKey: "transaction.sales.inventory.reserve", route: "/operacional/vendas?tx=ZVE05" },
   ZVE06: { code: "ZVE06", moduleCode: "SAL", moduleName: "Vendas", name: "Entregar pedido de venda", description: "Baixa valorada de estoque por entrega de venda confirmada.", permissionKey: "transaction.sales.inventory.fulfill", route: "/operacional/vendas?tx=ZVE06" },
   ZVE07: { code: "ZVE07", moduleCode: "SAL", moduleName: "Vendas", name: "Devolver venda", description: "Devolução auditável que usa o custo imutável da entrega.", permissionKey: "transaction.sales.inventory.return", route: "/operacional/vendas?tx=ZVE07" },
+  ZCX01: { code: "ZCX01", moduleCode: "CSH", moduleName: "Caixa e tesouraria", name: "Abrir caixa", description: "Criar caixa e abrir sessão por empresa e filial.", permissionKey: "transaction.cash.register.open", route: "/operacional/caixa?tx=ZCX01" },
+  ZCX02: { code: "ZCX02", moduleCode: "CSH", moduleName: "Caixa e tesouraria", name: "Movimentar caixa", description: "Registrar suprimento, sangria, recebimento ou pagamento auditável.", permissionKey: "transaction.cash.register.move", route: "/operacional/caixa?tx=ZCX02" },
+  ZCX03: { code: "ZCX03", moduleCode: "CSH", moduleName: "Caixa e tesouraria", name: "Fechar caixa", description: "Apurar conferência e diferença de sessão de caixa.", permissionKey: "transaction.cash.register.close", route: "/operacional/caixa?tx=ZCX03" },
+  ZCX04: { code: "ZCX04", moduleCode: "CSH", moduleName: "Caixa e tesouraria", name: "Consultar caixa", description: "Consultar caixas, sessões e movimentos por filial.", permissionKey: "transaction.cash.register.read", route: "/operacional/caixa?tx=ZCX04" },
 } as const satisfies Record<string, ErpTransactionDefinition>;
 
 export type ErpTransactionCode = keyof typeof erpTransactionCatalog;
