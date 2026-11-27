@@ -455,6 +455,46 @@ export async function decideSalesOrderAction(_: ActionState, form: FormData): Pr
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
 }
 
+export async function reserveSalesOrderInventoryAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const salesOrderId = value(form, "sales_order_id", 36); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(salesOrderId) || !id) return { status: "error", message: "Dados da reserva inválidos." };
+    const { data, error } = await client.rpc("operational_reserve_sales_order_inventory", { p_tenant_id: tenantId, p_sales_order_id: salesOrderId, p_request_id: id });
+    if (error || data !== "reserved") return { status: "error", message: "Reserva recusada. ZVE05, saldo disponível, filial e pedido confirmado são obrigatórios." };
+    revalidatePath("/operacional/vendas"); return { status: "success", message: "Estoque reservado de forma auditável; ainda não houve baixa, faturamento ou financeiro." };
+  } catch { return { status: "error", message: "Não foi possível concluir a reserva." }; }
+}
+
+export async function fulfillSalesOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const salesOrderId = value(form, "sales_order_id", 36); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(salesOrderId) || !id) return { status: "error", message: "Dados da entrega inválidos." };
+    const { data, error } = await client.rpc("operational_fulfill_sales_order", { p_tenant_id: tenantId, p_sales_order_id: salesOrderId, p_request_id: id });
+    if (error || data !== "fulfilled") return { status: "error", message: "Entrega recusada. ZVE06, reserva e estoque valorado são obrigatórios." };
+    revalidatePath("/operacional/vendas"); revalidatePath("/operacional/estoque"); return { status: "success", message: "Entrega baixou o estoque com custo médio; não houve lançamento fiscal ou financeiro." };
+  } catch { return { status: "error", message: "Não foi possível concluir a entrega." }; }
+}
+
+export async function releaseSalesOrderInventoryAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const salesOrderId = value(form, "sales_order_id", 36); const reason = value(form, "reason", 1000); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(salesOrderId) || !id || reason.length < 3) return { status: "error", message: "Informe uma justificativa de ao menos três caracteres." };
+    const { data, error } = await client.rpc("operational_release_sales_order_inventory", { p_tenant_id: tenantId, p_sales_order_id: salesOrderId, p_reason: reason, p_request_id: id });
+    if (error || data !== "released") return { status: "error", message: "Cancelamento recusado. Apenas pedidos confirmados e não entregues podem liberar reserva." };
+    revalidatePath("/operacional/vendas"); return { status: "success", message: "Reserva liberada e pedido cancelado com auditoria; não houve movimento de estoque." };
+  } catch { return { status: "error", message: "Não foi possível cancelar o pedido." }; }
+}
+
+export async function returnSalesOrderInventoryAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const salesOrderId = value(form, "sales_order_id", 36); const reason = value(form, "reason", 1000); const id = requestId(form);
+    if (!client || !UUID.test(tenantId) || !UUID.test(salesOrderId) || !id || reason.length < 3) return { status: "error", message: "Informe uma justificativa de ao menos três caracteres." };
+    const { data, error } = await client.rpc("operational_return_sales_order_inventory", { p_tenant_id: tenantId, p_sales_order_id: salesOrderId, p_reason: reason, p_request_id: id });
+    if (error || data !== "returned") return { status: "error", message: "Devolução recusada. ZVE07, rastreabilidade e ausência de saída posterior são obrigatórias." };
+    revalidatePath("/operacional/vendas"); revalidatePath("/operacional/estoque"); return { status: "success", message: "Devolução registrada com o custo histórico da entrega; não houve efeito fiscal ou financeiro." };
+  } catch { return { status: "error", message: "Não foi possível concluir a devolução." }; }
+}
+
 export async function convertQuotationToSalesOrderAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
     const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const quotationId = value(form, "quotation_id", 36); const id = requestId(form);

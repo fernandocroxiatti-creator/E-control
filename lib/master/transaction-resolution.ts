@@ -80,6 +80,9 @@ export const erpTransactionCatalog = {
   ZFI02: { code: "ZFI02", moduleCode: "FIN", moduleName: "Financeiro", name: "Criar contas a receber", description: "Registro empresarial e parcelado de direitos a receber.", permissionKey: "transaction.finance.receivable.manage", route: "/operacional/financeiro?tx=ZFI02" },
   ZFI03: { code: "ZFI03", moduleCode: "FIN", moduleName: "Financeiro", name: "Baixas financeiras", description: "Baixas parciais, totais e estornos auditáveis por filial.", permissionKey: "transaction.finance.settlement.manage", route: "/operacional/financeiro?tx=ZFI03" },
   ZFI04: { code: "ZFI04", moduleCode: "FIN", moduleName: "Financeiro", name: "Consultar contas", description: "Consulta empresarial de obrigações e parcelas.", permissionKey: "transaction.finance.read", route: "/operacional/financeiro?tx=ZFI04" },
+  ZVE05: { code: "ZVE05", moduleCode: "SAL", moduleName: "Vendas", name: "Reservar estoque da venda", description: "Reserva auditável de saldo para pedido de venda confirmado.", permissionKey: "transaction.sales.inventory.reserve", route: "/operacional/vendas?tx=ZVE05" },
+  ZVE06: { code: "ZVE06", moduleCode: "SAL", moduleName: "Vendas", name: "Entregar pedido de venda", description: "Baixa valorada de estoque por entrega de venda confirmada.", permissionKey: "transaction.sales.inventory.fulfill", route: "/operacional/vendas?tx=ZVE06" },
+  ZVE07: { code: "ZVE07", moduleCode: "SAL", moduleName: "Vendas", name: "Devolver venda", description: "Devolução auditável que usa o custo imutável da entrega.", permissionKey: "transaction.sales.inventory.return", route: "/operacional/vendas?tx=ZVE07" },
 } as const satisfies Record<string, ErpTransactionDefinition>;
 
 export type ErpTransactionCode = keyof typeof erpTransactionCatalog;
