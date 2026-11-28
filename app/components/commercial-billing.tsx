@@ -1,7 +1,9 @@
 "use client";
 
+import { operationalIdle } from "@/lib/operational/action-state";
+
 import { useActionState, useRef } from "react";
-import { cancelCommercialBillingAction, issueCommercialBillingAction, operationalIdle } from "@/app/actions/operational";
+import { cancelCommercialBillingAction, issueCommercialBillingAction } from "@/app/actions/operational";
 import type { OperationalCommercialBilling, OperationalSalesOrder, OperationalWorkOrder } from "@/lib/operational/read-model";
 
 import { BillingReceivable, type BillingFinancialLink } from "@/app/components/billing-receivable";

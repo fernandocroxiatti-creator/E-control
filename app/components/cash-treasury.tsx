@@ -1,7 +1,9 @@
 "use client";
 
+import { operationalIdle } from "@/lib/operational/action-state";
+
 import { useActionState, useRef } from "react";
-import { closeCashSessionAction, createCashRegisterAction, openCashSessionAction, operationalIdle, recordCashMovementAction } from "@/app/actions/operational";
+import { closeCashSessionAction, createCashRegisterAction, openCashSessionAction, recordCashMovementAction } from "@/app/actions/operational";
 import type { OperationalCashMovement, OperationalCashRegister, OperationalCashSession } from "@/lib/operational/read-model";
 
 type State = { status: string; message?: string };

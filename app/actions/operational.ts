@@ -10,7 +10,6 @@ import { businessPartyDiagnosticCode, businessPartyRpcMessage, prepareBusinessPa
 import { reportBusinessPartyFailure } from "@/lib/operational/diagnostics";
 
 type ActionState = { status: "idle" | "success" | "error"; message?: string };
-export const operationalIdle: ActionState = { status: "idle" };
 export type EmployeeInvitationActionState = ActionState & { invitationLink?: string; expiresAt?: string };
 export type EmployeeInvitationAcceptState = { status: "idle" | "accepted" | "rejected" | "error"; message?: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

@@ -1,7 +1,9 @@
 "use client";
 
+import { operationalIdle } from "@/lib/operational/action-state";
+
 import { useActionState, useMemo, useRef, useState } from "react";
-import { createFinancialObligationAction, operationalIdle, reverseFinancialSettlementAction, settleFinancialInstallmentAction } from "@/app/actions/operational";
+import { createFinancialObligationAction, reverseFinancialSettlementAction, settleFinancialInstallmentAction } from "@/app/actions/operational";
 import type { OperationalFinancialObligation, OperationalParty } from "@/lib/operational/read-model";
 
 type InstallmentInput = { due_date: string; amount: string };

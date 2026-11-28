@@ -1,7 +1,9 @@
 "use client";
 
+import { operationalIdle } from "@/lib/operational/action-state";
+
 import { useActionState, useRef, useState } from "react";
-import { convertQuotationToSalesOrderAction, createSalesOrderAction, decideSalesOrderAction, fulfillSalesOrderAction, operationalIdle, releaseSalesOrderInventoryAction, reserveSalesOrderInventoryAction, returnSalesOrderInventoryAction, updateSalesOrderAction } from "@/app/actions/operational";
+import { convertQuotationToSalesOrderAction, createSalesOrderAction, decideSalesOrderAction, fulfillSalesOrderAction, releaseSalesOrderInventoryAction, reserveSalesOrderInventoryAction, returnSalesOrderInventoryAction, updateSalesOrderAction } from "@/app/actions/operational";
 import type { OperationalItem, OperationalParty, OperationalQuotation, OperationalSalesOrder } from "@/lib/operational/read-model";
 
 type Line = { item_id: string; quantity: string; unit_price: string; discount_percent: string };
