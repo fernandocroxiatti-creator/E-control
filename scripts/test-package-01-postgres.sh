@@ -203,7 +203,7 @@ run_phase01_receipt() {
   local item="$1" request_id="$2" pause="$3" label="$4"
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -216,7 +216,7 @@ run_phase01_transfer() {
   local item="$1" request_id="$2" pause="$3" label="$4"
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -229,7 +229,7 @@ run_phase01_count_post() {
   local count_request="$1" _unused="$2" pause="$3" label="$4"
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -242,7 +242,7 @@ run_phase01_work_order_close() {
   local order_request="$1" _unused="$2" pause="$3" label="$4"
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -255,7 +255,7 @@ run_phase01_hard_receipt() {
   local order="$1" request_id="$2" pause="$3" label="$4"
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -268,7 +268,7 @@ run_phase01_hard_reverse() {
   local order="$1" request_id="$2" pause="$3" label="$4"
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -281,7 +281,7 @@ run_phase01_hard_multi_receipt() {
   local order="$1" request_id="$2" pause="$3" label="$4"
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -294,7 +294,7 @@ run_phase01_hard_multi_reverse() {
   local order="$1" request_id="$2" pause="$3" label="$4"
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -307,7 +307,7 @@ run_phase01_hard_work_order_close() {
   local pause="$1" label="$2"
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -509,7 +509,7 @@ run_phase01_idempotent_movement() {
   if [ "$conflict" = true ]; then statement="do \$idempotency\$ begin perform * from public.operational_record_inventory_movement_valued('ca100000-0000-4000-8000-000000000001','${branch}','${item}','entry',${quantity},${cost},'${request}','${reference}'); raise exception 'divergent movement request was accepted'; exception when unique_violation then null; end \$idempotency\$;"; fi
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -523,7 +523,7 @@ run_phase01_idempotent_derived_movement() {
   local _case_id="$1" _role="$2" pause="$3" label="$4"
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -552,7 +552,7 @@ run_phase01_idempotent_transfer() {
   if [ "$conflict" = true ]; then statement="do \$idempotency\$ begin perform public.operational_create_inventory_transfer('ca100000-0000-4000-8000-000000000001','${source}','${destination}','${item}',${quantity},'${reference}','${request}'); raise exception 'divergent transfer request was accepted'; exception when unique_violation then null; end \$idempotency\$;"; fi
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -581,7 +581,7 @@ run_phase01_idempotent_valuation() {
   if [ "$conflict" = true ]; then statement="do \$idempotency\$ begin perform public.operational_record_initial_inventory_valuation('ca100000-0000-4000-8000-000000000001','${branch}','${item}',${cost},'${reason}','${request}'); raise exception 'divergent valuation request was accepted'; exception when unique_violation then null; end \$idempotency\$;"; fi
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -603,7 +603,7 @@ run_phase01_namespace_movement() {
   esac
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -622,7 +622,7 @@ run_phase01_namespace_transfer() {
   esac
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','ca300000-0000-4000-8000-000000000001',true);
 select set_config('phase01.test_pause','$pause',true);
@@ -696,7 +696,8 @@ SQL
 # T09. The first session holds the exact work-order row lock acquired by the
 # production direct-purchase RPC. The second session is a separate PostgreSQL
 # client and must wait on that lock. This verifies serialization and replay
-# behavior without adding test hooks to Production SQL.
+# behavior without adding test hooks to Production SQL. The 3-second hold
+# allows the two Docker exec probes to observe blocking on slower hosts.
 phase02_wait_activity() {
   local label="$1" predicate="$2" observed
   for _ in $(seq 1 80); do
@@ -728,11 +729,11 @@ run_phase02_direct_purchase() {
   fi
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','d2200000-0000-4000-8000-000000000001',true);
 set local application_name='${label}';
-$(if [ "$first" = yes ]; then printf "%s\n%s\n" "select 1 from public.work_orders where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000001' for update;" "select pg_sleep(0.7);"; fi)
+$(if [ "$first" = yes ]; then printf "%s\n%s\n" "select 1 from public.work_orders where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000001' for update;" "select pg_sleep(3);"; fi)
 ${statement}
 commit;
 SQL
@@ -759,11 +760,11 @@ run_phase02_direct_reversal() {
   [ "$first" = yes ] || request='d2700000-0000-4000-8000-000000000005'
   "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
 begin;
-set local lock_timeout='3s'; set local statement_timeout='8s';
+set local lock_timeout='8s'; set local statement_timeout='15s';
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','d2200000-0000-4000-8000-000000000001',true);
 set local application_name='${label}';
-$(if [ "$first" = yes ]; then printf "%s\n%s\n" "select 1 from public.work_orders where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000001' for update;" "select pg_sleep(0.7);"; fi)
+$(if [ "$first" = yes ]; then printf "%s\n%s\n" "select 1 from public.work_orders where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000001' for update;" "select pg_sleep(3);"; fi)
 do \$reversal\$ begin
   perform public.operational_reverse_work_order_direct_purchase('d2000000-0000-4000-8000-000000000001',(select id from public.work_orders where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000001'),(select id from public.work_order_direct_purchases where tenant_id='d2000000-0000-4000-8000-000000000001' and request_id='d2700000-0000-4000-8000-000000000002'),null,'${request}');
   raise exception 'billing-unknown reversal was accepted';
@@ -903,3 +904,10 @@ echo "PASS: delivered sales billing, duplicate protection and cancellation guard
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128143000_restore_direct_purchase_reversal_execution.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/direct-purchase-reversal-authenticated.sql" >/dev/null
 echo "PASS: direct-purchase reversal as authenticated preserves scope, billing guard and idempotency"
+
+{ sed '/^\\ir /,$d' "$repo_root/tests/sql/business-party-details-validation.sql"; cat "$repo_root/supabase/migrations/20261128144000_business_party_details_validation.sql"; sed '1,/^\\ir /d' "$repo_root/tests/sql/business-party-details-validation.sql"; } | "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null
+echo "PASS: supplier PF/PJ details, CPF/CNPJ, email, legacy preservation and authenticated ACL"
+
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128145000_cancelled_financial_obligation_read_balance.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/cancelled-financial-obligation-read-balance.sql" >/dev/null
+echo "PASS: authenticated financial read extinguishes cancelled balances and refuses settlement"

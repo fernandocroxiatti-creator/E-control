@@ -130,14 +130,19 @@ function financialInstallments(form: FormData) {
   } catch { return null; }
 }
 
+function partyAddress(form: FormData) {
+  const fields = ["postal_code", "street", "number", "complement", "district", "city", "state", "country"];
+  return Object.fromEntries(fields.filter((key) => form.has(`address_${key}`)).map((key) => [key, value(form, `address_${key}`, 200)]));
+}
+
 export async function createBusinessPartyAction(_: ActionState, form: FormData): Promise<ActionState> {
   const diagnosticId = businessPartyDiagnosticCode();
   try {
     const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const id = requestId(form);
-    const prepared = prepareBusinessParty({ partyType: value(form, "party_type", 10), legalName: value(form, "legal_name", 200), documentNumber: value(form, "document_number", 18), contactEmail: value(form, "contact_email", 254), contactPhone: value(form, "contact_phone", 40) });
+    const prepared = prepareBusinessParty({ partyType: value(form, "party_type", 10), legalName: value(form, "legal_name", 200), documentNumber: value(form, "document_number", 18), contactEmail: value(form, "contact_email", 254), contactPhone: value(form, "contact_phone", 40), tradeName: value(form, "trade_name", 200), address: partyAddress(form) });
     if (!client || !UUID.test(tenantId) || !id) return { status: "error", message: "Ação indisponível ou dados inválidos." };
     if ("error" in prepared) return { status: "error", message: prepared.error };
-    const { error } = await client.rpc("operational_create_business_party", { p_tenant_id: tenantId, p_party_type: prepared.value.partyType, p_legal_name: prepared.value.legalName, p_document_number: prepared.value.documentNumber, p_contact_email: prepared.value.contactEmail, p_contact_phone: prepared.value.contactPhone, p_address: {}, p_request_id: id });
+    const { error } = await client.rpc("operational_create_business_party_v2", { p_tenant_id: tenantId, p_party_type: prepared.value.partyType, p_legal_name: prepared.value.legalName, p_document_number: prepared.value.documentNumber, p_contact_email: prepared.value.contactEmail, p_contact_phone: prepared.value.contactPhone, p_address: prepared.value.address ?? {}, p_trade_name: prepared.value.tradeName ?? null, p_request_id: id });
     if (error) return { status: "error", message: businessPartyRpcMessage(error, diagnosticId) };
     revalidatePath("/operacional/cadastros"); return { status: "success", message: "Cadastro registrado e auditado." };
   } catch (error) {
@@ -161,10 +166,11 @@ export async function createCatalogItemAction(_: ActionState, form: FormData): P
 export async function updateBusinessPartyAction(_: ActionState, form: FormData): Promise<ActionState> {
   try {
     const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const partyId = value(form, "party_id", 36); const id = requestId(form);
-    const legalName = value(form, "legal_name", 200);
-    if (!client || !UUID.test(tenantId) || !UUID.test(partyId) || !id || !legalName) return { status: "error", message: "Ação indisponível ou dados inválidos." };
-    const { error } = await client.rpc("operational_update_business_party", { p_tenant_id: tenantId, p_party_id: partyId, p_legal_name: legalName, p_contact_email: value(form, "contact_email", 254) || null, p_contact_phone: value(form, "contact_phone", 40) || null, p_address: {}, p_request_id: id });
-    if (error) return { status: "error", message: "Não foi possível atualizar o cadastro. A autorização empresarial continua obrigatória." };
+    const prepared = prepareBusinessParty({ partyType: "supplier", legalName: value(form, "legal_name", 200), documentNumber: value(form, "document_number", 18), originalDocumentNumber: value(form, "original_document_number", 18), contactEmail: value(form, "contact_email", 254), contactPhone: value(form, "contact_phone", 40), tradeName: value(form, "trade_name", 200), address: partyAddress(form) });
+    if (!client || !UUID.test(tenantId) || !UUID.test(partyId) || !id) return { status: "error", message: "Ação indisponível ou dados inválidos." };
+    if ("error" in prepared) return { status: "error", message: prepared.error };
+    const { error } = await client.rpc("operational_update_business_party_v2", { p_tenant_id: tenantId, p_party_id: partyId, p_legal_name: prepared.value.legalName, p_document_number: prepared.value.documentNumber, p_contact_email: prepared.value.contactEmail, p_contact_phone: prepared.value.contactPhone, p_address: prepared.value.address ?? {}, p_trade_name: prepared.value.tradeName ?? null, p_request_id: id });
+    if (error) return { status: "error", message: businessPartyRpcMessage(error, businessPartyDiagnosticCode()) };
     revalidatePath("/operacional/cadastros"); return { status: "success", message: "Cadastro atualizado e auditado." };
   } catch { return { status: "error", message: "Não foi possível concluir a operação." }; }
 }

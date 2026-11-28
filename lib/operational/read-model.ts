@@ -2,7 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 
-export type OperationalParty = { party_id: string; party_type: "customer" | "supplier" | "both"; legal_name: string; document_number: string | null; contact_email: string | null; contact_phone: string | null; status: "active" | "inactive"; created_at: string };
+export type OperationalParty = { trade_name?: string | null; address?: Record<string, unknown>; person_type?: "PF" | "PJ" | null; party_id: string; party_type: "customer" | "supplier" | "both"; legal_name: string; document_number: string | null; contact_email: string | null; contact_phone: string | null; status: "active" | "inactive"; created_at: string };
 export type OperationalItem = { item_id: string; item_type: "product" | "service"; code: string; name: string; category: string | null; unit_of_measure: string; current_cost: number; selling_price: number; minimum_stock: number; reorder_point: number; status: "active" | "inactive"; created_at: string };
 export type OperationalStock = { item_id: string; code: string; name: string; quantity: number; minimum_stock: number; reorder_point: number; below_reorder_point: boolean };
 export type OperationalInventoryMovement = { movement_id: string; item_id: string; item_code: string; item_name: string; movement_type: "initial" | "entry" | "exit" | "adjustment_positive" | "adjustment_negative" | "transfer_out" | "transfer_in" | "physical_count_in" | "physical_count_out" | "service_consumption" | "service_reversal"; quantity: number; balance_after: number; reference_note: string | null; created_at: string };
@@ -51,13 +51,13 @@ function page<T>(result: OperationalRead<T[]>, value: number): OperationalPage<T
 
 export async function listOperationalParties(tenantId: string, options: { search: string | null; partyType?: string | null; status?: string | null; page?: number }): Promise<OperationalPage<OperationalParty>> {
   const currentPage = requestedPage(options.page);
-  const result = await read<unknown>("operational_list_business_parties", { p_tenant_id: tenantId, p_search: options.search, p_party_type: options.partyType ?? null, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
+  const result = await read<unknown>("operational_list_business_parties_v2", { p_tenant_id: tenantId, p_search: options.search, p_party_type: options.partyType ?? null, p_status: options.status ?? null, p_limit: PAGE_SIZE + 1, p_offset: (currentPage - 1) * PAGE_SIZE });
   return result.status === "ready" && records<OperationalParty>(result.data, ["party_id", "party_type", "legal_name", "status", "created_at"])
     ? page({ status: "ready", data: result.data }, currentPage) : { status: "unavailable" };
 }
 
 export async function listOperationalSupplierOptions(tenantId: string): Promise<OperationalRead<OperationalParty[]>> {
-  const result = await read<unknown>("operational_list_business_parties", { p_tenant_id: tenantId, p_search: null, p_party_type: "supplier", p_status: "active", p_limit: 100, p_offset: 0 });
+  const result = await read<unknown>("operational_list_business_parties_v2", { p_tenant_id: tenantId, p_search: null, p_party_type: "supplier", p_status: "active", p_limit: 100, p_offset: 0 });
   return result.status === "ready" && records<OperationalParty>(result.data, ["party_id", "party_type", "legal_name", "status", "created_at"])
     ? { status: "ready", data: result.data } : { status: "unavailable" };
 }
