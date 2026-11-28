@@ -1,0 +1,55 @@
+{
+  "base_production_commit": "6718657967afa5e6a614c396a4e7df42170ec894",
+  "migrations": [
+    {
+      "file": "supabase/migrations/20261127150000_management_analytics_foundation.sql",
+      "sha256": "d6c498c956f9da9dbb467fd06d382c7576cd282dafd4bd3918a95535b0f00dc1",
+      "git_blob_sha1": "be0fd512e9eb7135f92c9018c8a9cda60b0f2a73"
+    },
+    {
+      "file": "supabase/migrations/20261127180000_treasury_bank_foundation.sql",
+      "sha256": "3883281883e11fb23caaaf7c20690422fc369567191680dcb8f8f19e9ba81c03",
+      "git_blob_sha1": "83f6153146d2e6890440ce8bcc3fcc8e80a45e50"
+    },
+    {
+      "file": "supabase/migrations/20261127181000_treasury_operations_read_models.sql",
+      "sha256": "69189f7cfc83887c177e75b874ecd9769602bc50c57c1ada8ce35294627485f6",
+      "git_blob_sha1": "7d561e0159f162e5c7183339e2fde45ffd8e8bb0"
+    },
+    {
+      "file": "supabase/migrations/20261127181500_treasury_account_maintenance.sql",
+      "sha256": "f9761ab64dfceaebf1fc443b2b600fea9b635ebfc154779faf6889adda73cb8a",
+      "git_blob_sha1": "7c6b695e1973198cfc639cf124a6d25d740d927c"
+    },
+    {
+      "file": "supabase/migrations/20261127182000_management_reports.sql",
+      "sha256": "cee0fcedc8f1916b3c2dabcc3efd40f0b212021ad9914cd93f3d343b26b92572",
+      "git_blob_sha1": "d039581db1bc035fd881a7aeee08b911807f2a9f"
+    },
+    {
+      "file": "supabase/migrations/20261127190000_saas_commercial_control_plane.sql",
+      "sha256": "029c4c2c36b7d81ba027b8cacfc20df9123a104760268c60cc7ae4f93a980ec7",
+      "git_blob_sha1": "a3ddb3b57a6053bff10c5903c6a2f805a5fb9c38"
+    },
+    {
+      "file": "supabase/migrations/20261128100000_saas_enforcement.sql",
+      "sha256": "3fd017af4266f5b2b945dc294e9649a2c3d8c87ab9bf3ec631054493e211ad32",
+      "git_blob_sha1": "3e6718b9c585041fbdbff8b933373e23ec89e7b1"
+    },
+    {
+      "file": "supabase/migrations/20261128110000_billing_finance_integration.sql",
+      "sha256": "584cf762bb66a411cb44906d43cb5f924e8fd6e5c84d896df9d3be91efc323f2",
+      "git_blob_sha1": "9cd2176787729df0398b64285b18530858409896"
+    },
+    {
+      "file": "supabase/migrations/20261128120000_treasury_ofx_import.sql",
+      "sha256": "89a5ccd2e6a86fccdda2a92b9ced17bc11ead2a7ddb71dcfe12fb05acd6c1da5",
+      "git_blob_sha1": "c83892102b7ed08934244e6c1c2c6515c4d41229"
+    },
+    {
+      "file": "supabase/migrations/20261128130000_operational_reports.sql",
+      "sha256": "06f76a23b142d4a05b6a732f564211bd82d49dbdb59d186026fbe8d940412ab3",
+      "git_blob_sha1": "9bb581d415959d674b2c90af3c413322e44f1291"
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 # Implementação local de Tesouraria, Gestão e SaaS
 
+Documento histórico da base local `ab32549`. As complementações e a situação atual estão em [Pacote comercial final](releases/2026-11-28-final-commercial-package.md).
+
 Base: `6718657`. Branch: `codex/local-erp-completion`.
 
 Os worktrees originais de Tesouraria, Analytics, Caixa/Relatórios e SaaS foram preservados. As três migrations não versionadas encontradas foram copiadas para integração e corrigidas; a migration SaaS recebeu timestamp distinto para evitar colisão com Tesouraria. Nenhuma migration foi aplicada a Supabase remoto.
