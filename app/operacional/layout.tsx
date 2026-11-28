@@ -1,3 +1,4 @@
+import { getCommerciallyBlockedTenants } from "@/lib/saas/read-model";
 import { redirect } from "next/navigation";
 import { ErpDashboard } from "@/app/components/erp-dashboard";
 import { createClient } from "@/lib/supabase/server";
@@ -12,5 +13,6 @@ export default async function OperationalLayout({ children }: { children: React.
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) redirect("/login?next=%2Foperacional%2Fcadastros");
   const access = await getOperationalTransactionContexts(supabase, user.id);
-  return <ErpDashboard email={user.email ?? "Usuário autenticado"} showMasterAdmin={await isCurrentSessionMaster(supabase)} transactionContexts={access.contexts} operationalContextStatus={access.status} operationalEnabled={Boolean(getSupabaseEnv()?.operationalEnabled)} activeSection="catalog">{children}</ErpDashboard>;
+  const commerciallyBlockedTenants = await getCommerciallyBlockedTenants(supabase, access.contexts);
+  return <ErpDashboard commerciallyBlockedTenants={commerciallyBlockedTenants} email={user.email ?? "Usuário autenticado"} showMasterAdmin={await isCurrentSessionMaster(supabase)} transactionContexts={access.contexts} operationalContextStatus={access.status} operationalEnabled={Boolean(getSupabaseEnv()?.operationalEnabled)} activeSection="catalog">{children}</ErpDashboard>;
 }

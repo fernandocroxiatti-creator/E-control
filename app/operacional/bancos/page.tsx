@@ -1,19 +1,23 @@
+import { OfxImport, type OfxData } from "@/app/components/ofx-import";
 import Link from "next/link";
 import { CompletionForm } from "@/app/components/completion-form";
 import { operationalReportContext, formatMoney, type BankData } from "@/lib/erp-completion/read-model";
 import { reportPeriod } from "@/lib/erp-completion/input";
 import { authorizeRouteTransaction } from "@/lib/operational/transaction-focus";
 export const dynamic = "force-dynamic";
-export default async function BankPage({ searchParams }: { searchParams: Promise<{ filial?: string; from?: string; to?: string; page?: string }> }) {
+export default async function BankPage({ searchParams }: { searchParams: Promise<{ filial?: string; from?: string; to?: string; page?: string; ofx_page?: string }> }) {
   const search = await searchParams; const context = await operationalReportContext(search.filial); const period = reportPeriod(search.from, search.to);
   if (!context) return <p className="master-notice">Sessão indisponível.</p>;
   const { client, access, selected, enabled } = context;
-  const grants = selected && enabled ? await Promise.all((["ZTR02", "ZTR03", "ZTR04", "ZTR05"] as const).map(tx => authorizeRouteTransaction(client, tx, selected.tenantId, selected.branchId))) : [];
+  const grants = selected && enabled ? await Promise.all((["ZTR02", "ZTR03", "ZTR04", "ZTR05", "ZTR06"] as const).map(tx => authorizeRouteTransaction(client, tx, selected.tenantId, selected.branchId))) : [];
   const allowed = (i: number) => grants[i]?.status === "authorized";
   const page = /^\d{1,6}$/.test(search.page ?? "") ? Math.max(1, Number(search.page)) : 1;
   const result = selected && period && enabled && allowed(3) ? await client.rpc("operational_get_bank_treasury", { p_tenant_id: selected.tenantId, p_branch_id: selected.branchId, p_from: period.from, p_to: period.to, p_offset: (page - 1) * 100 }) : null;
   const data = result && !result.error ? result.data as BankData : null;
   const accountOptions = data?.accounts.filter(a => a.status === "active").map(a => ({ id: a.id, name: `${a.code} · ${a.name}` })) ?? [];
+  const ofxPage = /^\d{1,6}$/.test(search.ofx_page ?? "") ? Math.max(1, Number(search.ofx_page)) : 1;
+  const ofxResult = selected && period && enabled && allowed(3) ? await client.rpc("operational_get_ofx_reconciliation", { p_tenant_id: selected.tenantId, p_branch_id: selected.branchId, p_from: period.from, p_to: period.to, p_offset: (ofxPage - 1) * 100 }) : null;
+  const ofxData = ofxResult && !ofxResult.error ? ofxResult.data as OfxData : null;
   const movements = data?.movements.slice(0, 100) ?? [];
   return <><h1>Contas bancárias, transferências e conciliação</h1><p>Movimentos em BRL, isolados por empresa e filial. Transferências internas não geram receita nem liquidam obrigações.</p>
     <form className="master-filter-form"><label>Filial<select name="filial" defaultValue={selected?.branchId}>{access.contexts.map(c => <option key={c.branchId} value={c.branchId}>{c.companyName} · {c.branchName}</option>)}</select></label><label>De<input type="date" name="from" defaultValue={period?.from} required /></label><label>Até<input type="date" name="to" defaultValue={period?.to} required /></label><button>Consultar</button></form>
@@ -28,5 +32,5 @@ export default async function BankPage({ searchParams }: { searchParams: Promise
         {allowed(2) ? <CompletionForm key={`ur${selected.branchId}`} command="unreconcile" tenantId={selected.tenantId} options={{ movement_id: movements.filter(m => m.reconciled_at).map(m => ({ id: m.id, name: `${m.occurred_on} · ${m.description} · ${m.statement_reference}` })) }} /> : null}
         {page > 1 ? <Link href={`?${new URLSearchParams({ filial: selected.branchId, from: period!.from, to: period!.to, page: String(page - 1) })}`}>Anterior</Link> : null}{data.movements.length > 100 ? <Link href={`?${new URLSearchParams({ filial: selected.branchId, from: period!.from, to: period!.to, page: String(page + 1) })}`}>Próxima</Link> : null}
       </> : <p className="master-notice">Consulta indisponível. Verifique implantação e autorização ZTR05; saldos não foram carregados.</p>}
-    </>}<Link href="/operacional/gestao">Fluxo de caixa e gestão</Link></>;
+    </>}{selected && enabled && data ? <><OfxImport tenantId={selected.tenantId} accounts={data.accounts} data={ofxData} allowBind={allowed(0)} allowImport={allowed(2) && allowed(4)} allowReconcile={allowed(2)} /><nav className="master-pagination" aria-label="Paginação OFX">{ofxPage > 1 ? <Link href={`?${new URLSearchParams({ filial: selected.branchId, from: period!.from, to: period!.to, ofx_page: String(ofxPage - 1) })}`}>Extratos anteriores</Link> : null}{ofxData && ofxData.lines.length > 100 ? <Link href={`?${new URLSearchParams({ filial: selected.branchId, from: period!.from, to: period!.to, ofx_page: String(ofxPage + 1) })}`}>Próximos extratos</Link> : null}</nav></> : null}<Link href="/operacional/gestao">Fluxo de caixa e gestão</Link></>;
 }

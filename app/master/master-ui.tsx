@@ -16,9 +16,6 @@ const masterNavigation = [
   { href: "/master/acessos-por-empresa", label: "Acessos por empresa", icon: "▤" },
   { href: "/master/auditoria", label: "Auditoria", icon: "≋" },
   { href: "/master/planos", label: "Planos e assinaturas", icon: "◇" },
-  { href: "/master/solicitacoes", label: "Solicitações", icon: "⌁" },
-  { href: "/master/suporte", label: "Suporte", icon: "?" },
-  { href: "/master/configuracoes", label: "Configurações", icon: "⚙" },
 ];
 
 export function MasterShell({ email, children }: { email: string; children: React.ReactNode }) {

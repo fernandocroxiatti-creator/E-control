@@ -48,7 +48,7 @@ export function parseCommand(command: string, form: FormData) {
   return { spec, args };
 }
 export function reportPeriod(from?: string, to?: string) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
   const start = from ?? `${today.slice(0, 7)}-01`; const end = to ?? today;
   if (!validDate(start) || !validDate(end) || start > end || Date.parse(end) - Date.parse(start) > 366 * 86400000) return null;
   return { from: start, to: end };

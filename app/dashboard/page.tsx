@@ -1,3 +1,4 @@
+import { getCommerciallyBlockedTenants } from "@/lib/saas/read-model";
 import { redirect } from "next/navigation";
 import { ErpDashboard } from "@/app/components/erp-dashboard";
 import { createClient } from "@/lib/supabase/server";
@@ -17,5 +18,5 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const showMasterAdmin = await isCurrentSessionMaster(supabase);
   const access = await getOperationalTransactionContexts(supabase, user.id);
   const { password } = await searchParams;
-  return <ErpDashboard email={user.email ?? "Usuário autenticado"} showMasterAdmin={showMasterAdmin} passwordUpdated={password === "updated"} transactionContexts={access.contexts} operationalContextStatus={access.status} operationalEnabled={Boolean(getSupabaseEnv()?.operationalEnabled)} />;
+  return <ErpDashboard commerciallyBlockedTenants={await getCommerciallyBlockedTenants(supabase, access.contexts)} email={user.email ?? "Usuário autenticado"} showMasterAdmin={showMasterAdmin} passwordUpdated={password === "updated"} transactionContexts={access.contexts} operationalContextStatus={access.status} operationalEnabled={Boolean(getSupabaseEnv()?.operationalEnabled)} />;
 }

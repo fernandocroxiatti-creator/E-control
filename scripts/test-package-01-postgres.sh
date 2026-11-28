@@ -6,7 +6,7 @@ container="econtrol-package01-postgres-${RANDOM}${RANDOM}"
 onboarding_result_one=''
 onboarding_result_two=''
 cleanup(){
-  "$docker_bin" rm -f "$container" >/dev/null 2>&1 || true
+  if [ "${ECONTROLL_TEST_KEEP_CONTAINER:-0}" != "1" ]; then "$docker_bin" rm -f "$container" >/dev/null 2>&1 || true; else echo "LOCAL TEST CONTAINER: $container"; fi
   [ -z "$onboarding_result_one" ] || rm -f "$onboarding_result_one"
   [ -z "$onboarding_result_two" ] || rm -f "$onboarding_result_two"
 }
@@ -851,6 +851,41 @@ do $$ begin
 end $$;
 SQL
 echo 'PASS: bank transfers, reconciliation, management reports, SaaS lifecycle, ACL and opposing transfer concurrency'
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128100000_saas_enforcement.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128110000_billing_finance_integration.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128120000_treasury_ofx_import.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128130000_operational_reports.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/final-commercial-behavior.sql" >/dev/null
+echo "PASS: final SaaS, billing/finance, OFX and report behavior"
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/final-capacity-concurrency-setup.sql" >/dev/null
+run_capacity_case() {
+  local label="$1" kind="$2" second="$3" pause="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+set application_name='$label';
+set statement_timeout='15s';
+begin;
+select app_private.test_final_capacity('$kind',$second);
+select pg_sleep($pause);
+commit;
+SQL
+}
+for kind in branch member; do
+  run_capacity_case "capacity-$kind-first" "$kind" false 2 & capacity_first_pid=$!
+  phase02_wait_activity "capacity-$kind-first" "wait_event='PgSleep'"
+  run_capacity_case "capacity-$kind-second" "$kind" true 0 & capacity_second_pid=$!
+  phase02_wait_activity "capacity-$kind-second" "wait_event_type='Lock'"
+  wait "$capacity_first_pid"
+  wait "$capacity_second_pid"
+done
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
+do $$ begin
+ if (select count(*) from public.branches where tenant_id='e1100000-0000-4000-8000-000000000001' and status='active')<>3
+ or (select count(*) from public.company_memberships where tenant_id='e1100000-0000-4000-8000-000000000001' and status in ('active','pending'))<>2
+ then raise exception 'Concurrent SaaS limit inconsistent'; end if;
+end $$;
+SQL
+echo 'PASS: concurrent branch and pending-user capacity cannot oversubscribe the plan'
+
 # T17 is the full Package 01/03/04/05 and Phase 01 regression above. T18 uses
 # an explicit fail-closed billing guard because the current schema has none.
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'

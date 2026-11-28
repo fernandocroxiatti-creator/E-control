@@ -28,11 +28,11 @@ const modules: ModuleItem[] = [
   { id: "bank", label: "Bancos e conciliação", icon: "wallet", status: "route", href: "/operacional/bancos" },
   { id: "cash", label: "Caixa", icon: "wallet", status: "route", href: "/operacional/caixa" },
   { id: "obligations", label: "Contas a pagar e receber", icon: "receipt", status: "route", href: "/operacional/financeiro" },
-  { id: "accounting", label: "Contabilidade", icon: "book", status: "development" },
   { id: "reports", label: "Gestão e relatórios", icon: "chart", status: "route", href: "/operacional/gestao" },
   { id: "budgets", label: "Orçamentos", icon: "clipboard", status: "route", href: "/operacional/orcamentos" },
   { id: "users", label: "Usuários e permissões", icon: "users", status: "route", href: "/operacional/equipe" },
-  { id: "settings", label: "Configurações", icon: "settings", status: "development" },
+  { id: "subscription", label: "Minha assinatura", icon: "receipt", status: "route", href: "/empresas/assinatura" },
+  { id: "export", label: "Central de relatórios", icon: "chart", status: "route", href: "/operacional/relatorios" },
 ];
 
 type DashboardTile = {
@@ -59,7 +59,7 @@ function withOperationalContext(href: string, context: AuthorizedTransactionCont
   return `${href}${separator}${new URLSearchParams({ empresa: context.tenantId, filial: context.branchId }).toString()}`;
 }
 
-export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated = false, activeSection = "overview", transactionContexts = [], operationalContextStatus = "no_active_membership", operationalEnabled = false, children }: { email: string; showMasterAdmin?: boolean; passwordUpdated?: boolean; activeSection?: string; transactionContexts?: AuthorizedTransactionContext[]; operationalContextStatus?: OperationalContextStatus; operationalEnabled?: boolean; children?: React.ReactNode }) {
+export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated = false, activeSection = "overview", transactionContexts = [], operationalContextStatus = "no_active_membership", operationalEnabled = false, commerciallyBlockedTenants = [], children }: { email: string; showMasterAdmin?: boolean; passwordUpdated?: boolean; activeSection?: string; transactionContexts?: AuthorizedTransactionContext[]; operationalContextStatus?: OperationalContextStatus; operationalEnabled?: boolean; commerciallyBlockedTenants?: string[]; children?: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -208,16 +208,18 @@ export function ErpDashboard({ email, showMasterAdmin = false, passwordUpdated =
         <main id="main-content" className="erp-content">
           {passwordUpdated && <p className="form-message success dashboard-password-message" role="status">Senha atualizada.</p>}
           <div id="transaction-result" className={`transaction-feedback${transactionMessage ? " is-visible" : ""}`} role="status" aria-live="polite">{transactionMessage}</div>
-          {children ?? <DashboardOverview transactionContexts={transactionContexts} selectedContext={selectedContext} operationalContextStatus={operationalContextStatus} operationalEnabled={operationalEnabled} />}
+          {commerciallyBlockedTenants.includes(selectedContext?.tenantId ?? transactionContexts[0]?.tenantId ?? "") ? <p className="master-notice" role="alert">A situação comercial desta empresa impede ou não permite confirmar operações. <Link href={`/empresas/assinatura?empresa=${selectedContext?.tenantId ?? transactionContexts[0]?.tenantId ?? ""}`}>Consultar assinatura e regularização</Link>. O acesso administrativo permanece disponível conforme suas permissões.</p> : null}
+          {children ?? <DashboardOverview commerciallyBlockedTenants={commerciallyBlockedTenants} transactionContexts={transactionContexts} selectedContext={selectedContext} operationalContextStatus={operationalContextStatus} operationalEnabled={operationalEnabled} />}
         </main>
       </div>
     </div>
   );
 }
 
-function DashboardOverview({ transactionContexts, selectedContext, operationalContextStatus, operationalEnabled }: { transactionContexts: AuthorizedTransactionContext[]; selectedContext: AuthorizedTransactionContext | undefined; operationalContextStatus: OperationalContextStatus; operationalEnabled: boolean }) {
+function DashboardOverview({ transactionContexts, selectedContext, operationalContextStatus, operationalEnabled, commerciallyBlockedTenants }: { commerciallyBlockedTenants: string[]; transactionContexts: AuthorizedTransactionContext[]; selectedContext: AuthorizedTransactionContext | undefined; operationalContextStatus: OperationalContextStatus; operationalEnabled: boolean }) {
   const activeContext = selectedContext ?? transactionContexts[0];
-  const operationalReady = operationalEnabled && Boolean(activeContext);
+  const commerciallyBlocked = commerciallyBlockedTenants.includes(activeContext?.tenantId ?? "");
+  const operationalReady = operationalEnabled && Boolean(activeContext) && !commerciallyBlocked;
   return (
     <>
       <div className="page-heading-row">
@@ -226,13 +228,13 @@ function DashboardOverview({ transactionContexts, selectedContext, operationalCo
       </div>
       <section className="readiness-banner" aria-labelledby="readiness-title">
         <span className="readiness-icon"><Icon name="shield" /></span>
-        {operationalReady ? <div><h2 id="readiness-title">Acesso empresarial ativo</h2><p>{activeContext.companyName} · {activeContext.branchCode} — {activeContext.branchName}. Cadastros e estoque são liberados conforme as transações autorizadas.</p></div>
+        {commerciallyBlocked ? <div><h2 id="readiness-title">Regularização comercial necessária</h2><p>Consulte a assinatura da empresa e solicite a regularização ao administrador.</p></div> : operationalReady ? <div><h2 id="readiness-title">Acesso empresarial ativo</h2><p>{activeContext.companyName} · {activeContext.branchCode} — {activeContext.branchName}. Cadastros e estoque são liberados conforme as transações autorizadas.</p></div>
           : activeContext ? <div><h2 id="readiness-title">Empresa autorizada</h2><p>{activeContext.companyName} · {activeContext.branchCode} — {activeContext.branchName}. As operações aguardam a habilitação explícita do ambiente.</p></div>
             : <div><h2 id="readiness-title">Contexto empresarial necessário</h2><p>{operationalContextMessage(operationalContextStatus) || "Sua sessão ainda não possui empresa e filial autorizadas."}</p></div>}
-        <span className="readiness-status">{operationalReady ? "Operações disponíveis" : activeContext ? "Operações aguardando habilitação" : "Acesso operacional bloqueado"}</span>
+        <span className="readiness-status">{commerciallyBlocked ? "Operações bloqueadas" : operationalReady ? "Operações disponíveis" : activeContext ? "Operações aguardando habilitação" : "Acesso operacional bloqueado"}</span>
       </section>
       <section className="module-overview" aria-labelledby="modules-title">
-        <div className="section-heading"><div><h2 id="modules-title">Áreas de gestão</h2><p>Atalhos exibem o estado de autorização real da sessão; módulos futuros permanecem identificados.</p></div><span className="section-count">{tiles.length} áreas</span></div>
+        <div className="section-heading"><div><h2 id="modules-title">Áreas de gestão</h2><p>Abra uma área para consultar as operações permitidas para a empresa e filial selecionadas.</p></div><span className="section-count">{tiles.length} áreas</span></div>
         <div className="overview-grid">
           {tiles.map((tile) => {
             const isOperational = tile.status === "authorized";
