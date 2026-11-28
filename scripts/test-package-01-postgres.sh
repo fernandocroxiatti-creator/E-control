@@ -899,3 +899,7 @@ echo "PASS: final migration chain preserves MIGO reads and tenant isolation"
 
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/delivered-sales-billing-consistency.sql" >/dev/null
 echo "PASS: delivered sales billing, duplicate protection and cancellation guard"
+
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128143000_restore_direct_purchase_reversal_execution.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/direct-purchase-reversal-authenticated.sql" >/dev/null
+echo "PASS: direct-purchase reversal as authenticated preserves scope, billing guard and idempotency"
