@@ -51,12 +51,15 @@ function CompanyScopedGrantManager({ tenantId, branches, items, grants, roles, r
   const activeBranches = branches.filter((branch) => branch.status === "active");
   const pilotPermissions = items.filter((item) => item.permission_key.startsWith("transaction.")
     && item.approval_state === "approved" && item.permission_approval_state === "approved");
-  const extraCatalogRead = pilotPermissions.some((item) => item.transaction_code === "MM01" || item.transaction_code === "SV01")
-    ? { transaction_code: "MDM", permission_key: "transaction.masterdata.catalog.read", label: "Leitura do catálogo necessária para os cadastros" }
-    : null;
+  const auxiliaryReads = [
+    { transaction_code: "MDM", permission_key: "transaction.masterdata.catalog.read", label: "Leitura do catálogo necessária para os cadastros", codes: ["MM01", "SV01"] },
+    { transaction_code: "BP01", permission_key: "transaction.masterdata.party.read", label: "Consultar clientes e fornecedores", codes: ["BP01"] },
+    { transaction_code: "MIGO", permission_key: "transaction.inventory.stock.read", label: "Consultar estoque da filial", codes: ["MIGO"] },
+  ].filter((option) => pilotPermissions.some((item) => option.codes.includes(item.transaction_code))
+    && roles.some((entry) => entry.entry_type === "permission" && entry.permission_key === option.permission_key && entry.approval_state === "approved"));
   const grantOptions = [...new Map([
     ...pilotPermissions.map((item) => ({ transaction_code: item.transaction_code, permission_key: item.permission_key, label: names[item.transaction_code] ?? item.transaction_code })),
-    ...(extraCatalogRead ? [extraCatalogRead] : []),
+    ...auxiliaryReads,
   ].map((option) => [option.permission_key, option])).values()];
   const approvedRoles = roles.filter((role) => role.entry_type === "role" && role.approval_state === "approved" && role.role_key)
     .map((role) => ({ role_key: role.role_key!, label: role.display_name }));
