@@ -1,8 +1,9 @@
 "use client";
 
+import { useOperationalRequest } from "@/lib/operational/use-operational-request";
 import { operationalIdle } from "@/lib/operational/action-state";
 
-import { useActionState, useMemo, useRef, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { createFinancialObligationAction, reverseFinancialSettlementAction, settleFinancialInstallmentAction } from "@/app/actions/operational";
 import type { OperationalFinancialObligation, OperationalParty } from "@/lib/operational/read-model";
 
@@ -12,11 +13,11 @@ const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "curren
 function Feedback({ state }: { state: { status: string; message?: string } }) { return state.message ? <p className={`master-company-feedback ${state.status === "success" ? "is-success" : "is-error"}`} role={state.status === "success" ? "status" : "alert"}>{state.message}</p> : null; }
 
 function ObligationForm({ tenantId, branchId, type, parties }: { tenantId: string; branchId: string; type: "payable" | "receivable"; parties: OperationalParty[] }) {
-  const [state, action, pending] = useActionState(createFinancialObligationAction, operationalIdle); const request = useRef<HTMLInputElement>(null);
+  const [state, action, pending] = useActionState(createFinancialObligationAction, operationalIdle); const { request, prepareRequest } = useOperationalRequest(state);
   const [installments, setInstallments] = useState<InstallmentInput[]>([{ due_date: "", amount: "" }]);
   const payload = useMemo(() => JSON.stringify(installments.map((row) => ({ due_date: row.due_date, amount: Number(row.amount) }))), [installments]);
   const update = (index: number, key: keyof InstallmentInput, value: string) => setInstallments((rows) => rows.map((row, current) => current === index ? { ...row, [key]: value } : row));
-  return <form action={action} className="master-company-form master-v2-form" onSubmit={() => { if (request.current && !request.current.value) request.current.value = crypto.randomUUID(); }}>
+  return <form action={action} className="master-company-form master-v2-form" onSubmit={() => { prepareRequest(); }}>
     <input type="hidden" name="tenant_id" value={tenantId} /><input type="hidden" name="branch_id" value={branchId} /><input type="hidden" name="obligation_type" value={type} /><input ref={request} type="hidden" name="request_id" /><input type="hidden" name="installments" value={payload} />
     <label>{type === "payable" ? "Fornecedor (opcional)" : "Cliente (opcional)"}<select name="counterparty_id"><option value="">Não vinculado</option>{parties.map((party) => <option key={party.party_id} value={party.party_id}>{party.legal_name}</option>)}</select></label>
     <label>Descrição<input name="description" maxLength={1000} required /></label><label>Data de emissão<input name="issue_date" type="date" required /></label>
@@ -26,13 +27,13 @@ function ObligationForm({ tenantId, branchId, type, parties }: { tenantId: strin
 }
 
 function SettleInstallment({ tenantId, installmentId, openAmount }: { tenantId: string; installmentId: string; openAmount: number }) {
-  const [state, action, pending] = useActionState(settleFinancialInstallmentAction, operationalIdle); const request = useRef<HTMLInputElement>(null);
-  return <form action={action} className="master-v2-form" onSubmit={() => { if (request.current) request.current.value = crypto.randomUUID(); }}><input type="hidden" name="tenant_id" value={tenantId} /><input type="hidden" name="installment_id" value={installmentId} /><input ref={request} type="hidden" name="request_id" /><label>Valor<input name="amount" inputMode="decimal" defaultValue={openAmount} required /></label><label>Data<input name="settled_on" type="date" required /></label><label>Método<input name="method" maxLength={80} placeholder="Ex.: transferência" required /></label><label>Referência<input name="reference" maxLength={300} /></label><button disabled={pending}>{pending ? "Registrando…" : "Registrar baixa"}</button><Feedback state={state} /></form>;
+  const [state, action, pending] = useActionState(settleFinancialInstallmentAction, operationalIdle); const { request, prepareRequest } = useOperationalRequest(state);
+  return <form action={action} className="master-v2-form" onSubmit={() => { prepareRequest(); }}><input type="hidden" name="tenant_id" value={tenantId} /><input type="hidden" name="installment_id" value={installmentId} /><input ref={request} type="hidden" name="request_id" /><label>Valor<input name="amount" inputMode="decimal" defaultValue={openAmount} required /></label><label>Data<input name="settled_on" type="date" required /></label><label>Método<input name="method" maxLength={80} placeholder="Ex.: transferência" required /></label><label>Referência<input name="reference" maxLength={300} /></label><button disabled={pending}>{pending ? "Registrando…" : "Registrar baixa"}</button><Feedback state={state} /></form>;
 }
 
 function ReverseSettlement({ tenantId, settlementId }: { tenantId: string; settlementId: string }) {
-  const [state, action, pending] = useActionState(reverseFinancialSettlementAction, operationalIdle); const request = useRef<HTMLInputElement>(null);
-  return <form action={action} className="master-v2-form" onSubmit={(event) => { if (!window.confirm("Confirmar estorno da baixa? A baixa original será preservada e o saldo será restaurado.")) event.preventDefault(); else if (request.current) request.current.value = crypto.randomUUID(); }}><input type="hidden" name="tenant_id" value={tenantId} /><input type="hidden" name="settlement_id" value={settlementId} /><input ref={request} type="hidden" name="request_id" /><label>Justificativa<textarea name="reason" minLength={3} maxLength={1000} required /></label><button disabled={pending}>{pending ? "Estornando…" : "Estornar baixa"}</button><Feedback state={state} /></form>;
+  const [state, action, pending] = useActionState(reverseFinancialSettlementAction, operationalIdle); const { request, prepareRequest } = useOperationalRequest(state);
+  return <form action={action} className="master-v2-form" onSubmit={(event) => { if (!window.confirm("Confirmar estorno da baixa? A baixa original será preservada e o saldo será restaurado.")) event.preventDefault(); else prepareRequest(); }}><input type="hidden" name="tenant_id" value={tenantId} /><input type="hidden" name="settlement_id" value={settlementId} /><input ref={request} type="hidden" name="request_id" /><label>Justificativa<textarea name="reason" minLength={3} maxLength={1000} required /></label><button disabled={pending}>{pending ? "Estornando…" : "Estornar baixa"}</button><Feedback state={state} /></form>;
 }
 
 /** Settlement reversal requires its immutable settlement id; it is deliberately available only from the audit detail API, not inferred from an installment. */

@@ -855,6 +855,9 @@ echo 'PASS: bank transfers, reconciliation, management reports, SaaS lifecycle, 
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128110000_billing_finance_integration.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128120000_treasury_ofx_import.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128130000_operational_reports.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128140000_restore_inventory_movement_authorization.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128141000_delivered_sales_billing_consistency.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261128142000_cancelled_obligation_report_balance.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/final-commercial-behavior.sql" >/dev/null
 echo "PASS: final SaaS, billing/finance, OFX and report behavior"
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/final-capacity-concurrency-setup.sql" >/dev/null
@@ -890,3 +893,9 @@ echo 'PASS: concurrent branch and pending-user capacity cannot oversubscribe the
 # an explicit fail-closed billing guard because the current schema has none.
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'
 echo 'PASS: Packages 01, 03, 04, 05, Phase 01 valuation, Phase 02 direct work-order purchase, Phase 03 quotation, and Phase 04 sales-order contracts pass against isolated PostgreSQL 17.11 with an Auth/Foundation compatibility harness.'
+
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/final-inventory-authorization.sql" >/dev/null
+echo "PASS: final migration chain preserves MIGO reads and tenant isolation"
+
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/delivered-sales-billing-consistency.sql" >/dev/null
+echo "PASS: delivered sales billing, duplicate protection and cancellation guard"

@@ -26,7 +26,7 @@ export default async function OperationalBillingPage({ searchParams }: { searchP
   const allowCancel = isRouteAuthorized(cancelAccess ?? null) && cancelAccess?.status === "authorized";
   const [billing, salesOrders, workOrders] = selected && enabled ? await Promise.all([
     allowRead ? listOperationalCommercialBilling(selected.tenantId, selected.branchId, { status: billingStatus(search.status) }) : Promise.resolve(undefined),
-    allowIssue ? listOperationalSalesOrders(selected.tenantId, selected.branchId, { status: "confirmed" }) : Promise.resolve(undefined),
+    allowIssue ? listOperationalSalesOrders(selected.tenantId, selected.branchId, { status: null }) : Promise.resolve(undefined),
     allowIssue ? listOperationalWorkOrders(selected.tenantId, selected.branchId, { status: "closed" }) : Promise.resolve(undefined),
   ]) : [];
   const financeResult = selected && enabled && allowRead ? await client.rpc("operational_list_billing_financial_links", { p_tenant_id: selected.tenantId, p_branch_id: selected.branchId, p_limit: 100, p_offset: 0 }) : null;

@@ -58,6 +58,7 @@ begin
  perform public.operational_reverse_financial_settlement(t,settlement,'Explicit test reversal',gen_random_uuid());
  perform public.operational_cancel_commercial_billing(t,bill,'Cancel after reversal',gen_random_uuid());
  if (select status from public.financial_obligations where id=obligation)<>'cancelled' or exists(select 1 from public.financial_installments where obligation_id=obligation and status<>'cancelled') then raise exception 'linked cancellation not atomic'; end if;
+ if exists(select 1 from jsonb_array_elements(public.operational_get_report(t,b,'finance','2026-11-01','2026-11-30')->'rows') r where r->>'status'='cancelled' and (r->>'balance')::numeric<>0) then raise exception 'cancelled obligation reports a collectible balance'; end if;
  if exists(select 1 from jsonb_array_elements(public.operational_get_management_report(t,b,'2026-11-01','2026-11-30')->'dre') r where (r->>'amount')::numeric<>0) then raise exception 'cancelled revenue still in DRE'; end if;
  manual_obligation:=public.operational_create_financial_obligation(t,b,'receivable',customer,'Existing manual obligation','2026-11-28','[{"due_date":"2026-12-28","amount":80}]',gen_random_uuid());
  begin perform public.operational_integrate_billing_receivable(t,second_bill,'2026-11-28','30 dias','[{"due_date":"2026-12-28","amount":"80"}]',gen_random_uuid()); raise exception 'manual obligation duplicate'; exception when unique_violation then null; end;

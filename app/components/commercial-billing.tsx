@@ -1,8 +1,9 @@
 "use client";
 
+import { useOperationalRequest } from "@/lib/operational/use-operational-request";
 import { operationalIdle } from "@/lib/operational/action-state";
 
-import { useActionState, useRef } from "react";
+import { useActionState } from "react";
 import { cancelCommercialBillingAction, issueCommercialBillingAction } from "@/app/actions/operational";
 import type { OperationalCommercialBilling, OperationalSalesOrder, OperationalWorkOrder } from "@/lib/operational/read-model";
 
@@ -17,8 +18,8 @@ function Feedback({ state }: { state: { status: string; message?: string } }) {
 
 function IssueForm({ tenantId, sources }: { tenantId: string; sources: Source[] }) {
   const [state, action, pending] = useActionState(issueCommercialBillingAction, operationalIdle);
-  const request = useRef<HTMLInputElement>(null);
-  return <form action={action} className="master-company-form master-v2-form" onSubmit={() => { if (request.current) request.current.value = crypto.randomUUID(); }}>
+  const { request, prepareRequest } = useOperationalRequest(state);
+  return <form action={action} className="master-company-form master-v2-form" onSubmit={() => { prepareRequest(); }}>
     <input type="hidden" name="tenant_id" value={tenantId} /><input ref={request} type="hidden" name="request_id" />
     <label>Origem faturável<select name="source_key" onChange={(event) => {
       const [type, id] = event.currentTarget.value.split(":");
@@ -33,8 +34,8 @@ function IssueForm({ tenantId, sources }: { tenantId: string; sources: Source[] 
 
 function CancelForm({ tenantId, documentId }: { tenantId: string; documentId: string }) {
   const [state, action, pending] = useActionState(cancelCommercialBillingAction, operationalIdle);
-  const request = useRef<HTMLInputElement>(null);
-  return <details className="master-row-editor"><summary>Cancelar faturamento</summary><form action={action} className="master-v2-form" onSubmit={() => { if (request.current) request.current.value = crypto.randomUUID(); }}>
+  const { request, prepareRequest } = useOperationalRequest(state);
+  return <details className="master-row-editor"><summary>Cancelar faturamento</summary><form action={action} className="master-v2-form" onSubmit={() => { prepareRequest(); }}>
     <input type="hidden" name="tenant_id" value={tenantId} /><input type="hidden" name="billing_document_id" value={documentId} /><input ref={request} type="hidden" name="request_id" />
     <p>Recebíveis vinculados serão cancelados junto ao faturamento somente depois do estorno explícito de todas as baixas. Dependências em caixa ou banco bloqueiam o cancelamento.</p><label>Justificativa<textarea name="reason" minLength={3} maxLength={1000} required /></label><button disabled={pending}>{pending ? "Cancelando…" : "Cancelar"}</button><Feedback state={state} />
   </form></details>;
@@ -43,7 +44,7 @@ function CancelForm({ tenantId, documentId }: { tenantId: string; documentId: st
 export function CommercialBilling({ tenantId, enabled, billing, salesOrders, workOrders, allowIssue, allowRead, allowCancel, allowLink = false, financialLinks = [] }: { tenantId: string; enabled: boolean; billing: OperationalCommercialBilling[]; salesOrders: OperationalSalesOrder[]; workOrders: OperationalWorkOrder[]; allowIssue: boolean; allowRead: boolean; allowCancel: boolean; allowLink?: boolean; financialLinks?: BillingFinancialLink[] }) {
   const billed = new Set(billing.map((document) => `${document.source_type}:${document.source_id}`));
   const sources: Source[] = [
-    ...salesOrders.filter((order) => order.status === "confirmed" && !billed.has(`sales_order:${order.sales_order_id}`)).map((order) => ({ sourceType: "sales_order" as const, sourceId: order.sales_order_id, label: `Venda #${order.sales_order_number} · ${order.customer_name} · ${money(order.total_amount)}` })),
+    ...salesOrders.filter((order) => (order.status === "confirmed" || order.status === "fulfilled") && !billed.has(`sales_order:${order.sales_order_id}`)).map((order) => ({ sourceType: "sales_order" as const, sourceId: order.sales_order_id, label: `Venda #${order.sales_order_number} · ${order.customer_name} · ${money(order.total_amount)}` })),
     ...workOrders.filter((order) => order.status === "closed" && !billed.has(`work_order:${order.work_order_id}`)).map((order) => ({ sourceType: "work_order" as const, sourceId: order.work_order_id, label: `O.S. #${order.order_number} · ${order.customer_name} · ${money(order.total_amount)}` })),
   ];
   return <section className="master-data-panel"><header><div><h2>Faturamento comercial</h2><p>Registro interno, auditável e reversível por cancelamento. A integração de recebíveis é explícita e auditada. Não emite documento fiscal nem movimenta caixa automaticamente.</p></div></header>

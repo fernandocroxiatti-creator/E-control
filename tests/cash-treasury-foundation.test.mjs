@@ -22,7 +22,8 @@ test("cash interface remains fail-closed behind scoped transaction authorization
     read("app/operacional/caixa/page.tsx"), read("app/components/cash-treasury.tsx"), read("app/actions/operational.ts"),
   ]);
   for (const value of ["authorizeRouteTransaction", "ZCX01", "ZCX02", "ZCX03", "ZCX04", "CashTreasury"]) assert.match(page, new RegExp(value));
-  for (const value of ["createCashRegisterAction", "openCashSessionAction", "recordCashMovementAction", "closeCashSessionAction", "crypto.randomUUID", "Caixa não liquida obrigações"]) assert.match(component, new RegExp(value));
+  for (const value of ["createCashRegisterAction", "openCashSessionAction", "recordCashMovementAction", "closeCashSessionAction", "useOperationalRequest", "Caixa não liquida obrigações"]) assert.match(component, new RegExp(value));
   for (const value of ["operational_create_cash_register", "operational_open_cash_session", "operational_record_cash_movement", "operational_close_cash_session"]) assert.match(actions, new RegExp(value));
+  assert.match(await read("lib/operational/use-operational-request.ts"), /crypto.randomUUID/);
   assert.match(actions, /revalidatePath\("\/operacional\/caixa"\)/);
 });
