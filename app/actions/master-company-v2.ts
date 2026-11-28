@@ -24,6 +24,9 @@ async function getAuthorizedMutationClient(requiresCompanyCreation = false) {
 
 function rpcErrorState(error: unknown): MasterMutationState {
   const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  const message = typeof error === "object" && error !== null && "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
+  if (code === "23514" && message === "Contracted resource limit reached; request a plan review") return { status: "error", message: "O limite de usuários ou filiais do plano contratado foi atingido. Revise o plano antes de adicionar ou reativar recursos." };
+  if (code === "23514") return { status: "error", message: "Os dados não atendem às regras do cadastro. Revise os campos e os limites do plano contratado." };
   if (code === "42501") return { status: "error", message: "A sessão atual não possui autorização para esta operação." };
   if (code === "23505") return { status: "error", message: "Já existe um registro com esse CNPJ ou código dentro das regras cadastradas." };
   if (code === "22023" || code === "P0002") return { status: "error", message: "Os dados não foram aceitos. Confira os campos e o estado atual do registro." };
