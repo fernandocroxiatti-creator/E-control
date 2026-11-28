@@ -1,6 +1,6 @@
 export type ErpTransactionDefinition = {
   code: string;
-  moduleCode: "MDM" | "INV" | "PUR" | "SVC" | "BUD" | "SAL" | "FIN" | "CSH";
+  moduleCode: "MDM" | "INV" | "PUR" | "SVC" | "BUD" | "SAL" | "FIN" | "CSH" | "TSY" | "MGT";
   moduleName: string;
   name: string;
   description: string;
@@ -13,6 +13,13 @@ export type ErpTransactionDefinition = {
  * every lookup is verified by authorize_company_transaction on the server.
  */
 export const erpTransactionCatalog = {
+  ZTR02: { code: "ZTR02", moduleCode: "TSY", moduleName: "Tesouraria", name: "Contas bancárias", description: "Contas bancárias por empresa e filial autorizada.", permissionKey: "transaction.treasury.account.manage", route: "/operacional/bancos?tx=ZTR02" },
+  ZTR03: { code: "ZTR03", moduleCode: "TSY", moduleName: "Tesouraria", name: "Movimentos e transferências bancárias", description: "Movimentos e transferências bancárias por empresa e filial autorizada.", permissionKey: "transaction.treasury.movement.manage", route: "/operacional/bancos?tx=ZTR03" },
+  ZTR04: { code: "ZTR04", moduleCode: "TSY", moduleName: "Tesouraria", name: "Conciliação bancária", description: "Conciliação bancária por empresa e filial autorizada.", permissionKey: "transaction.treasury.reconcile.manage", route: "/operacional/bancos?tx=ZTR04" },
+  ZTR05: { code: "ZTR05", moduleCode: "TSY", moduleName: "Tesouraria", name: "Consultar bancos", description: "Consultar bancos por empresa e filial autorizada.", permissionKey: "transaction.treasury.read", route: "/operacional/bancos?tx=ZTR05" },
+  ZGE01: { code: "ZGE01", moduleCode: "MGT", moduleName: "Gestão", name: "Dashboard, fluxo de caixa e DRE", description: "Dashboard, fluxo de caixa e DRE por empresa e filial autorizada.", permissionKey: "transaction.management.read", route: "/operacional/gestao?tx=ZGE01" },
+  ZGE02: { code: "ZGE02", moduleCode: "MGT", moduleName: "Gestão", name: "Exportar relatórios", description: "Exportar relatórios por empresa e filial autorizada.", permissionKey: "transaction.management.export", route: "/operacional/gestao?tx=ZGE02" },
+
   BP01: {
     code: "BP01", moduleCode: "MDM", moduleName: "Cadastros", name: "Clientes e fornecedores",
     description: "Consulta e gestão de parceiros comerciais autorizados.",

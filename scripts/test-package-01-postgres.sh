@@ -813,6 +813,44 @@ SQL
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126142100_cash_treasury_operations.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261126142200_cash_treasury_read_models.sql" >/dev/null
 "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/phase-07-cash-treasury-foundation.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261127150000_management_analytics_foundation.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261127180000_treasury_bank_foundation.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261127181000_treasury_operations_read_models.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261127181500_treasury_account_maintenance.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261127182000_management_reports.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/supabase/migrations/20261127190000_saas_commercial_control_plane.sql" >/dev/null
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/erp-completion-behavior.sql" >/dev/null
+# Opposing bank transfers must serialize without a deadlock or partial ledger.
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres < "$repo_root/tests/sql/erp-completion-concurrency-setup.sql" >/dev/null
+run_bank_transfer() {
+  local label="$1" source="$2" destination="$3" pause="$4"
+  "$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<SQL
+set application_name='$label';
+set statement_timeout='15s';
+begin;
+select set_config('request.jwt.claim.role','authenticated',false);
+select set_config('request.jwt.claim.sub','e1300000-0000-4000-8000-000000000001',false);
+select public.operational_transfer_bank_funds('e1100000-0000-4000-8000-000000000001',
+ (select id from public.treasury_bank_accounts where code='$source'),
+ (select id from public.treasury_bank_accounts where code='$destination'),10,'2026-11-27','Concurrent opposing transfer',gen_random_uuid());
+select pg_sleep($pause);
+commit;
+SQL
+}
+run_bank_transfer bank-first CONC01 CONC02 2 & bank_first_pid=$!
+phase02_wait_activity bank-first "wait_event='PgSleep'"
+run_bank_transfer bank-second CONC02 CONC01 0 & bank_second_pid=$!
+phase02_wait_activity bank-second "wait_event_type='Lock'"
+wait "$bank_first_pid"
+wait "$bank_second_pid"
+"$docker_bin" exec -i "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
+do $$ begin
+ if (select count(*) from public.treasury_bank_movements where tenant_id='e1100000-0000-4000-8000-000000000001')<>4
+ or exists(select bank_account_id from public.treasury_bank_movements where tenant_id='e1100000-0000-4000-8000-000000000001' group by bank_account_id having sum(case direction when 'in' then amount else -amount end)<>0)
+ then raise exception 'Opposing bank transfer concurrency lost balance'; end if;
+end $$;
+SQL
+echo 'PASS: bank transfers, reconciliation, management reports, SaaS lifecycle, ACL and opposing transfer concurrency'
 # T17 is the full Package 01/03/04/05 and Phase 01 regression above. T18 uses
 # an explicit fail-closed billing guard because the current schema has none.
 "$docker_bin" exec "$container" psql -X -v ON_ERROR_STOP=1 -U postgres -d postgres -Atc "select count(*) from pg_class where relnamespace in ('public'::regnamespace,'app_private'::regnamespace) and relname in ('business_parties','catalog_items','inventory_movements','company_employee_invitations');" | grep -qx '4'

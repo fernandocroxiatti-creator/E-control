@@ -25,8 +25,11 @@ const modules: ModuleItem[] = [
   { id: "services", label: "Ordens de serviço", icon: "clipboard", status: "route", href: "/operacional/ordens-servico" },
   { id: "sales", label: "Vendas", icon: "receipt", status: "route", href: "/operacional/vendas" },
   { id: "finance", label: "Faturamento", icon: "wallet", status: "route", href: "/operacional/faturamento" },
+  { id: "bank", label: "Bancos e conciliação", icon: "wallet", status: "route", href: "/operacional/bancos" },
+  { id: "cash", label: "Caixa", icon: "wallet", status: "route", href: "/operacional/caixa" },
+  { id: "obligations", label: "Contas a pagar e receber", icon: "receipt", status: "route", href: "/operacional/financeiro" },
   { id: "accounting", label: "Contabilidade", icon: "book", status: "development" },
-  { id: "reports", label: "Relatórios", icon: "chart", status: "development" },
+  { id: "reports", label: "Gestão e relatórios", icon: "chart", status: "route", href: "/operacional/gestao" },
   { id: "budgets", label: "Orçamentos", icon: "clipboard", status: "route", href: "/operacional/orcamentos" },
   { id: "users", label: "Usuários e permissões", icon: "users", status: "route", href: "/operacional/equipe" },
   { id: "settings", label: "Configurações", icon: "settings", status: "development" },
@@ -47,7 +50,7 @@ const tiles: DashboardTile[] = [
   { title: "Orçamentos", icon: "clipboard", href: "/operacional/orcamentos", status: "authorized" },
   { title: "Vendas", icon: "receipt", href: "/operacional/vendas", status: "authorized" },
   { title: "Faturamento", icon: "wallet", href: "/operacional/faturamento?tx=ZFB02", status: "authorized" },
-  { title: "Relatórios", icon: "chart", status: "development" },
+  { title: "Gestão e relatórios", icon: "chart", href: "/operacional/gestao", status: "authorized" },
 ];
 
 function withOperationalContext(href: string, context: AuthorizedTransactionContext | undefined) {
