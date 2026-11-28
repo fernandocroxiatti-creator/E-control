@@ -347,7 +347,7 @@ export async function reverseWorkOrderDirectPurchaseAction(_: ActionState, form:
     const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const workOrderId = value(form, "work_order_id", 36); const directPurchaseId = value(form, "direct_purchase_id", 36); const id = requestId(form); const reason = value(form, "reason", 1000) || null;
     if (!client || !UUID.test(tenantId) || !UUID.test(workOrderId) || !UUID.test(directPurchaseId) || !id) return { status: "error", message: "Dados de estorno inválidos." };
     const { error } = await client.rpc("operational_reverse_work_order_direct_purchase", { p_tenant_id: tenantId, p_work_order_id: workOrderId, p_direct_purchase_id: directPurchaseId, p_reason: reason, p_request_id: id });
-    if (error) return { status: "error", message: "Não foi possível estornar a compra direta. A O.S. precisa estar aberta, não faturada e autorizada." };
+    if (error) return { status: "error", message: "Não foi possível estornar a compra direta. A O.S. precisa estar aberta ou encerrada, sem faturamento ativo e autorizada." };
     revalidatePath("/operacional/ordens-servico"); return { status: "success", message: "Compra direta estornada por evento compensatório auditável." };
   } catch { return { status: "error", message: "Não foi possível estornar a compra direta." }; }
 }
@@ -489,6 +489,7 @@ export async function returnSalesOrderInventoryAction(_: ActionState, form: Form
     const client = await operationalClient(); const tenantId = value(form, "tenant_id", 36); const salesOrderId = value(form, "sales_order_id", 36); const reason = value(form, "reason", 1000); const id = requestId(form);
     if (!client || !UUID.test(tenantId) || !UUID.test(salesOrderId) || !id || reason.length < 3) return { status: "error", message: "Informe uma justificativa de ao menos três caracteres." };
     const { data, error } = await client.rpc("operational_return_sales_order_inventory", { p_tenant_id: tenantId, p_sales_order_id: salesOrderId, p_reason: reason, p_request_id: id });
+    if (error?.code === "55000" && error.message === "Cancel active commercial billing before cancelling or returning this sale") return { status: "error", message: "Cancele o faturamento ativo desta venda antes de registrar a devolução. Se houver baixas financeiras vinculadas, estorne-as primeiro." };
     if (error || data !== "returned") return { status: "error", message: "Devolução recusada. ZVE07, rastreabilidade e ausência de saída posterior são obrigatórias." };
     revalidatePath("/operacional/vendas"); revalidatePath("/operacional/estoque"); return { status: "success", message: "Devolução registrada com o custo histórico da entrega; não houve efeito fiscal ou financeiro." };
   } catch { return { status: "error", message: "Não foi possível concluir a devolução." }; }
