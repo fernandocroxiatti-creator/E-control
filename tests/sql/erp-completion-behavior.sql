@@ -9,7 +9,7 @@ begin
  insert into public.company_memberships(id,tenant_id,user_id,status,branch_access_mode,created_by_user_id) values(m,t,u,'active','all_branches',u);
  insert into public.access_role_definitions(role_key,display_name,scope,approval_state) values('completion_test','Local completion','company','approved');
  insert into public.membership_role_assignments(tenant_id,membership_id,role_key,assigned_by_user_id) values(t,m,'completion_test',u);
- if exists(select 1 from public.erp_transaction_authorization_catalog where transaction_code in ('ZTR02','ZTR03','ZTR04','ZTR05','ZGE01','ZGE02') and approval_state<>'pending') then raise exception 'new transactions must start pending'; end if;
+ if exists(select 1 from public.erp_transaction_authorization_catalog where transaction_code in ('ZTR02','ZTR03','ZTR04','ZTR05','ZGE01','ZGE02') and approval_state<>'pending_approval') then raise exception 'new transactions must start pending'; end if;
  update public.permission_definitions set approval_state='approved' where permission_key like 'transaction.treasury.%' or permission_key like 'transaction.management.%' or permission_key like 'transaction.finance.%';
  update public.erp_transaction_authorization_catalog set approval_state='approved' where transaction_code in ('ZTR02','ZTR03','ZTR04','ZTR05','ZGE01','ZGE02','ZFI01','ZFI02','ZFI03','ZFI04');
  insert into public.company_module_availability(tenant_id,module_code,enabled,changed_by_user_id) select t,x,true,u from unnest(array['TSY','MGT','FIN']) x;

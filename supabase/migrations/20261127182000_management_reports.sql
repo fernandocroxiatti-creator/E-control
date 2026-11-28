@@ -1,6 +1,6 @@
 begin;
-insert into public.permission_definitions(permission_key,description,approval_state) values ('transaction.management.read','Consultar fluxo de caixa, DRE gerencial e dashboard.','pending'),('transaction.management.export','Exportar relatórios gerenciais por filial.','pending') on conflict do nothing;
-insert into public.erp_transaction_authorization_catalog(transaction_code,module_code,permission_key,approval_state) values ('ZGE01','MGT','transaction.management.read','pending'),('ZGE02','MGT','transaction.management.export','pending') on conflict do nothing;
+insert into public.permission_definitions(permission_key,description,approval_state) values ('transaction.management.read','Consultar fluxo de caixa, DRE gerencial e dashboard.','pending_approval'),('transaction.management.export','Exportar relatórios gerenciais por filial.','pending_approval') on conflict do nothing;
+insert into public.erp_transaction_authorization_catalog(transaction_code,module_code,permission_key,approval_state) values ('ZGE01','MGT','transaction.management.read','pending_approval'),('ZGE02','MGT','transaction.management.export','pending_approval') on conflict do nothing;
 
 create function app_private.assert_management_permission(p_tenant_id uuid,p_branch_id uuid,p_export boolean default false)
 returns uuid language plpgsql stable security definer set search_path='' set row_security=off as $f$

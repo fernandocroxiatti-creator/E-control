@@ -1,6 +1,6 @@
 # Manifesto de migrations — pacote local final
 
-Ordem de aplicação: a ordem abaixo, somente após autorização remota específica. SHA-256 identifica o conteúdo integral; Git blob SHA-1 é fornecido no manifesto JSON. As seis primeiras migrations já pertencem à base local ab32549; as quatro seguintes são complementares. Nenhuma foi aplicada remotamente nesta execução.
+Revisão após preflight Production: cinco migrations corrigidas de `pending` para `pending_approval`, conforme constraints reais. Os cinco novos hashes exigem autorização complementar antes de aplicação remota. Nenhuma migration foi aplicada a Production. Ordem e dependências preservadas. SHA-256 identifica os bytes integrais; Git blob SHA-1 identifica o objeto no repositório.
 
 ### 20261127150000_management_analytics_foundation.sql
 
@@ -10,9 +10,9 @@ Git blob SHA-1: `be0fd512e9eb7135f92c9018c8a9cda60b0f2a73`
 
 ### 20261127180000_treasury_bank_foundation.sql
 
-SHA-256: `3883281883e11fb23caaaf7c20690422fc369567191680dcb8f8f19e9ba81c03`
+SHA-256: `dda95c60c7f394c463063fe558967b7897edeaa058c7152d67b21b87a171501b`
 
-Git blob SHA-1: `83f6153146d2e6890440ce8bcc3fcc8e80a45e50`
+Git blob SHA-1: `6f97de3d3ffc6a59bce93841df221c3eb37897cb`
 
 ### 20261127181000_treasury_operations_read_models.sql
 
@@ -28,9 +28,9 @@ Git blob SHA-1: `7c6b695e1973198cfc639cf124a6d25d740d927c`
 
 ### 20261127182000_management_reports.sql
 
-SHA-256: `cee0fcedc8f1916b3c2dabcc3efd40f0b212021ad9914cd93f3d343b26b92572`
+SHA-256: `10b340b260e140108f5b408d0c5af4f7933e51829687f787e102d1c0c80a707f`
 
-Git blob SHA-1: `d039581db1bc035fd881a7aeee08b911807f2a9f`
+Git blob SHA-1: `5e70e1a928606e547f10c6c534fe5df8a9848a13`
 
 ### 20261127190000_saas_commercial_control_plane.sql
 
@@ -46,18 +46,18 @@ Git blob SHA-1: `3e6718b9c585041fbdbff8b933373e23ec89e7b1`
 
 ### 20261128110000_billing_finance_integration.sql
 
-SHA-256: `584cf762bb66a411cb44906d43cb5f924e8fd6e5c84d896df9d3be91efc323f2`
+SHA-256: `ddcefe926ba8cc787d2f00fb0c80d94e03599931d048baf14331ed176f15b4d0`
 
-Git blob SHA-1: `9cd2176787729df0398b64285b18530858409896`
+Git blob SHA-1: `fb73a2641f36c69f95c3e30b23f2a4d819a4e309`
 
 ### 20261128120000_treasury_ofx_import.sql
 
-SHA-256: `89a5ccd2e6a86fccdda2a92b9ced17bc11ead2a7ddb71dcfe12fb05acd6c1da5`
+SHA-256: `2a84c3338d371f34bab0741b61e6310d60badb606ec83cdb4678d8f8cf802087`
 
-Git blob SHA-1: `c83892102b7ed08934244e6c1c2c6515c4d41229`
+Git blob SHA-1: `7248833ad8968f171baba936c357b7c88d0580cd`
 
 ### 20261128130000_operational_reports.sql
 
-SHA-256: `06f76a23b142d4a05b6a732f564211bd82d49dbdb59d186026fbe8d940412ab3`
+SHA-256: `aff12663c86f09ef843e6b5a7eac2880eccf3d2b38002dd49168ff319b79e4fe`
 
-Git blob SHA-1: `9bb581d415959d674b2c90af3c413322e44f1291`
+Git blob SHA-1: `5a92bcfd8fa462acca655d8b5d502d3a14152373`

@@ -1,12 +1,12 @@
 begin;
 -- Bank treasury is a distinct ledger. It never settles financial installments implicitly.
 insert into public.permission_definitions(permission_key,description,approval_state) values
- ('transaction.treasury.account.manage','Gerenciar contas bancárias por empresa e filial.','pending'),
- ('transaction.treasury.movement.manage','Registrar movimentos e transferências bancárias auditáveis.','pending'),
- ('transaction.treasury.reconcile.manage','Conciliar movimentos bancários manualmente.','pending'),
- ('transaction.treasury.read','Consultar tesouraria e fluxo de caixa.','pending') on conflict(permission_key) do nothing;
+ ('transaction.treasury.account.manage','Gerenciar contas bancárias por empresa e filial.','pending_approval'),
+ ('transaction.treasury.movement.manage','Registrar movimentos e transferências bancárias auditáveis.','pending_approval'),
+ ('transaction.treasury.reconcile.manage','Conciliar movimentos bancários manualmente.','pending_approval'),
+ ('transaction.treasury.read','Consultar tesouraria e fluxo de caixa.','pending_approval') on conflict(permission_key) do nothing;
 insert into public.erp_transaction_authorization_catalog(transaction_code,module_code,permission_key,approval_state) values
- ('ZTR02','TSY','transaction.treasury.account.manage','pending'),('ZTR03','TSY','transaction.treasury.movement.manage','pending'),('ZTR04','TSY','transaction.treasury.reconcile.manage','pending'),('ZTR05','TSY','transaction.treasury.read','pending') on conflict(transaction_code) do nothing;
+ ('ZTR02','TSY','transaction.treasury.account.manage','pending_approval'),('ZTR03','TSY','transaction.treasury.movement.manage','pending_approval'),('ZTR04','TSY','transaction.treasury.reconcile.manage','pending_approval'),('ZTR05','TSY','transaction.treasury.read','pending_approval') on conflict(transaction_code) do nothing;
 
 create table public.treasury_bank_accounts(
  id uuid primary key default pg_catalog.gen_random_uuid(),tenant_id uuid not null references public.companies(id) on delete restrict,branch_id uuid not null,

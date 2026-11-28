@@ -1,9 +1,9 @@
 begin;
 
 insert into public.permission_definitions(permission_key,description,approval_state)
-values('transaction.treasury.statement.import','Importar extratos OFX validados e consultar sugestões de conciliação.','pending') on conflict do nothing;
+values('transaction.treasury.statement.import','Importar extratos OFX validados e consultar sugestões de conciliação.','pending_approval') on conflict do nothing;
 insert into public.erp_transaction_authorization_catalog(transaction_code,module_code,permission_key,approval_state)
-values('ZTR06','TSY','transaction.treasury.statement.import','pending') on conflict do nothing;
+values('ZTR06','TSY','transaction.treasury.statement.import','pending_approval') on conflict do nothing;
 
 create table public.treasury_ofx_account_bindings (
  tenant_id uuid not null,branch_id uuid not null,bank_account_id uuid not null,

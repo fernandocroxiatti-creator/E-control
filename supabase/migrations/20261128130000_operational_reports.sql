@@ -1,15 +1,15 @@
 begin;
 insert into public.permission_definitions(permission_key,description,approval_state) values
- ('transaction.reports.purchases','Relatórios de compras por filial.','pending'),
- ('transaction.reports.sales','Relatórios de vendas por filial.','pending'),
- ('transaction.reports.inventory','Relatórios de movimentações de estoque por filial.','pending'),
- ('transaction.reports.finance','Relatórios financeiros por filial.','pending'),
- ('transaction.reports.banks','Relatórios bancários por filial.','pending'),
- ('transaction.reports.work_orders','Relatórios de ordens de serviço por filial.','pending') on conflict do nothing;
+ ('transaction.reports.purchases','Relatórios de compras por filial.','pending_approval'),
+ ('transaction.reports.sales','Relatórios de vendas por filial.','pending_approval'),
+ ('transaction.reports.inventory','Relatórios de movimentações de estoque por filial.','pending_approval'),
+ ('transaction.reports.finance','Relatórios financeiros por filial.','pending_approval'),
+ ('transaction.reports.banks','Relatórios bancários por filial.','pending_approval'),
+ ('transaction.reports.work_orders','Relatórios de ordens de serviço por filial.','pending_approval') on conflict do nothing;
 insert into public.erp_transaction_authorization_catalog(transaction_code,module_code,permission_key,approval_state) values
- ('ZRP01','MGT','transaction.reports.purchases','pending'),('ZRP02','MGT','transaction.reports.sales','pending'),
- ('ZRP03','MGT','transaction.reports.inventory','pending'),('ZRP04','MGT','transaction.reports.finance','pending'),
- ('ZRP05','MGT','transaction.reports.banks','pending'),('ZRP06','MGT','transaction.reports.work_orders','pending') on conflict do nothing;
+ ('ZRP01','MGT','transaction.reports.purchases','pending_approval'),('ZRP02','MGT','transaction.reports.sales','pending_approval'),
+ ('ZRP03','MGT','transaction.reports.inventory','pending_approval'),('ZRP04','MGT','transaction.reports.finance','pending_approval'),
+ ('ZRP05','MGT','transaction.reports.banks','pending_approval'),('ZRP06','MGT','transaction.reports.work_orders','pending_approval') on conflict do nothing;
 
 create function public.operational_get_report(p_tenant_id uuid,p_branch_id uuid,p_kind text,p_from date,p_to date,p_status text default null,p_search text default null,p_limit integer default 100,p_offset integer default 0,p_export boolean default false)
 returns jsonb language plpgsql stable security definer set search_path='' set row_security=off as $f$

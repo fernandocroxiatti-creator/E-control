@@ -5,7 +5,7 @@ select set_config('request.jwt.claim.sub','e1300000-0000-4000-8000-000000000001'
 do $setup$
 declare t uuid:='e1100000-0000-4000-8000-000000000001'; b uuid:='e1200000-0000-4000-8000-000000000001'; u uuid:='e1300000-0000-4000-8000-000000000001';
 begin
- if exists(select 1 from public.erp_transaction_authorization_catalog where transaction_code in ('ZFB04','ZTR06','ZRP01','ZRP02','ZRP03','ZRP04','ZRP05','ZRP06') and approval_state<>'pending') then raise exception 'new capabilities were auto-approved'; end if;
+ if exists(select 1 from public.erp_transaction_authorization_catalog where transaction_code in ('ZFB04','ZTR06','ZRP01','ZRP02','ZRP03','ZRP04','ZRP05','ZRP06') and approval_state<>'pending_approval') then raise exception 'new capabilities were auto-approved'; end if;
  update public.permission_definitions set approval_state='approved' where permission_key like 'transaction.reports.%' or permission_key like 'transaction.billing.%' or permission_key='transaction.treasury.statement.import' or permission_key in ('transaction.purchasing.purchase_order.read','transaction.sales.order.read','transaction.inventory.history.read','transaction.service_order.read');
  update public.erp_transaction_authorization_catalog set approval_state='approved' where transaction_code in ('ZFB01','ZFB02','ZFB03','ZFB04','ZTR06','ZRP01','ZRP02','ZRP03','ZRP04','ZRP05','ZRP06','ME23N','ZVE03','MB51','ZOS03');
  insert into public.company_module_availability(tenant_id,module_code,enabled,changed_by_user_id) select t,x,true,u from unnest(array['PUR','SAL','INV','SVC']) x on conflict do nothing;

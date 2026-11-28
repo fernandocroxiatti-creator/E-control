@@ -1,5 +1,7 @@
 # Pacote comercial local — 28/11/2026
 
+**Atualização de publicação:** consulte o [preflight Production e a correção de compatibilidade](2026-11-28-production-preflight.md). A branch de preparação foi publicada; migrations e promoção de main aguardam autorização dos hashes corrigidos.
+
 Branch de integração: `codex/local-erp-completion`. Base local: `ab32549`. Produção de referência: `6718657967afa5e6a614c396a4e7df42170ec894`.
 
 Commit de implementação validada: `76ad8d90fb9a5979388759c4ecc7bb93c5d85efb`.

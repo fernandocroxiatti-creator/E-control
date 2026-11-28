@@ -2,9 +2,9 @@ begin;
 
 -- Explicit linkage only. No historical billing or obligation is backfilled.
 insert into public.permission_definitions(permission_key,description,approval_state)
-values('transaction.billing.finance.link','ZFB04: integrar faturamento e recebível por empresa e filial.','pending') on conflict do nothing;
+values('transaction.billing.finance.link','ZFB04: integrar faturamento e recebível por empresa e filial.','pending_approval') on conflict do nothing;
 insert into public.erp_transaction_authorization_catalog(transaction_code,module_code,permission_key,approval_state)
-values('ZFB04','FIN','transaction.billing.finance.link','pending') on conflict do nothing;
+values('ZFB04','FIN','transaction.billing.finance.link','pending_approval') on conflict do nothing;
 
 create table public.billing_financial_links(
  tenant_id uuid not null, branch_id uuid not null, billing_document_id uuid not null, obligation_id uuid not null,
